@@ -1,0 +1,52 @@
+<bc-page-header
+  title="Dashboard"
+  subtitle="Resumen operativo de Go Medical"
+  [breadcrumbs]="[{ label: 'Inicio' }, { label: 'Dashboard' }]">
+</bc-page-header>
+
+<!-- Métricas -->
+<section class="metrics-grid" aria-label="Métricas principales">
+  <div *ngFor="let m of metrics" class="metric-card" [id]="m.id">
+    <div class="metric-card__header">
+      <span class="metric-card__label">{{ m.label }}</span>
+      <div class="metric-card__icon" [style.color]="m.accentColor" [innerHTML]="m.icon"></div>
+    </div>
+    <div class="metric-card__value">{{ m.value }}</div>
+    <div *ngIf="m.delta" class="metric-card__delta"
+         [class.metric-card__delta--pos]="m.deltaPositive"
+         [class.metric-card__delta--neg]="!m.deltaPositive">
+      <span class="metric-card__delta-arrow">{{ m.deltaPositive ? '↑' : '↓' }}</span>
+      {{ m.delta }}
+    </div>
+  </div>
+</section>
+
+<!-- Actividad reciente -->
+<section class="dashboard-section">
+  <div class="dashboard-section__header">
+    <h2 class="dashboard-section__title">Actividad reciente</h2>
+    <span class="dashboard-section__subtitle">Últimos movimientos en el sistema</span>
+  </div>
+
+  <div class="activity-list">
+    <div *ngFor="let item of recentActivity" class="activity-item">
+      <div class="activity-item__meta">
+        <span class="activity-item__type">{{ item.type }}</span>
+        <span class="activity-item__time">{{ item.time }}</span>
+      </div>
+      <p class="activity-item__description">{{ item.description }}</p>
+      <bc-status-badge [label]="item.badge" [variant]="item.badgeVariant" size="sm"></bc-status-badge>
+    </div>
+  </div>
+</section>
+
+<!-- Aviso fase -->
+<div class="dashboard-notice" role="note">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+    <line x1="12" y1="8" x2="12.01" y2="8"/>
+  </svg>
+  Los datos mostrados son simulados. El dashboard se conectará a datos reales en la Fase 2 de integración con Supabase.
+</div>
+

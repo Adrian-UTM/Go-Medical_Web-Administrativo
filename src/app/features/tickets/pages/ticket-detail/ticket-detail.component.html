@@ -1,0 +1,145 @@
+<bc-loader *ngIf="isLoading()" message="Cargando expediente tecnico..."></bc-loader>
+
+<ng-container *ngIf="!isLoading() && ticket()">
+  <bc-page-header
+    [title]="ticket()!.ticketNumber"
+    [breadcrumbs]="breadcrumbs">
+    <a [routerLink]="['/tickets', ticket()!.id, 'editar']" class="btn-secondary">Editar</a>
+    <a routerLink="/tickets" class="btn-ghost">← Volver</a>
+  </bc-page-header>
+
+  <div *ngIf="actionMessage()" class="info-banner">
+    {{ actionMessage() }}
+  </div>
+
+  <div class="document-hero">
+    <div class="document-hero__main">
+      <div class="document-hero__meta">
+        <span class="document-hero__file">{{ ticket()!.ticketNumber }}</span>
+        <bc-status-badge
+          [label]="getStatusBadge(ticket()!.status).label"
+          [variant]="getStatusBadge(ticket()!.status).variant"
+          [showDot]="true">
+        </bc-status-badge>
+        <bc-status-badge
+          [label]="getPriorityBadge(ticket()!.priority).label"
+          [variant]="getPriorityBadge(ticket()!.priority).variant"
+          [showDot]="true">
+        </bc-status-badge>
+      </div>
+
+      <p class="document-hero__description">{{ ticket()!.description }}</p>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-item__label">Tipo</span>
+          <span class="info-item__value">{{ getTypeLabel(ticket()!.type) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Cliente</span>
+          <span class="info-item__value">{{ ticket()!.clientNameSnapshot }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Contacto</span>
+          <span class="info-item__value">{{ getClientContact() }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Producto / equipo</span>
+          <span class="info-item__value">{{ getRelatedAsset() }}</span>
+        </div>
+        <div class="info-item" *ngIf="productCategoryLabel()">
+          <span class="info-item__label">Categoria</span>
+          <span class="info-item__value">{{ productCategoryLabel() }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Tecnico asignado</span>
+          <span class="info-item__value">{{ ticket()!.assignedTechnicianName || 'Sin asignar' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Fecha de solicitud</span>
+          <span class="info-item__value">{{ ticket()!.requestedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Atencion tentativa</span>
+          <span class="info-item__value">{{ ticket()!.scheduledAt ? (ticket()!.scheduledAt | date:'dd/MM/yyyy HH:mm') : 'Sin programar' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <aside class="action-card">
+      <span class="action-card__label">Acciones mock</span>
+      <bc-custom-select
+        [options]="technicianOptions"
+        [ngModel]="selectedTechnician()"
+        (ngModelChange)="selectedTechnician.set($event)"
+        placeholder="Seleccionar tecnico">
+      </bc-custom-select>
+      <button type="button" class="btn-primary" (click)="assignTechnician()" [disabled]="isProcessing()">Asignar tecnico</button>
+      <button type="button" class="btn-secondary" (click)="markInProgress()" [disabled]="isProcessing() || ticket()!.status === 'in_progress'">Marcar en proceso</button>
+      <button type="button" class="btn-secondary" (click)="markWaitingParts()" [disabled]="isProcessing() || ticket()!.status === 'waiting_parts'">Esperando refaccion</button>
+      <button type="button" class="btn-secondary" (click)="markResolved()" [disabled]="isProcessing() || ticket()!.status === 'resolved'">Marcar resuelto</button>
+      <button type="button" class="btn-secondary" (click)="closeTicket()" [disabled]="isProcessing() || ticket()!.status === 'closed'">Cerrar ticket</button>
+      <button type="button" class="btn-ghost" (click)="cancelTicket()" [disabled]="isProcessing() || ticket()!.status === 'canceled'">Cancelar ticket</button>
+    </aside>
+  </div>
+
+  <div class="detail-layout">
+    <section class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Expediente tecnico</h2>
+        <span class="detail-card__subtitle">Resumen del ticket, notas internas y archivos de referencia mock</span>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-row">
+          <span class="detail-row__label">Titulo</span>
+          <span class="detail-row__value">{{ ticket()!.title }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Numero de serie</span>
+          <span class="detail-row__value detail-row__value--mono">{{ ticket()!.equipmentSerialNumber || 'No registrado' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Ultima actualizacion</span>
+          <span class="detail-row__value">{{ ticket()!.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Adjuntos mock</span>
+          <span class="detail-row__value">{{ ticket()!.attachments?.length ? ticket()!.attachments!.join(', ') : 'Sin adjuntos' }}</span>
+        </div>
+      </div>
+
+      <div class="notes-box" *ngIf="ticket()!.notes">
+        <span class="notes-box__label">Notas internas</span>
+        <p>{{ ticket()!.notes }}</p>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Historial de seguimiento</h2>
+        <span class="detail-card__subtitle">Eventos registrados automaticamente en el flujo mock del ticket</span>
+      </div>
+
+      <div class="history-list">
+        <article class="history-item" *ngFor="let item of sortedHistory()">
+          <div class="history-item__head">
+            <span class="history-item__date">{{ item.date | date:'dd/MM/yyyy HH:mm' }}</span>
+            <bc-status-badge
+              [label]="getStatusBadge(item.status).label"
+              [variant]="getStatusBadge(item.status).variant"
+              [showDot]="true">
+            </bc-status-badge>
+          </div>
+          <p class="history-item__comment">{{ item.comment }}</p>
+          <span class="history-item__author">{{ item.authorName }}</span>
+        </article>
+      </div>
+    </section>
+  </div>
+</ng-container>
+
+<div *ngIf="!isLoading() && !ticket()" class="not-found">
+  <p>El ticket solicitado no fue encontrado.</p>
+  <a routerLink="/tickets" class="btn-ghost">← Volver a tickets</a>
+</div>

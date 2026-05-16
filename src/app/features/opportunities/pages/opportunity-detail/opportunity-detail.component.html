@@ -1,0 +1,153 @@
+<bc-loader *ngIf="isLoading()" message="Cargando oportunidad..."></bc-loader>
+
+<ng-container *ngIf="!isLoading() && opportunity()">
+  <bc-page-header
+    [title]="opportunity()!.folio"
+    [breadcrumbs]="breadcrumbs">
+    <a routerLink="/oportunidades" class="btn-ghost">← Volver</a>
+  </bc-page-header>
+
+  <div *ngIf="actionMessage()" class="info-banner">
+    {{ actionMessage() }}
+  </div>
+
+  <div class="opportunity-hero">
+    <div class="opportunity-hero__main">
+      <div class="opportunity-hero__meta">
+        <span class="opportunity-hero__folio">{{ opportunity()!.folio }}</span>
+        <bc-status-badge
+          [label]="getCartStatusBadge(opportunity()!.cartStatus).label"
+          [variant]="getCartStatusBadge(opportunity()!.cartStatus).variant"
+          [showDot]="true">
+        </bc-status-badge>
+        <bc-status-badge
+          [label]="getOpportunityStatusBadge(opportunity()!.opportunityStatus).label"
+          [variant]="getOpportunityStatusBadge(opportunity()!.opportunityStatus).variant"
+          size="sm">
+        </bc-status-badge>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="summary-item__label">Cliente / Prospecto</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.companyName }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Contacto</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.displayName }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Correo</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.email }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Telefono</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.phone }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Responsable</span>
+          <span class="summary-item__value">{{ opportunity()!.assignedTo }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Ultima actividad</span>
+          <span class="summary-item__value">{{ opportunity()!.lastActivityAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="opportunity-hero__side">
+      <div class="action-card">
+        <span class="action-card__label">Acciones mock</span>
+        <button type="button" class="btn-primary" (click)="markAsContacted()">Marcar como contactado</button>
+        <button type="button" class="btn-secondary" (click)="markAsInterested()">Marcar como interesado</button>
+        <button type="button" class="btn-secondary" (click)="markAsNoResponse()">Marcar como no respondio</button>
+        <button type="button" class="btn-secondary" (click)="convertToOrder()">Convertir a pedido</button>
+        <button type="button" class="btn-secondary" (click)="convertToQuote()">Convertir a cotizacion</button>
+        <button type="button" class="btn-ghost" (click)="closeOpportunity()">Cerrar oportunidad</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-layout">
+    <div class="detail-main">
+      <section class="detail-card">
+        <div class="detail-card__header">
+          <h2 class="detail-card__title">Productos del carrito</h2>
+          <span class="detail-card__subtitle">Resumen del carrito abandonado o recuperado</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table" aria-label="Productos del carrito">
+            <thead>
+              <tr>
+                <th scope="col">SKU</th>
+                <th scope="col">Producto</th>
+                <th scope="col">Categoria</th>
+                <th scope="col" class="text-center">Cantidad</th>
+                <th scope="col" class="text-right">Precio</th>
+                <th scope="col" class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of opportunity()!.items" class="data-table__row">
+                <td class="data-table__mono">{{ item.sku }}</td>
+                <td><span class="item-name">{{ item.productName }}</span></td>
+                <td class="data-table__secondary">{{ getCategoryLabel(item.productCategory) }}</td>
+                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.unitPrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+                <td class="text-right item-total">{{ item.estimatedLineTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="detail-card">
+        <div class="detail-card__header">
+          <h2 class="detail-card__title">Historial de seguimiento</h2>
+          <span class="detail-card__subtitle">Registro comercial mock de interacciones</span>
+        </div>
+
+        <div class="timeline">
+          <div *ngFor="let followUp of opportunity()!.followUps" class="timeline-item">
+            <div class="timeline-item__content">
+              <div class="timeline-item__top">
+                <span class="timeline-item__title">{{ followUp.title }}</span>
+                <span class="timeline-item__date">{{ followUp.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <p class="timeline-item__note">{{ followUp.note }}</p>
+              <span class="timeline-item__author">{{ followUp.createdBy }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="detail-side">
+      <section class="detail-card detail-card--side">
+        <div class="totals-card">
+          <div class="totals-row">
+            <span>Subtotal estimado</span>
+            <strong>{{ opportunity()!.estimatedSubtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+          </div>
+          <div class="totals-row totals-row--grand">
+            <span>Total estimado</span>
+            <strong>{{ opportunity()!.estimatedTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="detail-card detail-card--side">
+        <div class="detail-card__header detail-card__header--compact">
+          <h2 class="detail-card__title">Notas comerciales</h2>
+        </div>
+        <p class="commercial-notes">{{ opportunity()!.commercialNotes }}</p>
+      </section>
+    </aside>
+  </div>
+</ng-container>
+
+<div *ngIf="!isLoading() && !opportunity()" class="not-found">
+  <p>La oportunidad no fue encontrada.</p>
+  <a routerLink="/oportunidades" class="btn-ghost">← Volver a oportunidades</a>
+</div>

@@ -1,0 +1,116 @@
+/* top-products-table.component.css */
+
+.report-table-wrap {
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--font-size-sm);
+}
+
+.report-table th,
+.report-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.report-table th {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background-color: var(--color-gray-50);
+}
+
+.report-table tbody tr:last-child td { border-bottom: none; }
+
+.report-table tbody tr:hover td {
+  background-color: var(--color-bg-hover);
+}
+
+.text-right { text-align: right; }
+
+/* ---- Rank badge ---- */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  background-color: var(--color-gray-100);
+  color: var(--color-text-secondary);
+}
+
+.rank-badge--gold   { background: #fef3c7; color: #b45309; }
+.rank-badge--silver { background: #f1f5f9; color: #64748b; }
+.rank-badge--bronze { background: #fef0e8; color: #c2410c; }
+
+/* ---- Product cell ---- */
+.product-cell { display: flex; flex-direction: column; gap: 2px; }
+.product-name { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); white-space: normal; }
+.product-sku  { font-size: var(--font-size-xs); color: var(--color-text-muted); font-family: monospace; }
+
+/* ---- Category badge ---- */
+.category-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: var(--color-gray-100);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+/* ---- Num cells ---- */
+.num-cell   { font-variant-numeric: tabular-nums; color: var(--color-text-primary); }
+.profit-cell { color: #16a34a; font-weight: var(--font-weight-semibold); }
+
+/* ---- Margin bar ---- */
+.margin-bar-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 100px;
+  justify-content: flex-end;
+}
+
+.margin-bar {
+  display: inline-block;
+  height: 6px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: var(--radius-full);
+  min-width: 4px;
+}
+
+.margin-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ---- Empty ---- */
+.report-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-12);
+  color: var(--color-text-muted);
+}
+
+.report-empty p {
+  font-size: var(--font-size-sm);
+  margin: 0;
+}

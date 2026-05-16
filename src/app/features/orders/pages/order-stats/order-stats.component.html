@@ -1,0 +1,97 @@
+<bc-page-header
+  title="Estadisticas de pedidos"
+  subtitle="Vista ejecutiva de comportamiento comercial, ingresos y avance operativo"
+  [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Pedidos', routerLink: '/pedidos' }, { label: 'Estadisticas' }]">
+  <a routerLink="/pedidos" class="btn-ghost">Volver a pedidos</a>
+  <a routerLink="/pedidos/nuevo" class="btn-primary">Nuevo pedido</a>
+</bc-page-header>
+
+<div class="filters-panel">
+  <div class="filters-panel__row">
+    <div class="filter-group filter-group--grow">
+      <label class="filter-label">Periodo</label>
+      <bc-custom-select
+        [options]="presetOptions"
+        [ngModel]="selectedPreset()"
+        (ngModelChange)="onPresetChange($event)">
+      </bc-custom-select>
+    </div>
+
+    <div class="filter-group filter-group--grow">
+      <label class="filter-label">Agrupar por</label>
+      <bc-custom-select
+        [options]="groupingOptions"
+        [ngModel]="selectedGrouping()"
+        (ngModelChange)="onGroupingChange($event)">
+      </bc-custom-select>
+    </div>
+
+    <div class="filter-group" *ngIf="isCustomRange()">
+      <label class="filter-label" for="dateFrom">Desde</label>
+      <input id="dateFrom" type="date" class="filter-date" [ngModel]="customDateFrom()" (ngModelChange)="customDateFrom.set($event)">
+    </div>
+
+    <div class="filter-group" *ngIf="isCustomRange()">
+      <label class="filter-label" for="dateTo">Hasta</label>
+      <input id="dateTo" type="date" class="filter-date" [ngModel]="customDateTo()" (ngModelChange)="customDateTo.set($event)">
+    </div>
+
+    <div class="filter-actions">
+      <button type="button" class="btn-ghost" (click)="resetFilters()">Restablecer</button>
+    </div>
+  </div>
+</div>
+
+<bc-loader *ngIf="isLoading()" message="Cargando estadisticas de pedidos..."></bc-loader>
+
+<bc-empty-state
+  *ngIf="!isLoading() && orders().length === 0"
+  title="Sin pedidos para analizar"
+  description="Aun no hay pedidos mock suficientes para construir estadisticas de este modulo."
+  [hasAction]="false">
+</bc-empty-state>
+
+<ng-container *ngIf="!isLoading() && orders().length > 0">
+  <div class="stats-note">
+    <div>
+      <span class="stats-note__label">Periodo analizado</span>
+      <strong>{{ snapshot().periodLabel }}</strong>
+    </div>
+    <div>
+      <span class="stats-note__label">Actualizado</span>
+      <strong>{{ snapshot().generatedAt | date:'dd/MM/yyyy HH:mm' }}</strong>
+    </div>
+  </div>
+
+  <section class="section-block">
+    <bc-order-kpi-cards [kpis]="snapshot().kpis"></bc-order-kpi-cards>
+  </section>
+
+  <section class="charts-grid">
+    <bc-order-period-chart
+      title="Pedidos por periodo"
+      subtitle="Conteo de pedidos segun el agrupador seleccionado"
+      [series]="ordersChartSeries()"
+      valueType="count">
+    </bc-order-period-chart>
+
+    <bc-order-period-chart
+      title="Ingresos por periodo"
+      subtitle="Suma de totales vigentes por periodo"
+      [series]="revenueChartSeries()"
+      valueType="currency">
+    </bc-order-period-chart>
+  </section>
+
+  <section class="data-grid">
+    <bc-order-status-summary [rows]="snapshot().statusSummary"></bc-order-status-summary>
+    <bc-top-ordered-products [rows]="snapshot().topOrderedProducts"></bc-top-ordered-products>
+  </section>
+
+  <div class="dev-note">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span><strong>Datos mock.</strong> Al conectar Supabase, esta vista puede consultar agregados reales desde <code>orders</code> y <code>order_items</code>, ya sea con SQL agrupado, vistas materializadas o RPCs para KPIs y series temporales.</span>
+  </div>
+</ng-container>

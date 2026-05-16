@@ -1,0 +1,110 @@
+<bc-loader *ngIf="isLoading()" message="Cargando detalle del documento..."></bc-loader>
+
+<ng-container *ngIf="!isLoading() && documentRecord()">
+  <bc-page-header
+    [title]="documentRecord()!.title"
+    [breadcrumbs]="breadcrumbs">
+    <a routerLink="/documentos" class="btn-ghost">← Volver</a>
+  </bc-page-header>
+
+  <div *ngIf="actionMessage()" class="info-banner">
+    {{ actionMessage() }}
+  </div>
+
+  <div class="document-hero">
+    <div class="document-hero__main">
+      <div class="document-hero__meta">
+        <span class="document-hero__file">{{ documentRecord()!.fileName }}</span>
+        <bc-status-badge
+          [label]="getStatusBadge(documentRecord()!.status).label"
+          [variant]="getStatusBadge(documentRecord()!.status).variant"
+          [showDot]="true">
+        </bc-status-badge>
+      </div>
+
+      <p class="document-hero__description">
+        Documento tecnico preparado para consulta administrativa y futura sincronizacion con Supabase Storage.
+      </p>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-item__label">Tipo</span>
+          <span class="info-item__value">{{ getDocumentTypeLabel(documentRecord()!.documentType) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Relacionado con</span>
+          <span class="info-item__value">{{ getRelatedEntityLabel(documentRecord()!.relatedEntityType) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Producto asociado</span>
+          <span class="info-item__value">{{ documentRecord()!.productNameSnapshot || 'No aplica' }}</span>
+        </div>
+        <div class="info-item" *ngIf="productCategoryLabel()">
+          <span class="info-item__label">Categoria del producto</span>
+          <span class="info-item__value">{{ productCategoryLabel() }}</span>
+        </div>
+        <div class="info-item" *ngIf="documentRecord()!.equipmentSerialNumber">
+          <span class="info-item__label">Serie de equipo</span>
+          <span class="info-item__value info-item__value--mono">{{ documentRecord()!.equipmentSerialNumber }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Archivo</span>
+          <span class="info-item__value info-item__value--mono">{{ documentRecord()!.fileExtension.toUpperCase() }} · {{ documentRecord()!.fileSizeLabel }}</span>
+        </div>
+      </div>
+    </div>
+
+    <aside class="action-card">
+      <span class="action-card__label">Acciones mock</span>
+      <button type="button" class="btn-primary" (click)="downloadDocument()" [disabled]="isProcessing()">Descargar</button>
+      <button type="button" class="btn-secondary" (click)="archiveDocument()" [disabled]="documentRecord()!.status === 'archived' || isProcessing()">Archivar</button>
+      <a routerLink="/documentos" class="btn-ghost">Volver al listado</a>
+    </aside>
+  </div>
+
+  <div class="detail-layout">
+    <section class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Ficha documental</h2>
+        <span class="detail-card__subtitle">Metadatos administrativos y relacion con producto o equipo</span>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-row">
+          <span class="detail-row__label">Titulo del documento</span>
+          <span class="detail-row__value">{{ documentRecord()!.title }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Nombre del archivo</span>
+          <span class="detail-row__value detail-row__value--mono">{{ documentRecord()!.fileName }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Usuario que lo cargo</span>
+          <span class="detail-row__value">{{ documentRecord()!.uploadedBy }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Fecha de carga</span>
+          <span class="detail-row__value">{{ documentRecord()!.uploadedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Ultima actualizacion</span>
+          <span class="detail-row__value">{{ documentRecord()!.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-row__label">Entidad relacionada</span>
+          <span class="detail-row__value">{{ documentRecord()!.relatedEntityName || 'Documento general' }}</span>
+        </div>
+      </div>
+
+      <div class="notes-box" *ngIf="documentRecord()!.notes">
+        <span class="notes-box__label">Notas</span>
+        <p>{{ documentRecord()!.notes }}</p>
+      </div>
+    </section>
+  </div>
+</ng-container>
+
+<div *ngIf="!isLoading() && !documentRecord()" class="not-found">
+  <p>El documento solicitado no fue encontrado.</p>
+  <a routerLink="/documentos" class="btn-ghost">← Volver a documentos</a>
+</div>

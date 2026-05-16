@@ -1,0 +1,113 @@
+import { Component, computed, inject, signal } from '@angular/core';
+import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
+import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
+import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
+import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
+import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
+import { OrderMockService } from '../../services/order.mock.service';
+import { Order, OrderStatsPeriodPreset, OrderStatus } from '../../../../models/order.model';
+import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
+
+@Component({
+  selector: 'bc-order-list',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    CurrencyPipe,
+    DatePipe,
+    PageHeaderComponent,
+    StatusBadgeComponent,
+    LoaderComponent,
+    EmptyStateComponent,
+    CustomSelectComponent,
+  ],
+  templateUrl: './order-list.component.html',
+  styleUrl: './order-list.component.css',
+})
+export class OrderListComponent {
+  private readonly orderService = inject(OrderMockService);
+
+  readonly isLoading = signal(true);
+  readonly orders = signal<Order[]>([]);
+  readonly searchQuery = signal('');
+  readonly selectedStatus = signal<OrderStatus | ''>('');
+  readonly quickPreset = signal<OrderStatsPeriodPreset>('today');
+
+  readonly statusOptions: { value: OrderStatus | ''; label: string }[] = [
+    { value: '', label: 'Todos los estados' },
+    { value: OrderStatus.Draft, label: 'Borrador' },
+    { value: OrderStatus.PendingReview, label: 'Pendiente de revision' },
+    { value: OrderStatus.PendingPayment, label: 'Pendiente de pago' },
+    { value: OrderStatus.Paid, label: 'Pagado' },
+    { value: OrderStatus.Processing, label: 'En proceso' },
+    { value: OrderStatus.Shipped, label: 'Enviado' },
+    { value: OrderStatus.Delivered, label: 'Entregado' },
+    { value: OrderStatus.Canceled, label: 'Cancelado' },
+  ];
+
+  readonly filteredOrders = computed(() => {
+    const query = this.searchQuery().trim().toLowerCase();
+    const status = this.selectedStatus();
+
+    return this.orders().filter(order => {
+      const matchesQuery = !query || [
+        order.folio,
+        order.clientNameSnapshot,
+        ...order.items.map(item => item.productName),
+      ].some(value => value.toLowerCase().includes(query));
+
+      const matchesStatus = !status || order.status === status;
+      return matchesQuery && matchesStatus;
+    });
+  });
+
+  readonly quickSummary = computed(() => buildOrderStatsSnapshot(this.orders(), {
+    periodPreset: this.quickPreset(),
+    grouping: 'day',
+  }));
+
+  readonly hasActiveFilters = computed(() => !!this.searchQuery().trim() || !!this.selectedStatus());
+
+  constructor() {
+    void this.loadOrders();
+  }
+
+  async loadOrders(): Promise<void> {
+    this.isLoading.set(true);
+    this.orders.set(await this.orderService.getOrders());
+    this.isLoading.set(false);
+  }
+
+  clearFilters(): void {
+    this.searchQuery.set('');
+    this.selectedStatus.set('');
+  }
+
+  setQuickPreset(preset: OrderStatsPeriodPreset): void {
+    this.quickPreset.set(preset);
+  }
+
+  getStatusBadge(status: OrderStatus): { label: string; variant: BadgeVariant } {
+    const statusMap: Record<OrderStatus, { label: string; variant: BadgeVariant }> = {
+      [OrderStatus.Draft]: { label: 'Borrador', variant: 'neutral' },
+      [OrderStatus.PendingReview]: { label: 'Pendiente de revision', variant: 'warning' },
+      [OrderStatus.PendingPayment]: { label: 'Pendiente de pago', variant: 'warning' },
+      [OrderStatus.Paid]: { label: 'Pagado', variant: 'success' },
+      [OrderStatus.Processing]: { label: 'En proceso', variant: 'info' },
+      [OrderStatus.Shipped]: { label: 'Enviado', variant: 'primary' },
+      [OrderStatus.Delivered]: { label: 'Entregado', variant: 'success' },
+      [OrderStatus.Canceled]: { label: 'Cancelado', variant: 'danger' },
+    };
+
+    return statusMap[status];
+  }
+
+  getItemsCount(order: Order): number {
+    return order.items.reduce((sum, item) => sum + item.quantity, 0);
+  }
+}

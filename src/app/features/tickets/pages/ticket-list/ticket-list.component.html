@@ -1,0 +1,141 @@
+<bc-page-header
+  title="Tickets / Soporte tecnico"
+  subtitle="Registro y seguimiento administrativo de fallas, garantias, revisiones e instalaciones"
+  [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Tickets' }]">
+  <a routerLink="/tickets/nuevo" class="btn-primary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Nuevo ticket
+  </a>
+</bc-page-header>
+
+<div class="filters-bar">
+  <div class="filters-bar__search">
+    <span class="filters-bar__search-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </span>
+    <input
+      type="search"
+      class="filters-bar__input"
+      placeholder="Buscar por ticket, cliente, titulo, producto o tecnico..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+      aria-label="Buscar tickets">
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="statusOptions"
+      [ngModel]="selectedStatus()"
+      (ngModelChange)="selectedStatus.set($event)"
+      placeholder="Todos los estados">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="priorityOptions"
+      [ngModel]="selectedPriority()"
+      (ngModelChange)="selectedPriority.set($event)"
+      placeholder="Todas las prioridades">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="typeOptions"
+      [ngModel]="selectedType()"
+      (ngModelChange)="selectedType.set($event)"
+      placeholder="Todos los tipos">
+    </bc-custom-select>
+  </div>
+
+  <button *ngIf="hasActiveFilters()" class="btn-ghost btn-sm" (click)="clearFilters()">
+    Limpiar filtros
+  </button>
+</div>
+
+<bc-loader *ngIf="isLoading()" message="Cargando tickets de soporte..."></bc-loader>
+
+<bc-empty-state
+  *ngIf="!isLoading() && filteredTickets().length === 0"
+  title="Sin tickets"
+  description="No se encontraron tickets con los filtros aplicados."
+  [hasAction]="hasActiveFilters()">
+  <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
+</bc-empty-state>
+
+<div class="table-wrapper" *ngIf="!isLoading() && filteredTickets().length > 0">
+  <table class="data-table" aria-label="Listado de tickets de soporte">
+    <thead>
+      <tr>
+        <th scope="col">Ticket</th>
+        <th scope="col">Cliente</th>
+        <th scope="col">Tipo</th>
+        <th scope="col">Prioridad</th>
+        <th scope="col">Estado</th>
+        <th scope="col">Producto / equipo</th>
+        <th scope="col">Fecha solicitud</th>
+        <th scope="col">Tecnico</th>
+        <th scope="col" class="text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let ticket of filteredTickets()" class="data-table__row">
+        <td class="data-table__name">
+          <span class="ticket-number">{{ ticket.ticketNumber }}</span>
+          <span class="ticket-meta">{{ ticket.title }}</span>
+        </td>
+        <td class="data-table__name">
+          <span class="ticket-client">{{ ticket.clientNameSnapshot }}</span>
+        </td>
+        <td class="data-table__secondary">{{ getTypeLabel(ticket.type) }}</td>
+        <td>
+          <bc-status-badge
+            [label]="getPriorityBadge(ticket.priority).label"
+            [variant]="getPriorityBadge(ticket.priority).variant"
+            [showDot]="true">
+          </bc-status-badge>
+        </td>
+        <td>
+          <bc-status-badge
+            [label]="getStatusBadge(ticket.status).label"
+            [variant]="getStatusBadge(ticket.status).variant"
+            [showDot]="true">
+          </bc-status-badge>
+        </td>
+        <td>
+          <span class="ticket-related">{{ getRelatedAsset(ticket) }}</span>
+        </td>
+        <td class="data-table__secondary">{{ ticket.requestedAt | date:'dd/MM/yyyy' }}</td>
+        <td class="data-table__secondary">{{ ticket.assignedTechnicianName || 'Sin asignar' }}</td>
+        <td class="text-center">
+          <div class="table-actions">
+            <a [routerLink]="['/tickets', ticket.id]" class="btn-icon" aria-label="Ver detalle" title="Ver detalle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </a>
+            <a [routerLink]="['/tickets', ticket.id, 'editar']" class="btn-icon" aria-label="Editar ticket" title="Editar ticket">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </a>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="table-footer">
+    <span class="table-count">{{ filteredTickets().length }} ticket{{ filteredTickets().length !== 1 ? 's' : '' }} registrado{{ filteredTickets().length !== 1 ? 's' : '' }}</span>
+  </div>
+</div>

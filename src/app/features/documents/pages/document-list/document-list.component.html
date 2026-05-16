@@ -1,0 +1,145 @@
+<bc-page-header
+  title="Documentos"
+  subtitle="Repositorio tecnico para manuales, fichas, certificados y garantias asociadas a productos existentes"
+  [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Documentos' }]">
+  <a routerLink="/documentos/nuevo" class="btn-primary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Subir documento
+  </a>
+</bc-page-header>
+
+<div class="info-banner">
+  Los documentos tecnicos se administran sobre productos ya creados en el catalogo y quedan listos para conectarse despues con Storage.
+</div>
+
+<div *ngIf="actionMessage()" class="info-banner info-banner--soft">
+  {{ actionMessage() }}
+</div>
+
+<div class="filters-bar">
+  <div class="filters-bar__search">
+    <span class="filters-bar__search-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </span>
+    <input
+      type="search"
+      class="filters-bar__input"
+      placeholder="Buscar por titulo, archivo o producto..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+      aria-label="Buscar documentos">
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="typeOptions"
+      [ngModel]="selectedType()"
+      (ngModelChange)="selectedType.set($event)"
+      placeholder="Todos los tipos">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="statusOptions"
+      [ngModel]="selectedStatus()"
+      (ngModelChange)="selectedStatus.set($event)"
+      placeholder="Todos los estados">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="productOptions()"
+      [ngModel]="selectedProductId()"
+      (ngModelChange)="selectedProductId.set($event)"
+      placeholder="Todos los productos">
+    </bc-custom-select>
+  </div>
+
+  <button *ngIf="hasActiveFilters()" class="btn-ghost btn-sm" (click)="clearFilters()">
+    Limpiar filtros
+  </button>
+</div>
+
+<bc-loader *ngIf="isLoading()" message="Cargando documentos tecnicos..."></bc-loader>
+
+<bc-empty-state
+  *ngIf="!isLoading() && filteredDocuments().length === 0"
+  title="Sin documentos"
+  description="No se encontraron documentos tecnicos con los filtros aplicados."
+  [hasAction]="hasActiveFilters()">
+  <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
+</bc-empty-state>
+
+<div class="table-wrapper" *ngIf="!isLoading() && filteredDocuments().length > 0">
+  <table class="data-table" aria-label="Listado de documentos tecnicos">
+    <thead>
+      <tr>
+        <th scope="col">Documento</th>
+        <th scope="col">Tipo</th>
+        <th scope="col">Producto o equipo</th>
+        <th scope="col">Archivo</th>
+        <th scope="col">Estado</th>
+        <th scope="col">Fecha de carga</th>
+        <th scope="col" class="text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let systemDocument of filteredDocuments()" class="data-table__row">
+        <td class="data-table__name">
+          <span class="document-title">{{ systemDocument.title }}</span>
+          <span class="document-meta">{{ systemDocument.uploadedBy }}</span>
+        </td>
+        <td class="data-table__secondary">{{ getDocumentTypeLabel(systemDocument.documentType) }}</td>
+        <td>
+          <span class="document-related">{{ getRelatedLabel(systemDocument) }}</span>
+          <span class="document-meta" *ngIf="systemDocument.equipmentSerialNumber">Serie {{ systemDocument.equipmentSerialNumber }}</span>
+        </td>
+        <td>
+          <span class="data-table__mono">{{ systemDocument.fileName }}</span>
+          <span class="document-meta">{{ systemDocument.fileSizeLabel }}</span>
+        </td>
+        <td>
+          <bc-status-badge
+            [label]="getStatusBadge(systemDocument.status).label"
+            [variant]="getStatusBadge(systemDocument.status).variant"
+            [showDot]="true">
+          </bc-status-badge>
+        </td>
+        <td class="data-table__secondary">{{ systemDocument.uploadedAt | date:'dd/MM/yyyy' }}</td>
+        <td class="text-center">
+          <div class="table-actions">
+            <a [routerLink]="['/documentos', systemDocument.id]" class="btn-icon" title="Ver detalle" aria-label="Ver detalle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </a>
+            <button type="button" class="btn-icon" (click)="downloadDocument(systemDocument)" [disabled]="isProcessing() === systemDocument.id" title="Descargar mock" aria-label="Descargar mock">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button type="button" class="btn-icon" (click)="archiveDocument(systemDocument)" [disabled]="systemDocument.status === 'archived' || isProcessing() === systemDocument.id" title="Archivar mock" aria-label="Archivar mock">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="table-footer">
+    <span class="table-count">{{ filteredDocuments().length }} documento{{ filteredDocuments().length !== 1 ? 's' : '' }} tecnico{{ filteredDocuments().length !== 1 ? 's' : '' }}</span>
+  </div>
+</div>

@@ -1,0 +1,20 @@
+[33mÔØ»[39m Building...
+[32mÔ£ö[39m Building...
+Application bundle generation failed. [5.935 seconds]
+
+X [ERROR] NG8002: Can't bind to 'value' since it isn't a known property of 'bc-custom-select'.
+1. If 'bc-custom-select' is an Angular component and it has 'value' input, then verify that it is included in the '@Component.imports' of this component.
+2. If 'bc-custom-select' is a Web Component then add 'CUSTOM_ELEMENTS_SCHEMA' to the '@Component.schemas' of this component to suppress this message.
+3. To allow any property add 'NO_ERRORS_SCHEMA' to the '@Component.schemas' of this component. [plugin angular-compiler]
+
+    src/app/features/clients/pages/client-list/client-list.component.html:32:8:
+      32 Ôöé         [value]="selectedType()"
+         ÔòÁ         ~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Error occurs in the template of component ClientListComponent.
+
+    src/app/features/clients/pages/client-list/client-list.component.ts:24:15:
+      24 Ôöé   templateUrl: './client-list.component.html',
+         ÔòÁ                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+

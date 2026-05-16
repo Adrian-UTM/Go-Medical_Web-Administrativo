@@ -1,0 +1,12 @@
+src/app/features/clients/pages/client-detail/client-detail.component.ts(4,37): error TS2307: Cannot find module '../../../shared/components/page-header/page-header.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-detail/client-detail.component.ts(5,38): error TS2307: Cannot find module '../../../shared/components/status-badge/status-badge.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-detail/client-detail.component.ts(6,33): error TS2307: Cannot find module '../../../shared/components/loader/loader.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-detail/client-detail.component.ts(8,50): error TS2307: Cannot find module '../../../core/models/client.model' or its corresponding type declarations.
+src/app/features/clients/pages/client-form/client-form.component.ts(5,37): error TS2307: Cannot find module '../../../shared/components/page-header/page-header.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-form/client-form.component.ts(6,33): error TS2307: Cannot find module '../../../shared/components/loader/loader.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-form/client-form.component.ts(8,42): error TS2307: Cannot find module '../../../core/models/client.model' or its corresponding type declarations.
+src/app/features/clients/pages/client-list/client-list.component.ts(5,37): error TS2307: Cannot find module '../../../shared/components/page-header/page-header.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-list/client-list.component.ts(6,38): error TS2307: Cannot find module '../../../shared/components/search-input/search-input.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-list/client-list.component.ts(7,38): error TS2307: Cannot find module '../../../shared/components/status-badge/status-badge.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-list/client-list.component.ts(8,33): error TS2307: Cannot find module '../../../shared/components/loader/loader.component' or its corresponding type declarations.
+src/app/features/clients/pages/client-list/client-list.component.ts(10,50): error TS2307: Cannot find module '../../../core/models/client.model' or its corresponding type declarations.

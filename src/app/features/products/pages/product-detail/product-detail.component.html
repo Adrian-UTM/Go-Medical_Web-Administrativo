@@ -1,0 +1,201 @@
+<bc-loader *ngIf="isLoading()"></bc-loader>
+
+<ng-container *ngIf="!isLoading() && product()">
+  <bc-page-header
+    [title]="product()!.name"
+    [breadcrumbs]="breadcrumbs">
+    <a [routerLink]="['/productos', product()!.id, 'editar']" class="btn-secondary">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Editar
+    </a>
+    <button type="button" class="btn-secondary" (click)="addTechnicalDocument()">
+      Agregar documento tecnico
+    </button>
+    <button type="button" class="btn-secondary btn-secondary--danger" (click)="deleteProduct()" [disabled]="isDeleting()">
+      {{ isDeleting() ? 'Eliminando...' : 'Eliminar' }}
+    </button>
+    <a routerLink="/productos" class="btn-ghost">← Volver</a>
+  </bc-page-header>
+
+  <div *ngIf="actionMessage()" class="info-banner">
+    {{ actionMessage() }}
+  </div>
+
+  <div class="product-hero">
+    <div class="product-hero__main">
+      <div class="product-hero__image" *ngIf="product()!.image_url; else emptyProductImage">
+        <img [src]="product()!.image_url" [alt]="product()!.name">
+      </div>
+      <ng-template #emptyProductImage>
+        <div class="product-hero__image product-hero__image--empty">
+          <span>Sin imagen</span>
+        </div>
+      </ng-template>
+
+      <div class="product-hero__meta">
+        <span class="product-hero__sku">{{ product()!.sku }}</span>
+        <bc-status-badge
+          [label]="getStatusBadge(product()!.status).label"
+          [variant]="getStatusBadge(product()!.status).variant"
+          [showDot]="true">
+        </bc-status-badge>
+        <span class="product-hero__category">{{ getCategoryLabel(product()!.category) }}</span>
+      </div>
+
+      <p *ngIf="product()!.description" class="product-hero__description">
+        {{ product()!.description }}
+      </p>
+
+      <div class="product-hero__tags" *ngIf="product()!.tags?.length">
+        <span *ngFor="let tag of product()!.tags" class="product-tag">{{ tag }}</span>
+      </div>
+    </div>
+
+    <div class="product-hero__pricing">
+      <div class="product-price-card">
+        <span class="product-price-card__label">Precio MXN</span>
+        <span class="product-price-card__value">
+          {{ product()!.price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
+        </span>
+        <span *ngIf="product()!.price_usd" class="product-price-card__ref">
+          Ref. USD {{ product()!.price_usd | currency:'USD':'symbol':'1.0-0' }}
+        </span>
+        <div class="product-price-card__info" *ngIf="product()!.brand">
+          <span>{{ product()!.brand }}</span>
+          <span *ngIf="product()!.model"> · {{ product()!.model }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-sections">
+    <section class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Informacion general</h2>
+        <span class="detail-card__subtitle">Datos comerciales y de catalogo del producto</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-item__label">SKU</span>
+          <span class="info-item__value info-item__value--mono">{{ product()!.sku }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Categoria</span>
+          <span class="info-item__value">{{ getCategoryLabel(product()!.category) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Marca</span>
+          <span class="info-item__value">{{ product()!.brand ?? '—' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Modelo</span>
+          <span class="info-item__value">{{ product()!.model ?? '—' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Precio MXN</span>
+          <span class="info-item__value">{{ product()!.price_mxn | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+        </div>
+        <div class="info-item" *ngIf="product()!.price_usd">
+          <span class="info-item__label">Ref. USD</span>
+          <span class="info-item__value">{{ product()!.price_usd | currency:'USD':'symbol':'1.2-2' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Creado</span>
+          <span class="info-item__value">{{ product()!.created_at | date:'dd/MM/yyyy' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Ultima actualizacion</span>
+          <span class="info-item__value">{{ product()!.updated_at | date:'dd/MM/yyyy' }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="detail-card__header detail-card__header--split">
+        <div>
+          <h2 class="detail-card__title">Documentos tecnicos</h2>
+          <span class="detail-card__subtitle">Manuales, fichas tecnicas, certificados, garantias y guias de mantenimiento asociadas al producto</span>
+        </div>
+        <button type="button" class="btn-secondary" (click)="addTechnicalDocument()">
+          Agregar documento tecnico
+        </button>
+      </div>
+
+      <div *ngIf="areDocumentsLoading()" class="tab-empty">
+        Cargando documentos tecnicos del producto...
+      </div>
+
+      <div *ngIf="!areDocumentsLoading() && technicalDocuments().length === 0" class="tab-empty">
+        Sin documentos tecnicos relacionados con este producto todavia.
+      </div>
+
+      <div class="documents-grid" *ngIf="!areDocumentsLoading() && technicalDocuments().length">
+        <article *ngFor="let doc of technicalDocuments()" class="document-card">
+          <div class="document-card__content">
+            <div class="document-card__top">
+              <div class="document-card__info">
+                <span class="document-card__type">{{ getDocumentTypeLabel(doc.documentType) }}</span>
+                <span class="document-card__title">{{ doc.title }}</span>
+                <div class="document-card__meta">{{ getDocumentMeta(doc) }}</div>
+              </div>
+              <bc-status-badge
+                [label]="getDocumentStatusBadge(doc.status).label"
+                [variant]="getDocumentStatusBadge(doc.status).variant"
+                [showDot]="true">
+              </bc-status-badge>
+            </div>
+
+            <div class="document-card__details">
+              <span>Cargado: {{ doc.uploadedAt | date:'dd/MM/yyyy' }}</span>
+              <span *ngIf="doc.equipmentSerialNumber">Serie: {{ doc.equipmentSerialNumber }}</span>
+              <span>Responsable: {{ doc.uploadedBy }}</span>
+            </div>
+
+            <p *ngIf="doc.notes" class="document-card__notes">{{ doc.notes }}</p>
+          </div>
+
+          <div class="document-card__actions">
+            <a [routerLink]="['/documentos', doc.id]" class="btn-ghost-sm">Ver detalle</a>
+            <button type="button" class="btn-ghost-sm" (click)="downloadDocument(doc)" [disabled]="processingDocumentId() === doc.id">
+              Descargar mock
+            </button>
+            <button type="button" class="btn-ghost-sm" (click)="archiveDocument(doc)" [disabled]="doc.status === 'archived' || processingDocumentId() === doc.id">
+              Archivar mock
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Especificaciones tecnicas</h2>
+        <span class="detail-card__subtitle">Caracteristicas agrupadas del producto o equipo</span>
+      </div>
+
+      <div *ngIf="!product()!.specs || product()!.specs!.length === 0" class="tab-empty">
+        Sin especificaciones tecnicas registradas.
+      </div>
+      <div *ngFor="let group of getSpecGroups(product()!)" class="spec-group">
+        <h3 class="spec-group__title">{{ group }}</h3>
+        <table class="spec-table">
+          <tbody>
+            <tr *ngFor="let spec of getSpecsByGroup(product()!, group)" class="spec-table__row">
+              <td class="spec-table__name">{{ spec.spec_name }}</td>
+              <td class="spec-table__value">{{ spec.spec_value }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</ng-container>
+
+<div *ngIf="!isLoading() && !product()" class="not-found">
+  <p>El producto no fue encontrado.</p>
+  <a routerLink="/productos" class="btn-ghost">← Volver a productos</a>
+</div>

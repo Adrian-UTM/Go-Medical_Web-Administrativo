@@ -1,0 +1,127 @@
+<bc-loader *ngIf="isLoading()" message="Cargando detalle del pedido..."></bc-loader>
+
+<ng-container *ngIf="!isLoading() && order()">
+  <bc-page-header
+    [title]="order()!.folio"
+    [breadcrumbs]="breadcrumbs">
+    <a [routerLink]="['/pedidos', order()!.id, 'editar']" class="btn-secondary">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Editar
+    </a>
+    <a routerLink="/pedidos" class="btn-ghost">← Volver</a>
+  </bc-page-header>
+
+  <div *ngIf="actionMessage()" class="info-banner">
+    {{ actionMessage() }}
+  </div>
+
+  <div class="order-hero">
+    <div class="order-hero__main">
+      <div class="order-hero__meta">
+        <span class="order-hero__folio">{{ order()!.folio }}</span>
+        <bc-status-badge
+          [label]="getStatusBadge(order()!.status).label"
+          [variant]="getStatusBadge(order()!.status).variant"
+          [showDot]="true">
+        </bc-status-badge>
+        <span class="order-hero__units">{{ getUnitsCount(order()!) }} articulo{{ getUnitsCount(order()!) !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <div class="order-hero__summary-grid">
+        <div class="summary-item">
+          <span class="summary-item__label">Cliente</span>
+          <span class="summary-item__value">{{ order()!.clientNameSnapshot }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Fecha de alta</span>
+          <span class="summary-item__value">{{ order()!.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Ultima actualizacion</span>
+          <span class="summary-item__value">{{ order()!.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Entrega / direccion</span>
+          <span class="summary-item__value">{{ getShippingAddress() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="order-hero__side">
+      <div class="action-card">
+        <span class="action-card__label">Acciones mock</span>
+        <button type="button" class="btn-primary" (click)="markAsPaid()">Marcar como pagado</button>
+        <button type="button" class="btn-secondary btn-secondary--block" (click)="markAsShipped()">Marcar como enviado</button>
+        <button type="button" class="btn-ghost btn-ghost--block" (click)="printOrder()">Imprimir</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-layout">
+    <div class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Resumen administrativo</h2>
+        <span class="detail-card__subtitle">Detalle de conceptos y trazabilidad del pedido</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table" aria-label="Conceptos del pedido">
+          <thead>
+            <tr>
+              <th scope="col">SKU</th>
+              <th scope="col">Concepto</th>
+              <th scope="col">Categoria</th>
+              <th scope="col" class="text-center">Cantidad</th>
+              <th scope="col" class="text-right">Precio</th>
+              <th scope="col" class="text-right">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of order()!.items" class="data-table__row">
+              <td class="data-table__mono">{{ item.sku }}</td>
+              <td>
+                <span class="item-name">{{ item.productName }}</span>
+              </td>
+              <td class="data-table__secondary">{{ getCategoryLabel(item.productCategory) }}</td>
+              <td class="text-center">{{ item.quantity }}</td>
+              <td class="text-right">{{ item.unitPrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+              <td class="text-right item-total">{{ item.totalLinePrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="notes-box" *ngIf="order()!.notes">
+        <span class="notes-box__label">Notas</span>
+        <p>{{ order()!.notes }}</p>
+      </div>
+    </div>
+
+    <aside class="totals-card">
+      <div class="totals-card__section">
+        <span class="totals-card__label">Subtotal</span>
+        <strong>{{ order()!.subtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+      </div>
+      <div class="totals-card__section">
+        <span class="totals-card__label">
+          IVA
+          <span *ngIf="order()!.taxExempt" class="totals-card__meta">Exento</span>
+          <span *ngIf="!order()!.taxExempt" class="totals-card__meta">{{ order()!.taxPct * 100 | number:'1.0-0' }}%</span>
+        </span>
+        <strong>{{ order()!.tax | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+      </div>
+      <div class="totals-card__section totals-card__section--grand">
+        <span class="totals-card__label">Total</span>
+        <strong>{{ order()!.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+      </div>
+    </aside>
+  </div>
+</ng-container>
+
+<div *ngIf="!isLoading() && !order()" class="not-found">
+  <p>El pedido no fue encontrado.</p>
+  <a routerLink="/pedidos" class="btn-ghost">← Volver a pedidos</a>
+</div>

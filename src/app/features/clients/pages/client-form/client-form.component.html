@@ -1,0 +1,167 @@
+<bc-loader *ngIf="isLoading()"></bc-loader>
+
+<ng-container *ngIf="!isLoading()">
+  <bc-page-header
+    [title]="pageTitle"
+    [breadcrumbs]="breadcrumbs">
+    <button type="submit" form="clientForm" class="btn-primary" [disabled]="isSaving()">
+      <span *ngIf="isSaving()">Guardando...</span>
+      <span *ngIf="!isSaving()">{{ isEditMode() ? 'Guardar Cambios' : 'Crear Cliente' }}</span>
+    </button>
+    <a routerLink="/clientes" class="btn-ghost">← Volver</a>
+  </bc-page-header>
+
+  <form id="clientForm" [formGroup]="clientForm" (ngSubmit)="onSubmit()" class="form-layout">
+    
+    <!-- Lado izquierdo: Formularios -->
+    <div class="form-main">
+      
+      <!-- Panel 1: Datos Generales -->
+      <div class="form-panel">
+        <h2 class="form-panel__title">1. Datos Comerciales / Fiscales</h2>
+        
+        <div class="form-row form-row--2">
+          <div class="form-group">
+            <label for="businessName" class="form-label">Razón Social o Nombre Activo *</label>
+            <input type="text" id="businessName" class="form-control" formControlName="businessName" 
+                   [class.is-invalid]="isFieldInvalid('businessName')" placeholder="Ej. Unidad de Diagnóstico... o Dr. Juan...">
+            <div class="form-error" *ngIf="isFieldInvalid('businessName')">
+              Este campo es obligatorio
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="rfc" class="form-label">RFC *</label>
+            <input type="text" id="rfc" class="form-control" formControlName="rfc" 
+                   [class.is-invalid]="isFieldInvalid('rfc')" placeholder="Ej. XAXX010101000">
+            <div class="form-error" *ngIf="isFieldInvalid('rfc')">
+              El RFC es obligatorio (máx 13 caracteres)
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="tradeName" class="form-label">Nombre Comercial (Opcional)</label>
+          <input type="text" id="tradeName" class="form-control" formControlName="tradeName" 
+                 placeholder="Ej. Clínica San Lucas">
+        </div>
+      </div>
+
+      <!-- Panel 2: Contacto -->
+      <div class="form-panel">
+        <h2 class="form-panel__title">2. Datos de Contacto</h2>
+
+        <div class="form-row form-row--2">
+          <div class="form-group">
+            <label for="contactName" class="form-label">Nombre del Contacto *</label>
+            <input type="text" id="contactName" class="form-control" formControlName="contactName" 
+                   [class.is-invalid]="isFieldInvalid('contactName')">
+            <div class="form-error" *ngIf="isFieldInvalid('contactName')">
+              El nombre completo es obligatorio
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="contactPosition" class="form-label">Cargo / Puesto (Opcional)</label>
+            <input type="text" id="contactPosition" class="form-control" formControlName="contactPosition" 
+                   placeholder="Ej. Director, Médico Titular">
+          </div>
+        </div>
+
+        <div class="form-row form-row--2">
+          <div class="form-group">
+            <label for="email" class="form-label">Email de Contacto *</label>
+            <input type="email" id="email" class="form-control" formControlName="email" 
+                   [class.is-invalid]="isFieldInvalid('email')" placeholder="correo@ejemplo.com">
+            <div class="form-error" *ngIf="isFieldInvalid('email')">
+              Por favor ingresa un correo electrónico válido
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="phone" class="form-label">Teléfono *</label>
+            <input type="tel" id="phone" class="form-control" formControlName="phone" 
+                   [class.is-invalid]="isFieldInvalid('phone')" placeholder="10 dígitos">
+            <div class="form-error" *ngIf="isFieldInvalid('phone')">
+              El teléfono es obligatorio
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="billingEmail" class="form-label">Email para Facturación (Opcional)</label>
+          <input type="email" id="billingEmail" class="form-control" formControlName="billingEmail" 
+                 [class.is-invalid]="isFieldInvalid('billingEmail')" placeholder="Dejar vacío si es el mismo">
+          <div class="form-error" *ngIf="isFieldInvalid('billingEmail')">
+            Debe ser un correo electrónico válido
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 3: Ubicación -->
+      <div class="form-panel">
+        <h2 class="form-panel__title">3. Ubicación</h2>
+
+        <div class="form-group">
+          <label for="address" class="form-label">Dirección Fiscal / Principal *</label>
+          <input type="text" id="address" class="form-control" formControlName="address" 
+                 [class.is-invalid]="isFieldInvalid('address')" placeholder="Calle, Número, Colonia, C.P.">
+          <div class="form-error" *ngIf="isFieldInvalid('address')">
+            La dirección es obligatoria
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="shippingAddress" class="form-label">Dirección de Entrega de Equipos (Opcional)</label>
+          <input type="text" id="shippingAddress" class="form-control" formControlName="shippingAddress" 
+                 placeholder="Dejar vacío si es la misma que la fiscal">
+        </div>
+
+        <div class="form-row form-row--2">
+          <div class="form-group">
+            <label for="city" class="form-label">Ciudad *</label>
+            <input type="text" id="city" class="form-control" formControlName="city" 
+                   [class.is-invalid]="isFieldInvalid('city')" placeholder="Ej. Mérida">
+            <div class="form-error" *ngIf="isFieldInvalid('city')">Obligatorio</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="state" class="form-label">Estado *</label>
+            <input type="text" id="state" class="form-control" formControlName="state" 
+                   [class.is-invalid]="isFieldInvalid('state')" placeholder="Ej. Yucatán">
+            <div class="form-error" *ngIf="isFieldInvalid('state')">Obligatorio</div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- Lado derecho: Meta info -->
+    <div class="form-sidebar">
+      
+      <div class="form-panel">
+        <h2 class="form-panel__title">Clasificación</h2>
+        
+        <div class="form-group">
+          <label for="clientType" class="form-label">Tipo de Cliente *</label>
+          <bc-custom-select formControlName="clientType" [options]="typeOptions" placeholder="Selecciona un tipo"></bc-custom-select>
+        </div>
+        
+        <div class="form-group">
+          <label for="status" class="form-label">Estado de la cuenta *</label>
+          <bc-custom-select formControlName="status" [options]="statusOptions" placeholder="Selecciona estado"></bc-custom-select>
+        </div>
+      </div>
+
+      <div class="form-panel">
+        <h2 class="form-panel__title">Notas Internas</h2>
+        <div class="form-group">
+          <label class="form-label text-muted">¿Algún comentario administrativo?</label>
+          <textarea id="notes" class="form-control" rows="5" formControlName="notes" 
+                    placeholder="Escribe aquí... (Opcional)"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</ng-container>

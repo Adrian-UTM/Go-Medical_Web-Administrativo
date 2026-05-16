@@ -1,0 +1,217 @@
+<!-- reports-dashboard.component.html -->
+
+<div class="page-header">
+  <div class="page-header__left">
+    <nav class="breadcrumb" aria-label="Navegación">
+      <span class="breadcrumb__item">Inicio</span>
+      <span class="breadcrumb__sep">›</span>
+      <span class="breadcrumb__item breadcrumb__item--active">Reportes</span>
+    </nav>
+    <h1 class="page-title">Reportes Comerciales</h1>
+    <p class="page-subtitle">Análisis de ventas, productos y rendimiento comercial de Go Medical.</p>
+  </div>
+  <div class="page-header__actions">
+    <span class="last-updated">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      Actualizado: {{ lastUpdated | date:'dd/MM/yyyy HH:mm' }}
+    </span>
+    <button class="btn-refresh" (click)="applyFilters()" title="Actualizar datos">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      Refrescar
+    </button>
+  </div>
+</div>
+
+<div class="filters-panel">
+  <div class="filters-panel__row">
+    <div class="filter-group">
+      <label class="filter-label">Desde</label>
+      <div class="date-picker-shell" #fromPickerShell>
+        <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(fromDateInput)">
+          <span>{{ formatFilterDate(dateFrom) }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </button>
+        <input
+          #fromDateInput
+          class="date-picker-shell__native"
+          type="date"
+          [ngModel]="dateFrom"
+          (ngModelChange)="onDateInputChange('from', $event)"
+          [min]="minReportDate"
+          [max]="maxReportDate"
+          inputmode="none"
+          (keydown)="$event.preventDefault()"
+          (click)="openDatePicker(fromDateInput)">
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label class="filter-label">Hasta</label>
+      <div class="date-picker-shell">
+        <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(toDateInput)">
+          <span>{{ formatFilterDate(dateTo) }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </button>
+        <input
+          #toDateInput
+          class="date-picker-shell__native"
+          type="date"
+          [ngModel]="dateTo"
+          (ngModelChange)="onDateInputChange('to', $event)"
+          [min]="minReportDate"
+          [max]="maxReportDate"
+          inputmode="none"
+          (keydown)="$event.preventDefault()"
+          (click)="openDatePicker(toDateInput)">
+      </div>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn-primary" (click)="applyFilters()">Aplicar filtros</button>
+      <button class="btn-ghost" (click)="clearFilters()">Limpiar</button>
+    </div>
+  </div>
+</div>
+
+<div class="error-banner" *ngIf="error()">
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  {{ error() }}
+</div>
+
+<section class="section-block" *ngIf="loading()">
+  <bc-revenue-summary-cards [kpis]="null" />
+</section>
+
+<section class="section-block" *ngIf="!loading() && kpis()">
+  <bc-revenue-summary-cards [kpis]="kpis()" />
+</section>
+
+<div class="section-divider" *ngIf="!loading()">
+  <span class="section-divider__label">Análisis detallado</span>
+</div>
+
+<div class="tables-block" *ngIf="!loading()">
+  <div class="tab-nav">
+    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'top'"
+            (click)="setTab('top')" id="tab-top">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+        <polyline points="16 7 22 7 22 13"/>
+      </svg>
+      Más vendidos
+    </button>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'low'"
+            (click)="setTab('low')" id="tab-low">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>
+        <polyline points="16 17 22 17 22 11"/>
+      </svg>
+      Menos vendidos
+    </button>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'customers'"
+            (click)="setTab('customers')" id="tab-customers">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Clientes principales
+    </button>
+  </div>
+
+  <div class="table-panel">
+    <div *ngIf="activeTab === 'top'">
+      <div class="table-header">
+        <div>
+          <h2 class="table-title">Productos más vendidos</h2>
+          <p class="table-subtitle">Ordenados por unidades vendidas en pedidos completados.</p>
+        </div>
+      </div>
+      <bc-top-products-table [rows]="topProducts()" />
+    </div>
+
+    <div *ngIf="activeTab === 'low'">
+      <div class="table-header">
+        <div>
+          <h2 class="table-title">Productos de baja rotación</h2>
+          <p class="table-subtitle">Productos con menor movimiento de ventas. Candidatos a revisión de stock o estrategia.</p>
+        </div>
+      </div>
+      <bc-low-products-table [rows]="lowProducts()" />
+    </div>
+
+    <div *ngIf="activeTab === 'customers'">
+      <div class="table-header">
+        <div>
+          <h2 class="table-title">Clientes principales</h2>
+          <p class="table-subtitle">Ordenados por volumen de compra total en el período seleccionado.</p>
+        </div>
+      </div>
+      <bc-top-customers-table [rows]="topCustomers()" />
+    </div>
+  </div>
+</div>
+
+<section class="order-analytics" *ngIf="!loading() && orderAnalytics()">
+  <div class="order-analytics__header">
+    <div>
+      <h2 class="table-title">Analítica de pedidos</h2>
+      <p class="table-subtitle">Serie temporal y comportamiento operativo de pedidos dentro del módulo de Reportes.</p>
+    </div>
+    <div class="order-analytics__controls">
+      <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'day'" (click)="setOrderAnalyticsGrouping('day')">Día</button>
+      <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'week'" (click)="setOrderAnalyticsGrouping('week')">Semana</button>
+      <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'month'" (click)="setOrderAnalyticsGrouping('month')">Mes</button>
+    </div>
+  </div>
+
+  <div class="order-analytics__label">{{ orderAnalytics()!.periodLabel }}</div>
+
+  <div class="order-analytics__charts">
+    <bc-order-period-chart
+      title="Pedidos por periodo"
+      subtitle="Comportamiento de volumen segun la agrupacion seleccionada"
+      [series]="orderCountSeries()"
+      valueType="count">
+    </bc-order-period-chart>
+
+    <bc-order-period-chart
+      title="Ingresos por periodo"
+      subtitle="Suma de totales no cancelados por periodo"
+      [series]="orderRevenueSeries()"
+      valueType="currency">
+    </bc-order-period-chart>
+  </div>
+
+  <div class="order-analytics__tables">
+    <bc-order-status-summary [rows]="orderAnalytics()!.statusSummary"></bc-order-status-summary>
+    <bc-top-ordered-products [rows]="orderAnalytics()!.topOrderedProducts"></bc-top-ordered-products>
+  </div>
+</section>
+
+<div class="dev-note" *ngIf="!loading()">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  <span><strong>Datos mock.</strong> Al conectar Supabase, los KPIs se calcularán con RPCs o Edge Functions con agregaciones SQL (GROUP BY, SUM) sobre las tablas <code>orders</code>, <code>order_items</code>, <code>products</code> e <code>inventory_stocks</code>.</span>
+</div>

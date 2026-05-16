@@ -1,0 +1,24 @@
+/* Reutilizando estilos de auth-layout (card, form, input, button) que ya deberían estar definidos globalmente o en card específico. 
+   Importaremos el CSS de login original o directamente pondremos los estilos base de auth aquí por conveniencia. */
+
+@import '../login/login.component.css';
+
+/* Extra styles for auth links */
+.auth-links {
+  margin-top: var(--space-4);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.auth-links a {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.auth-links a:hover {
+  text-decoration: underline;
+  color: var(--color-accent);
+}

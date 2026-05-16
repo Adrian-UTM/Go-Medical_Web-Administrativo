@@ -1,0 +1,117 @@
+<bc-page-header
+  [title]="pageTitle"
+  [breadcrumbs]="breadcrumbs">
+  <a routerLink="/clientes/nuevo" class="btn-primary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+    Nuevo Cliente
+  </a>
+</bc-page-header>
+
+<div class="filters-bar">
+  <div class="filters-bar__search">
+    <div class="search-wrapper">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input 
+        type="text" 
+        class="form-control" 
+        placeholder="Buscar por nombre, correo o contacto..."
+        (keyup)="onSearch($any($event.target).value)">
+    </div>
+  </div>
+  
+  <div class="filters-bar__actions">
+    <div style="min-width: 200px;">
+      <bc-custom-select
+        [options]="typeOptions"
+        [ngModel]="selectedType()"
+        (ngModelChange)="onTypeChangeCustom($event)"
+        placeholder="Todos los Tipos">
+      </bc-custom-select>
+    </div>
+  </div>
+</div>
+
+<bc-loader *ngIf="isLoading()"></bc-loader>
+
+<div class="clients-grid" *ngIf="!isLoading()">
+  
+  <div *ngIf="clients().length === 0" class="empty-state">
+    <div class="empty-state__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+    </div>
+    <h3 class="empty-state__title">No se encontraron clientes</h3>
+    <p class="empty-state__text">Intenta ajustar los filtros o el término de búsqueda.</p>
+    <button *ngIf="searchQuery() || selectedType() !== 'all'" class="btn-ghost" (click)="searchQuery.set(''); selectedType.set('all')">
+      Limpiar filtros
+    </button>
+  </div>
+
+  <table class="table" *ngIf="clients().length > 0">
+    <thead>
+      <tr>
+        <th>Cliente / Contacto</th>
+        <th>Tipo</th>
+        <th>Ubicación</th>
+        <th>Teléfono</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let client of clients()">
+        <td>
+          <div class="client-cell">
+            <span class="client-cell__name">{{ client.businessName }} <span *ngIf="client.tradeName" class="client-cell__trade">({{ client.tradeName }})</span></span>
+            <span class="client-cell__contact">{{ client.contactName }} &middot; {{ client.email }}</span>
+          </div>
+        </td>
+        <td>
+          <span class="type-badge">{{ getTypeLabel(client.clientType) }}</span>
+        </td>
+        <td>
+          <div class="location-cell">
+            <span class="location-cell__city">{{ client.city }}, {{ client.state }}</span>
+          </div>
+        </td>
+        <td>
+          <span class="phone-text">{{ client.phone }}</span>
+        </td>
+        <td>
+          <bc-status-badge
+            [label]="getStatusBadge(client.status).label"
+            [variant]="getStatusBadge(client.status).variant"
+            [showDot]="true">
+          </bc-status-badge>
+        </td>
+        <td class="text-right">
+          <div class="row-actions">
+            <a [routerLink]="['/clientes', client.id]" class="btn-icon" title="Ver detalle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </a>
+            <a [routerLink]="['/clientes', client.id, 'editar']" class="btn-icon" title="Editar">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </a>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  
+</div>

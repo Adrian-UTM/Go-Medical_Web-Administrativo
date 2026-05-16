@@ -1,0 +1,114 @@
+<bc-page-header
+  title="Movimientos de inventario"
+  subtitle="Trazabilidad operativa de entradas, salidas y ajustes mock"
+  [breadcrumbs]="[
+    { label: 'Inicio', routerLink: '/dashboard' },
+    { label: 'Inventario', routerLink: '/inventario' },
+    { label: 'Movimientos' }
+  ]">
+  <a routerLink="/inventario/ajuste" class="btn-primary">Registrar movimiento</a>
+</bc-page-header>
+
+<div class="filters-bar">
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="movementTypeOptions"
+      [ngModel]="selectedMovementType()"
+      (ngModelChange)="selectedMovementType.set($event)"
+      placeholder="Todos los movimientos">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select filters-bar__select--wide">
+    <bc-custom-select
+      [options]="productOptions()"
+      [ngModel]="selectedProductId()"
+      (ngModelChange)="selectedProductId.set($event)"
+      placeholder="Todos los productos">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="categoryOptions"
+      [ngModel]="selectedCategory()"
+      (ngModelChange)="selectedCategory.set($event)"
+      placeholder="Todas las categorias">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="sortOptions"
+      [ngModel]="sortDirection()"
+      (ngModelChange)="sortDirection.set($event)"
+      placeholder="Orden">
+    </bc-custom-select>
+  </div>
+
+  <button *ngIf="hasActiveFilters()" class="btn-ghost btn-sm" (click)="clearFilters()">
+    Limpiar filtros
+  </button>
+</div>
+
+<bc-loader *ngIf="isLoading()" message="Cargando movimientos..." />
+
+<bc-empty-state
+  *ngIf="!isLoading() && filteredMovements().length === 0"
+  title="Sin movimientos"
+  description="No existen movimientos que coincidan con los filtros seleccionados."
+  [hasAction]="hasActiveFilters()">
+  <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
+</bc-empty-state>
+
+<div class="table-wrapper" *ngIf="!isLoading() && filteredMovements().length > 0">
+  <table class="data-table" aria-label="Listado de movimientos de inventario">
+    <thead>
+      <tr>
+        <th scope="col">Fecha</th>
+        <th scope="col">Producto</th>
+        <th scope="col">Movimiento</th>
+        <th scope="col" class="text-center">Cantidad</th>
+        <th scope="col" class="text-center">Stock anterior</th>
+        <th scope="col" class="text-center">Stock resultante</th>
+        <th scope="col">Referencia</th>
+        <th scope="col">Usuario</th>
+        <th scope="col">Notas</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let movement of filteredMovements()" class="data-table__row">
+        <td class="data-table__secondary">
+          {{ movement.createdAt | date:'dd/MM/yyyy HH:mm' }}
+        </td>
+        <td class="data-table__name">
+          <span class="movement-product">{{ movement.productName }}</span>
+          <span class="movement-meta">{{ movement.sku }} · {{ getCategoryLabel(movement.productCategory) }}</span>
+        </td>
+        <td>
+          <bc-status-badge
+            [label]="getMovementBadge(movement.movementType).label"
+            [variant]="getMovementBadge(movement.movementType).variant"
+            size="sm">
+          </bc-status-badge>
+        </td>
+        <td class="text-center">
+          <span [class.quantity-negative]="movement.quantity < 0" [class.quantity-positive]="movement.quantity > 0">
+            {{ movement.quantity > 0 ? '+' : '' }}{{ movement.quantity }}
+          </span>
+        </td>
+        <td class="text-center">{{ movement.previousStock }}</td>
+        <td class="text-center">{{ movement.resultingStock }}</td>
+        <td class="data-table__secondary">
+          {{ getReferenceLabel(movement.referenceType) }} · {{ movement.referenceId }}
+        </td>
+        <td>{{ movement.createdBy }}</td>
+        <td class="movement-notes">{{ movement.notes || '—' }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="table-footer">
+    <span class="table-count">{{ filteredMovements().length }} movimiento{{ filteredMovements().length !== 1 ? 's' : '' }}</span>
+  </div>
+</div>

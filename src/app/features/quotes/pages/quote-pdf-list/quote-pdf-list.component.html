@@ -1,0 +1,135 @@
+<bc-page-header
+  title="PDFs generados"
+  subtitle="Consulta rapida de cotizaciones listas para regenerar, descargar y compartir desde frontend"
+  [breadcrumbs]="[
+    { label: 'Inicio', routerLink: '/dashboard' },
+    { label: 'Cotizaciones', routerLink: '/cotizaciones' },
+    { label: 'PDFs generados' }
+  ]">
+  <a routerLink="/cotizaciones" class="btn-ghost">← Volver a cotizaciones</a>
+  <a routerLink="/cotizaciones/nueva" class="btn-primary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Nueva cotizacion
+  </a>
+</bc-page-header>
+
+<div class="info-banner info-banner--soft">
+  Mientras no exista almacenamiento en backend, esta vista regenera el PDF en frontend usando la informacion mock actual de la cotizacion.
+</div>
+
+<div *ngIf="actionMessage()" class="info-banner">
+  {{ actionMessage() }}
+</div>
+
+<div class="filters-bar">
+  <div class="filters-bar__search">
+    <span class="filters-bar__search-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </span>
+    <input
+      type="search"
+      class="filters-bar__input"
+      placeholder="Buscar por folio, cliente o producto..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+      aria-label="Buscar PDFs generados">
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="statusOptions"
+      [ngModel]="selectedStatus()"
+      (ngModelChange)="selectedStatus.set($event)"
+      placeholder="Todos los estados">
+    </bc-custom-select>
+  </div>
+
+  <button *ngIf="hasActiveFilters()" class="btn-ghost btn-sm" (click)="clearFilters()">
+    Limpiar filtros
+  </button>
+</div>
+
+<bc-loader *ngIf="isLoading()" message="Cargando PDFs generados..."></bc-loader>
+
+<bc-empty-state
+  *ngIf="!isLoading() && filteredQuotes().length === 0"
+  title="Sin PDFs generados"
+  description="No se encontraron cotizaciones listas para regenerar PDF con los filtros aplicados."
+  [hasAction]="hasActiveFilters()">
+  <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
+</bc-empty-state>
+
+<div class="table-wrapper" *ngIf="!isLoading() && filteredQuotes().length > 0">
+  <table class="data-table" aria-label="Listado de PDFs generados de cotizaciones">
+    <thead>
+      <tr>
+        <th scope="col">Folio</th>
+        <th scope="col">Cliente</th>
+        <th scope="col">Fecha PDF</th>
+        <th scope="col">Vigencia</th>
+        <th scope="col" class="text-right">Total</th>
+        <th scope="col">Estado</th>
+        <th scope="col" class="text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let quote of filteredQuotes()" class="data-table__row">
+        <td class="data-table__folio">{{ quote.quoteNumber }}</td>
+        <td class="data-table__name">
+          <span class="quote-client">{{ quote.clientNameSnapshot }}</span>
+          <span class="quote-meta">{{ quote.items.length }} concepto{{ quote.items.length !== 1 ? 's' : '' }}</span>
+        </td>
+        <td class="data-table__secondary">{{ quote.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+        <td class="data-table__secondary">{{ quote.validUntil | date:'dd/MM/yyyy' }}</td>
+        <td class="text-right data-table__total">{{ quote.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+        <td>
+          <bc-status-badge
+            [label]="getStatusBadge(getDisplayStatus(quote)).label"
+            [variant]="getStatusBadge(getDisplayStatus(quote)).variant"
+            [showDot]="true">
+          </bc-status-badge>
+        </td>
+        <td class="text-center">
+          <div class="table-actions table-actions--dense">
+            <a [routerLink]="['/cotizaciones', quote.id]" class="btn-icon" aria-label="Ver cotizacion" title="Ver cotizacion">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </a>
+            <button type="button" class="btn-icon" (click)="downloadPdf(quote)" [disabled]="isGeneratingPdf() === quote.id" aria-label="Descargar PDF" title="Descargar PDF">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </button>
+            <button type="button" class="btn-icon" (click)="sendByWhatsappMock(quote)" aria-label="Compartir por WhatsApp" title="Compartir por WhatsApp">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.29a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn-icon" (click)="sendByEmailMock(quote)" aria-label="Enviar por correo" title="Enviar por correo">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="table-footer">
+    <span class="table-count">{{ filteredQuotes().length }} PDF{{ filteredQuotes().length !== 1 ? 's' : '' }} disponible{{ filteredQuotes().length !== 1 ? 's' : '' }} para regeneracion</span>
+  </div>
+</div>
+

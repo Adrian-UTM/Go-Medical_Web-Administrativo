@@ -1,0 +1,142 @@
+<bc-page-header
+  title="Inventario"
+  subtitle="Control visual de stock, almacenes y alertas operativas"
+  [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Inventario' }]">
+  <a routerLink="/inventario/ajuste" class="btn-primary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Registrar movimiento
+  </a>
+</bc-page-header>
+
+<div class="info-banner">
+  El inventario se administra sobre productos ya creados en el catalogo.
+</div>
+
+<div class="filters-bar">
+  <div class="filters-bar__search">
+    <span class="filters-bar__search-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </span>
+    <input
+      type="search"
+      class="filters-bar__input"
+      placeholder="Buscar por SKU, producto o almacen..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+      aria-label="Buscar inventario">
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="categoryOptions"
+      [ngModel]="selectedCategory()"
+      (ngModelChange)="selectedCategory.set($event)"
+      placeholder="Todas las categorias">
+    </bc-custom-select>
+  </div>
+
+  <div class="filters-bar__select">
+    <bc-custom-select
+      [options]="stockStatusOptions"
+      [ngModel]="selectedStockStatus()"
+      (ngModelChange)="selectedStockStatus.set($event)"
+      placeholder="Todos los estados">
+    </bc-custom-select>
+  </div>
+
+  <button *ngIf="hasActiveFilters()" class="btn-ghost btn-sm" (click)="clearFilters()">
+    Limpiar filtros
+  </button>
+</div>
+
+<bc-loader *ngIf="isLoading()" message="Cargando stock..." />
+
+<bc-empty-state
+  *ngIf="!isLoading() && filteredStocks().length === 0"
+  title="Sin registros de inventario"
+  description="No se encontraron existencias con los filtros aplicados."
+  [hasAction]="hasActiveFilters()">
+  <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
+</bc-empty-state>
+
+<div class="table-wrapper" *ngIf="!isLoading() && filteredStocks().length > 0">
+  <table class="data-table" aria-label="Listado de inventario">
+    <thead>
+      <tr>
+        <th scope="col">SKU</th>
+        <th scope="col">Producto</th>
+        <th scope="col">Categoria</th>
+        <th scope="col">Almacen</th>
+        <th scope="col" class="text-center">Stock actual</th>
+        <th scope="col" class="text-center">Stock minimo</th>
+        <th scope="col">Estado</th>
+        <th scope="col" class="text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let stock of filteredStocks()" class="data-table__row">
+        <td class="data-table__mono">{{ stock.sku }}</td>
+        <td class="data-table__name">{{ stock.productName }}</td>
+        <td class="data-table__secondary">{{ getCategoryLabel(stock.productCategory) }}</td>
+        <td>{{ stock.warehouseName }}</td>
+        <td class="text-center">
+          <span class="stock-figure">{{ stock.currentStock }}</span>
+          <span class="stock-unit">{{ stock.unit }}</span>
+        </td>
+        <td class="text-center">
+          {{ stock.minStock }} {{ stock.unit }}
+        </td>
+        <td>
+          <bc-status-badge
+            [label]="getStockStatusBadge(stock).label"
+            [variant]="getStockStatusBadge(stock).variant"
+            [showDot]="true">
+          </bc-status-badge>
+        </td>
+        <td class="text-center">
+          <div class="table-actions">
+            <a
+              [routerLink]="['/inventario/movimientos']"
+              [queryParams]="{ productId: stock.productId }"
+              class="btn-icon"
+              title="Ver movimientos">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </a>
+            <a
+              [routerLink]="['/inventario/ajuste']"
+              [queryParams]="{ productId: stock.productId }"
+              class="btn-icon"
+              title="Registrar movimiento">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20V10"/><path d="m18 20-6-6-6 6"/><path d="M12 4v2"/>
+              </svg>
+            </a>
+            <a
+              [routerLink]="['/productos', stock.productId]"
+              class="btn-icon"
+              title="Ver documentos del producto">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                <polyline points="13 2 13 9 20 9"/>
+              </svg>
+            </a>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="table-footer">
+    <span class="table-count">{{ filteredStocks().length }} registro{{ filteredStocks().length !== 1 ? 's' : '' }} de stock</span>
+  </div>
+</div>

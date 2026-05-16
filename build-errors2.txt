@@ -1,0 +1,74 @@
+[33mÔØ»[39m Building...
+[32mÔ£ö[39m Building...
+[1mInitial chunk files[22m  [2m | [22m[1mNames[22m                   [2m | [22m [1mRaw size[22m[2m | [22m[1mEstimated transfer size[22m
+[32mchunk-PL2TGLSO.js[39m    [2m | [22m[2m-[22m                       [2m | [22m[36m274.40 kB[39m[2m | [22m               [36m74.77 kB[39m
+[32mpolyfills-FFHMD2TL.js[39m[2m | [22m[2mpolyfills[22m               [2m | [22m [36m34.52 kB[39m[2m | [22m               [36m11.28 kB[39m
+[32mstyles-WCTE2BK3.css[39m  [2m | [22m[2mstyles[22m                  [2m | [22m [36m15.15 kB[39m[2m | [22m                [36m1.92 kB[39m
+[32mmain-GKJVB5TK.js[39m     [2m | [22m[2mmain[22m                    [2m | [22m  [36m2.38 kB[39m[2m | [22m              [36m788 bytes[39m
+[32mchunk-WMHRQSIW.js[39m    [2m | [22m[2m-[22m                       [2m | [22m  [36m2.12 kB[39m[2m | [22m              [36m800 bytes[39m
+[32mchunk-4CLCTAJ7.js[39m    [2m | [22m[2m-[22m                       [2m | [22m[36m830 bytes[39m[2m | [22m              [36m830 bytes[39m
+
+[1m [22m                    [2m | [22m[1mInitial total[22m           [2m | [22m[1m329.39 kB[22m[2m | [22m               [1m90.38 kB[22m
+
+[1mLazy chunk files[22m     [2m | [22m[1mNames[22m                   [2m | [22m [1mRaw size[22m[2m | [22m[1mEstimated transfer size[22m
+[32mchunk-QPA4YYQD.js[39m    [2m | [22m[2m-[22m                       [2m | [22m [36m37.49 kB[39m[2m | [22m                [36m7.94 kB[39m
+[32mchunk-W6ATIYIQ.js[39m    [2m | [22m[2mproduct-detail-component[22m[2m | [22m [36m18.00 kB[39m[2m | [22m                [36m4.35 kB[39m
+[32mchunk-5UQWKZBP.js[39m    [2m | [22m[2mproduct-list-component[22m  [2m | [22m [36m16.91 kB[39m[2m | [22m                [36m4.13 kB[39m
+[32mchunk-SYE5X7GQ.js[39m    [2m | [22m[2madmin-layout-component[22m  [2m | [22m [36m16.71 kB[39m[2m | [22m                [36m3.73 kB[39m
+[32mchunk-GA4GRIHF.js[39m    [2m | [22m[2mproduct-form-component[22m  [2m | [22m [36m15.10 kB[39m[2m | [22m                [36m3.90 kB[39m
+[32mchunk-ZUSWPCW4.js[39m    [2m | [22m[2mclient-detail-component[22m [2m | [22m [36m14.63 kB[39m[2m | [22m                [36m3.78 kB[39m
+[32mchunk-42NUMXCL.js[39m    [2m | [22m[2mclient-form-component[22m   [2m | [22m [36m12.32 kB[39m[2m | [22m                [36m3.39 kB[39m
+[32mchunk-4OXNBZV2.js[39m    [2m | [22m[2mclient-list-component[22m   [2m | [22m [36m11.70 kB[39m[2m | [22m                [36m3.34 kB[39m
+[32mchunk-HLO5QGSI.js[39m    [2m | [22m[2mregister-component[22m      [2m | [22m [36m11.43 kB[39m[2m | [22m                [36m3.07 kB[39m
+[32mchunk-IRUOYM6U.js[39m    [2m | [22m[2mlogin-component[22m         [2m | [22m [36m10.49 kB[39m[2m | [22m                [36m2.93 kB[39m
+[32mchunk-JJBKHLMM.js[39m    [2m | [22m[2mdashboard-component[22m     [2m | [22m  [36m9.32 kB[39m[2m | [22m                [36m2.69 kB[39m
+[32mchunk-AFH7IIEO.js[39m    [2m | [22m[2m-[22m                       [2m | [22m  [36m5.90 kB[39m[2m | [22m                [36m1.84 kB[39m
+[32mchunk-O6Q5X6BW.js[39m    [2m | [22m[2m-[22m                       [2m | [22m  [36m5.72 kB[39m[2m | [22m                [36m1.83 kB[39m
+[32mchunk-2IZAIJSU.js[39m    [2m | [22m[2m-[22m                       [2m | [22m  [36m3.46 kB[39m[2m | [22m                [36m1.36 kB[39m
+[32mchunk-LVZ6OIHA.js[39m    [2m | [22m[2m-[22m                       [2m | [22m  [36m3.25 kB[39m[2m | [22m                [36m1.04 kB[39m
+[2m...and 6 more lazy chunks files. Use "--verbose" to show all the files.[22m
+
+Application bundle generation failed. [8.478 seconds]
+
+Ôû▓ [WARNING] src/app/layouts/admin-layout/components/sidebar/sidebar.component.css exceeded maximum budget. Budget 2.05 kB was not met by 705 bytes with a total of 2.75 kB.
+
+
+Ôû▓ [WARNING] src/app/features/products/pages/product-form/product-form.component.css exceeded maximum budget. Budget 2.05 kB was not met by 2.54 kB with a total of 4.58 kB.
+
+
+Ôû▓ [WARNING] src/app/features/dashboard/pages/dashboard/dashboard.component.css exceeded maximum budget. Budget 2.05 kB was not met by 876 bytes with a total of 2.92 kB.
+
+
+Ôû▓ [WARNING] src/app/features/auth/pages/login/login.component.css exceeded maximum budget. Budget 2.05 kB was not met by 1.67 kB with a total of 3.71 kB.
+
+
+Ôû▓ [WARNING] src/app/features/auth/pages/login/login.component.css exceeded maximum budget. Budget 2.05 kB was not met by 1.67 kB with a total of 3.71 kB.
+
+
+Ôû▓ [WARNING] src/app/features/products/pages/product-list/product-list.component.css exceeded maximum budget. Budget 2.05 kB was not met by 2.65 kB with a total of 4.69 kB.
+
+
+Ôû▓ [WARNING] src/app/features/products/pages/product-detail/product-detail.component.css exceeded maximum budget. Budget 2.05 kB was not met by 4.38 kB with a total of 6.43 kB.
+
+
+Ôû▓ [WARNING] src/app/features/clients/pages/client-detail/client-detail.component.css exceeded maximum budget. Budget 2.05 kB was not met by 3.80 kB with a total of 5.85 kB.
+
+
+Ôû▓ [WARNING] src/app/features/clients/pages/client-list/client-list.component.css exceeded maximum budget. Budget 2.05 kB was not met by 1.77 kB with a total of 3.82 kB.
+
+
+Ôû▓ [WARNING] src/app/shared/components/custom-select/custom-select.component.css exceeded maximum budget. Budget 2.05 kB was not met by 175 bytes with a total of 2.22 kB.
+
+
+X [ERROR] src/app/features/products/pages/product-form/product-form.component.css exceeded maximum budget. Budget 4.10 kB was not met by 487 bytes with a total of 4.58 kB.
+
+
+X [ERROR] src/app/features/products/pages/product-list/product-list.component.css exceeded maximum budget. Budget 4.10 kB was not met by 598 bytes with a total of 4.69 kB.
+
+
+X [ERROR] src/app/features/products/pages/product-detail/product-detail.component.css exceeded maximum budget. Budget 4.10 kB was not met by 2.34 kB with a total of 6.43 kB.
+
+
+X [ERROR] src/app/features/clients/pages/client-detail/client-detail.component.css exceeded maximum budget. Budget 4.10 kB was not met by 1.75 kB with a total of 5.85 kB.
+
+
