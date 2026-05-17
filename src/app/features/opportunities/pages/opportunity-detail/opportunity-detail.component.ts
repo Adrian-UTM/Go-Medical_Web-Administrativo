@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
-import { OpportunitiesMockService } from '../../services/opportunities-mock.service';
+import { OpportunitiesSupabaseService } from '../../services/opportunities.supabase.service';
 import { Opportunity, OpportunityCartStatus, OpportunityStatus } from '../../models/opportunity.model';
 import { ProductCategory } from '../../../../models/product.model';
 
@@ -25,11 +25,12 @@ import { ProductCategory } from '../../../../models/product.model';
 })
 export class OpportunityDetailComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly opportunitiesService = inject(OpportunitiesMockService);
+  private readonly opportunitiesService = inject(OpportunitiesSupabaseService);
 
   readonly isLoading = signal(true);
   readonly opportunity = signal<Opportunity | null>(null);
   readonly actionMessage = signal('');
+  readonly errorMessage = signal('');
 
   constructor() {
     void this.loadOpportunity();
@@ -51,8 +52,16 @@ export class OpportunityDetailComponent {
     }
 
     this.isLoading.set(true);
-    this.opportunity.set(await this.opportunitiesService.getOpportunityById(id) ?? null);
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      this.opportunity.set(await this.opportunitiesService.getOpportunityById(id) ?? null);
+    } catch (error) {
+      this.opportunity.set(null);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar la oportunidad.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   async markAsContacted(): Promise<void> {
@@ -68,11 +77,11 @@ export class OpportunityDetailComponent {
   }
 
   async convertToOrder(): Promise<void> {
-    await this.runAction(() => this.opportunitiesService.convertToOrder(this.opportunity()!.id), 'Oportunidad convertida a pedido mock.');
+    await this.runAction(() => this.opportunitiesService.convertToOrder(this.opportunity()!.id), 'Oportunidad convertida a pedido.');
   }
 
   async convertToQuote(): Promise<void> {
-    await this.runAction(() => this.opportunitiesService.convertToQuote(this.opportunity()!.id), 'Oportunidad convertida a cotizacion mock.');
+    await this.runAction(() => this.opportunitiesService.convertToQuote(this.opportunity()!.id), 'Oportunidad convertida a cotización.');
   }
 
   async closeOpportunity(): Promise<void> {
@@ -96,9 +105,9 @@ export class OpportunityDetailComponent {
       [OpportunityStatus.New]: { label: 'Nueva', variant: 'warning' },
       [OpportunityStatus.Contacted]: { label: 'Contactado', variant: 'info' },
       [OpportunityStatus.Interested]: { label: 'Interesado', variant: 'success' },
-      [OpportunityStatus.NoResponse]: { label: 'No respondio', variant: 'danger' },
+      [OpportunityStatus.NoResponse]: { label: 'No respondió', variant: 'danger' },
       [OpportunityStatus.ConvertedToOrder]: { label: 'Pedido', variant: 'primary' },
-      [OpportunityStatus.ConvertedToQuote]: { label: 'Cotizacion', variant: 'primary' },
+      [OpportunityStatus.ConvertedToQuote]: { label: 'Cotización', variant: 'primary' },
       [OpportunityStatus.Closed]: { label: 'Cerrada', variant: 'neutral' },
     };
 
@@ -106,7 +115,12 @@ export class OpportunityDetailComponent {
   }
 
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -114,7 +128,7 @@ export class OpportunityDetailComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoría';
   }
 
   private async runAction(operation: () => Promise<Opportunity | undefined>, successMessage: string): Promise<void> {
@@ -122,12 +136,20 @@ export class OpportunityDetailComponent {
       return;
     }
 
-    const updated = await operation();
-    if (!updated) {
-      return;
-    }
+    this.actionMessage.set('');
+    this.errorMessage.set('');
 
-    this.opportunity.set(updated);
-    this.actionMessage.set(successMessage);
+    try {
+      const updated = await operation();
+      if (!updated) {
+        this.errorMessage.set('No fue posible actualizar la oportunidad.');
+        return;
+      }
+
+      this.opportunity.set(updated);
+      this.actionMessage.set(successMessage);
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible actualizar la oportunidad.');
+    }
   }
 }

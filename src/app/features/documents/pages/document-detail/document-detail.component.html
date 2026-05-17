@@ -23,7 +23,7 @@
       </div>
 
       <p class="document-hero__description">
-        Documento tecnico preparado para consulta administrativa y futura sincronizacion con Supabase Storage.
+        Documento técnico disponible para consulta administrativa.
       </p>
 
       <div class="info-grid">
@@ -55,7 +55,7 @@
     </div>
 
     <aside class="action-card">
-      <span class="action-card__label">Acciones mock</span>
+      <span class="action-card__label">Acciones del documento</span>
       <button type="button" class="btn-primary" (click)="downloadDocument()" [disabled]="isProcessing()">Descargar</button>
       <button type="button" class="btn-secondary" (click)="archiveDocument()" [disabled]="documentRecord()!.status === 'archived' || isProcessing()">Archivar</button>
       <a routerLink="/documentos" class="btn-ghost">Volver al listado</a>
@@ -108,3 +108,5 @@
   <p>El documento solicitado no fue encontrado.</p>
   <a routerLink="/documentos" class="btn-ghost">← Volver a documentos</a>
 </div>
+
+

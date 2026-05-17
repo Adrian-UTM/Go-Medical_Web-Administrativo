@@ -4,10 +4,10 @@ import { NgFor, NgIf, CurrencyPipe, DatePipe } from '@angular/common';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
-import { ProductsMockService } from '../../services/products.mock.service';
-import { DocumentsMockService } from '../../../documents/services/documents.mock.service';
+import { ProductSupabaseService } from '../../services/product.supabase.service';
+import { DocumentsSupabaseService } from '../../../documents/services/documents.supabase.service';
 import { DocumentStatus, DocumentType, RelatedEntityType, SystemDocument } from '../../../documents/models/document.model';
-import { Product, ProductCategory, ProductStatus } from '../../../../models/product.model';
+import { Product, ProductCategory } from '../../../../models/product.model';
 
 @Component({
   selector: 'bc-product-detail',
@@ -22,8 +22,8 @@ import { Product, ProductCategory, ProductStatus } from '../../../../models/prod
 export class ProductDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private productsService = inject(ProductsMockService);
-  private documentsService = inject(DocumentsMockService);
+  private productsService = inject(ProductSupabaseService);
+  private documentsService = inject(DocumentsSupabaseService);
 
   private readonly technicalDocumentTypes = new Set<DocumentType>([
     DocumentType.UserManual,
@@ -51,7 +51,7 @@ export class ProductDetailComponent implements OnInit {
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
-    this.productsService.getProduct(id).subscribe({
+    this.productsService.getProductById(id).subscribe({
       next: (p) => {
         this.product.set(p);
         this.isLoading.set(false);
@@ -69,18 +69,16 @@ export class ProductDetailComponent implements OnInit {
       return;
     }
 
-    const confirmed = window.confirm(`Se eliminara el producto ${currentProduct.name}. Esta accion es mock pero quitara el registro del catalogo actual. Deseas continuar?`);
+    const confirmed = window.confirm(`Se eliminara el producto ${currentProduct.name}. Esta accion quitara el registro del catalogo actual. Deseas continuar?`);
     if (!confirmed) {
       return;
     }
 
     this.isDeleting.set(true);
     this.productsService.deleteProduct(currentProduct.id).subscribe({
-      next: async (success) => {
+      next: async () => {
         this.isDeleting.set(false);
-        if (success) {
-          await this.router.navigate(['/productos']);
-        }
+        await this.router.navigate(['/productos']);
       },
       error: () => {
         this.isDeleting.set(false);
@@ -143,24 +141,23 @@ export class ProductDetailComponent implements OnInit {
   }
 
   getCategoryLabel(cat: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
-      [ProductCategory.UltrasoundVet]: 'Ultrasonido Veterinario',
-      [ProductCategory.UltrasoundHuman]: 'Ultrasonido Humano',
-      [ProductCategory.Consumables]: 'Consumibles',
-      [ProductCategory.SpareParts]: 'Refacciones',
-      [ProductCategory.Services]: 'Servicios',
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo Médico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido Humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido Veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
     };
     return labels[cat] ?? cat;
   }
 
-  getStatusBadge(status: ProductStatus): { label: string; variant: BadgeVariant } {
-    const map: Record<ProductStatus, { label: string; variant: BadgeVariant }> = {
-      [ProductStatus.Active]: { label: 'Activo', variant: 'success' },
-      [ProductStatus.Inactive]: { label: 'Inactivo', variant: 'neutral' },
-      [ProductStatus.Discontinued]: { label: 'Descontinuado', variant: 'danger' },
-      [ProductStatus.Draft]: { label: 'Borrador', variant: 'warning' },
-    };
-    return map[status] ?? { label: status, variant: 'neutral' };
+  getStatusBadge(isActive: boolean | undefined): { label: string; variant: BadgeVariant } {
+    if (isActive) {
+      return { label: 'Activo', variant: 'success' };
+    }
+    return { label: 'Inactivo', variant: 'neutral' };
   }
 
   getDocumentTypeLabel(type: DocumentType): string {
@@ -225,3 +222,4 @@ export class ProductDetailComponent implements OnInit {
     }
   }
 }
+

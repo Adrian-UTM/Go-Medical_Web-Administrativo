@@ -10,7 +10,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { Client } from '../../../../core/models/client.model';
 import { Product, ProductCategory } from '../../../../models/product.model';
 import { ServiceTicket, TicketPriority, TicketStatus, TicketType, TicketUpsertPayload } from '../../models/ticket.model';
-import { TicketsMockService } from '../../services/tickets.mock.service';
+import { TicketSupabaseService } from '../../services/ticket.supabase.service';
 
 @Component({
   selector: 'bc-ticket-form',
@@ -31,7 +31,7 @@ export class TicketFormComponent {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly ticketsService = inject(TicketsMockService);
+  private readonly ticketsService = inject(TicketSupabaseService);
 
   readonly isEditMode = signal(false);
   readonly isLoadingData = signal(true);
@@ -133,20 +133,25 @@ export class TicketFormComponent {
     this.isEditMode.set(isEditing);
     this.isLoadingData.set(true);
 
-    const [clients, products] = await Promise.all([
-      this.ticketsService.getActiveClients(),
-      this.ticketsService.getAvailableProducts(),
-    ]);
+    try {
+      const [clients, products, technicians] = await Promise.all([
+        this.ticketsService.getActiveClients(),
+        this.ticketsService.getAvailableProducts(),
+        this.ticketsService.getTechnicians(),
+      ]);
 
-    this.clients.set(clients);
-    this.products.set(products);
-    this.technicians.set(this.ticketsService.technicians());
+      this.clients.set(clients);
+      this.products.set(products);
+      this.technicians.set(technicians);
 
-    if (isEditing && this.ticketId) {
-      await this.loadTicket(this.ticketId);
+      if (isEditing && this.ticketId) {
+        await this.loadTicket(this.ticketId);
+      }
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible preparar el formulario del ticket.');
+    } finally {
+      this.isLoadingData.set(false);
     }
-
-    this.isLoadingData.set(false);
   }
 
   async loadTicket(id: string): Promise<void> {
@@ -207,8 +212,8 @@ export class TicketFormComponent {
       }
 
       await this.router.navigate(['/tickets', savedTicket.id]);
-    } catch {
-      this.errorMessage.set('Ocurrio un error al guardar el ticket. Intenta nuevamente.');
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Ocurrio un error al guardar el ticket. Intenta nuevamente.');
     } finally {
       this.isSaving.set(false);
     }
@@ -224,7 +229,14 @@ export class TicketFormComponent {
   }
 
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -232,7 +244,7 @@ export class TicketFormComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 
   private syncSelectedClient(clientId: string, ticket?: ServiceTicket): void {
@@ -289,3 +301,5 @@ export class TicketFormComponent {
     return new Date(value).toISOString();
   }
 }
+
+

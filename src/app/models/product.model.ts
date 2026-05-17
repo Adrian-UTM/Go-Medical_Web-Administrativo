@@ -1,83 +1,172 @@
 // models/product.model.ts
-// Modelos de productos (equipos, consumibles, servicios)
+// Modelos de productos basados en Supabase
 
 import { AuditFields } from './common.model';
 
 export enum ProductCategory {
-  UltrasoundHuman    = 'ultrasound_human',
-  UltrasoundVet      = 'ultrasound_vet',
-  Consumables        = 'consumables',
-  SpareParts         = 'spare_parts',
-  Services           = 'services',
+  EquipoMedico = 'equipo_medico',
+  UltrasonidoHumano = 'ultrasonido_humano',
+  UltrasonidoVeterinario = 'ultrasonido_veterinario',
+  Consumible = 'consumible',
+  Refaccion = 'refaccion',
+  Accesorio = 'accesorio',
+  Servicio = 'servicio',
+  // Legacy para compatibilidad con mocks de otros modulos (eliminar al final)
+  UltrasoundHuman = 'ultrasound_human',
+  UltrasoundVet = 'ultrasound_vet',
+  Consumables = 'consumables',
+  SpareParts = 'spare_parts',
+  Services = 'services',
 }
 
+// Legacy para mocks
 export enum ProductStatus {
-  Active       = 'active',
-  Inactive     = 'inactive',
+  Active = 'active',
+  Inactive = 'inactive',
   Discontinued = 'discontinued',
-  Draft        = 'draft',
+  Draft = 'draft',
 }
 
-export enum ProductDocumentType {
-  UserManual    = 'user_manual',
-  TechSpec      = 'tech_spec',
-  Brochure      = 'brochure',
-  Certificate   = 'certificate',
-  Warranty      = 'warranty',
-  Other         = 'other',
+export enum ProductApplication {
+  Humano = 'humano',
+  Veterinario = 'veterinario',
+  Ambos = 'ambos',
+  General = 'general',
+}
+
+export enum StockUnit {
+  Pieza = 'pieza',
+  Caja = 'caja',
+  Unidad = 'unidad',
+  Litro = 'litro',
+  Rollo = 'rollo',
+  Paquete = 'paquete',
+  Servicio = 'servicio',
+}
+
+export enum DocumentType {
+  Manual = 'manual',
+  FichaTecnica = 'ficha_tecnica',
+  Certificado = 'certificado',
+  CotizacionPdf = 'cotizacion_pdf',
+  ReporteServicio = 'reporte_servicio',
+  Imagen = 'imagen',
+  Otro = 'otro',
+}
+
+export enum DocumentStatus {
+  Available = 'available',
+  Pending = 'pending',
+  Archived = 'archived',
 }
 
 export interface Product extends AuditFields {
-  id: string;                       // uuid
-  sku: string;                      // Codigo unico interno
+  id: string;                       
+  sku: string;                      
   name: string;
-  description?: string;
   category: ProductCategory;
-  status: ProductStatus;
-  price_mxn: number;                // Precio en MXN (precio base)
-  price_usd?: number;               // Precio referencial en USD (opcional)
-  brand?: string;                   // Marca del fabricante
-  model?: string;                   // Modelo del equipo
-  image_url?: string;               // URL o data URL mock para vista previa / futura Storage
+  application?: ProductApplication;
+  commercial_brand?: string;
+  description?: string;
+  brand?: string;
+  model?: string;
+  unit_price_mxn?: number;
+  reference_price_usd?: number;
+  cost_price_mxn?: number;
+  currency?: string;
+  unit?: StockUnit;
+  is_active?: boolean;
+  requires_serial?: boolean;
+  track_inventory?: boolean;
+  lead_time_days?: number;
+  old_price?: number;
+  warranty_text?: string;
+  shipping_info?: string;
+  availability_status?: string;
+  subcategory?: string;
+  created_by?: string;
+
+  // Asociaciones
   specs?: ProductSpec[];
   documents?: ProductDocument[];
+  media?: ProductMedia[];
+
+  // Legacy para compatibilidad con mocks (eliminar al final)
+  price_mxn?: number;
+  price_usd?: number;
+  status?: ProductStatus;
   tags?: string[];
+  image_url?: string;
 }
 
 export interface ProductSpec {
   id: string;
-  product_id: string;               // FK → products.id
-  spec_group?: string;              // Ej: Imagen, Conectividad, Dimensiones
-  spec_name: string;                // Ej: Frecuencia de transductor
-  spec_value: string;               // Ej: 2-15 MHz
+  product_id: string;               
+  spec_group?: string;              
+  spec_key?: string;                
+  spec_value: string;               
   sort_order: number;
+  created_at?: string;
+  spec_name?: string; // Legacy mock
+}
+
+export interface ProductMedia {
+  id: string;
+  product_id: string;
+  file_path: string;
+  file_name?: string;
+  document_type: DocumentType;
+  is_primary: boolean;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface ProductDocument {
   id: string;
-  product_id: string;               // FK → products.id
-  document_type: ProductDocumentType;
+  product_id: string;               
   title: string;
-  file_url: string;                 // URL en Supabase Storage
-  file_name: string;
+  file_path?: string;
+  document_type: DocumentType;
+  status?: DocumentStatus;
+  file_name?: string;
+  file_extension?: string;
   file_size_bytes?: number;
-  language?: string;                // es, en
+  notes?: string;
+  uploaded_by?: string;
+  is_public_to_clients?: boolean;
+  created_at?: string;
+  updated_at?: string;
+
+  // Legacy mocks
+  file_url?: string;
   version?: string;
-  uploaded_at: string;
+  language?: string;
+  uploaded_at?: string;
 }
 
 export interface CreateProductDto {
   sku: string;
   name: string;
-  description?: string;
   category: ProductCategory;
-  status: ProductStatus;
-  price_mxn: number;
-  price_usd?: number;
+  application?: ProductApplication;
+  commercial_brand?: string;
+  description?: string;
   brand?: string;
   model?: string;
-  image_url?: string;
-  tags?: string[];
+  unit_price_mxn?: number;
+  reference_price_usd?: number;
+  cost_price_mxn?: number;
+  currency?: string;
+  unit?: StockUnit;
+  is_active?: boolean;
+  requires_serial?: boolean;
+  track_inventory?: boolean;
+  lead_time_days?: number;
+  old_price?: number;
+  warranty_text?: string;
+  shipping_info?: string;
+  availability_status?: string;
+  subcategory?: string;
 }
 
 export type UpdateProductDto = Partial<CreateProductDto>;
@@ -85,7 +174,8 @@ export type UpdateProductDto = Partial<CreateProductDto>;
 export interface ProductFilters {
   search?: string;
   category?: ProductCategory;
-  status?: ProductStatus;
+  is_active?: boolean;
   min_price?: number;
   max_price?: number;
+  status?: ProductStatus; // Legacy mock
 }

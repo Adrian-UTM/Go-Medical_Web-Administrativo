@@ -336,3 +336,49 @@
     grid-template-columns: 1fr;
   }
 }
+
+.empty-report-note {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-gray-50);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.ticket-status-panel {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+.ticket-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+}
+
+.ticket-status-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background-color: var(--color-gray-50);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ticket-status-card__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-status-card__value {
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-primary);
+}

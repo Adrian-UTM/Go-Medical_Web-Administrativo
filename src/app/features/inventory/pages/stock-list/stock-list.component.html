@@ -61,8 +61,8 @@
 
 <bc-empty-state
   *ngIf="!isLoading() && filteredStocks().length === 0"
-  title="Sin registros de inventario"
-  description="No se encontraron existencias con los filtros aplicados."
+  [title]="emptyStateTitle"
+  [description]="emptyStateDescription"
   [hasAction]="hasActiveFilters()">
   <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>

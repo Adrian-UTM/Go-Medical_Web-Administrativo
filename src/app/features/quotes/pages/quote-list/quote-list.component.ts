@@ -8,7 +8,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Quote, QuoteStatus } from '../../models/quote.model';
-import { QuotesMockService } from '../../services/quotes.mock.service';
+import { QuoteSupabaseService } from '../../services/quote.supabase.service';
 
 @Component({
   selector: 'bc-quote-list',
@@ -29,9 +29,10 @@ import { QuotesMockService } from '../../services/quotes.mock.service';
   styleUrl: './quote-list.component.css',
 })
 export class QuoteListComponent {
-  private readonly quotesService = inject(QuotesMockService);
+  private readonly quotesService = inject(QuoteSupabaseService);
 
   readonly isLoading = signal(true);
+  readonly errorMessage = signal('');
   readonly quotes = signal<Quote[]>([]);
   readonly searchQuery = signal('');
   readonly selectedStatus = signal<QuoteStatus | ''>('');
@@ -71,8 +72,16 @@ export class QuoteListComponent {
 
   async loadQuotes(): Promise<void> {
     this.isLoading.set(true);
-    this.quotes.set(await this.quotesService.getQuotes());
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      this.quotes.set(await this.quotesService.getQuotes());
+    } catch (error) {
+      this.quotes.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar las cotizaciones.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {

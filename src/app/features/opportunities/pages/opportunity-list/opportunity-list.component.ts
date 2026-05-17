@@ -7,7 +7,7 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
-import { OpportunitiesMockService } from '../../services/opportunities-mock.service';
+import { OpportunitiesSupabaseService } from '../../services/opportunities.supabase.service';
 import { Opportunity, OpportunityCartStatus, OpportunityStatus } from '../../models/opportunity.model';
 
 @Component({
@@ -29,9 +29,10 @@ import { Opportunity, OpportunityCartStatus, OpportunityStatus } from '../../mod
   styleUrl: './opportunity-list.component.css',
 })
 export class OpportunityListComponent {
-  private readonly opportunitiesService = inject(OpportunitiesMockService);
+  private readonly opportunitiesService = inject(OpportunitiesSupabaseService);
 
   readonly isLoading = signal(true);
+  readonly errorMessage = signal('');
   readonly opportunities = signal<Opportunity[]>([]);
   readonly searchQuery = signal('');
   readonly selectedCartStatus = signal<OpportunityCartStatus | ''>('');
@@ -51,9 +52,9 @@ export class OpportunityListComponent {
     { value: OpportunityStatus.New, label: 'Nueva' },
     { value: OpportunityStatus.Contacted, label: 'Contactado' },
     { value: OpportunityStatus.Interested, label: 'Interesado' },
-    { value: OpportunityStatus.NoResponse, label: 'No respondio' },
+    { value: OpportunityStatus.NoResponse, label: 'No respondió' },
     { value: OpportunityStatus.ConvertedToOrder, label: 'Convertida a pedido' },
-    { value: OpportunityStatus.ConvertedToQuote, label: 'Convertida a cotizacion' },
+    { value: OpportunityStatus.ConvertedToQuote, label: 'Convertida a cotización' },
     { value: OpportunityStatus.Closed, label: 'Cerrada' },
   ];
 
@@ -80,14 +81,40 @@ export class OpportunityListComponent {
     !!this.searchQuery().trim() || !!this.selectedCartStatus() || !!this.selectedOpportunityStatus()
   );
 
+  get emptyStateTitle(): string {
+    if (this.errorMessage()) {
+      return 'No se pudo cargar la información';
+    }
+
+    return this.hasActiveFilters() ? 'Sin oportunidades' : 'No hay oportunidades comerciales registradas';
+  }
+
+  get emptyStateDescription(): string {
+    if (this.errorMessage()) {
+      return this.errorMessage();
+    }
+
+    return this.hasActiveFilters()
+      ? 'No se encontraron oportunidades con los filtros aplicados.'
+      : 'No hay oportunidades comerciales registradas.';
+  }
+
   constructor() {
     void this.loadOpportunities();
   }
 
   async loadOpportunities(): Promise<void> {
     this.isLoading.set(true);
-    this.opportunities.set(await this.opportunitiesService.getOpportunities());
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      this.opportunities.set(await this.opportunitiesService.getOpportunities());
+    } catch (error) {
+      this.opportunities.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar las oportunidades comerciales.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {
@@ -113,9 +140,9 @@ export class OpportunityListComponent {
       [OpportunityStatus.New]: { label: 'Nueva', variant: 'warning' },
       [OpportunityStatus.Contacted]: { label: 'Contactado', variant: 'info' },
       [OpportunityStatus.Interested]: { label: 'Interesado', variant: 'success' },
-      [OpportunityStatus.NoResponse]: { label: 'No respondio', variant: 'danger' },
+      [OpportunityStatus.NoResponse]: { label: 'No respondió', variant: 'danger' },
       [OpportunityStatus.ConvertedToOrder]: { label: 'Pedido', variant: 'primary' },
-      [OpportunityStatus.ConvertedToQuote]: { label: 'Cotizacion', variant: 'primary' },
+      [OpportunityStatus.ConvertedToQuote]: { label: 'Cotización', variant: 'primary' },
       [OpportunityStatus.Closed]: { label: 'Cerrada', variant: 'neutral' },
     };
 
@@ -123,6 +150,10 @@ export class OpportunityListComponent {
   }
 
   getItemsPreview(opportunity: Opportunity): string {
+    if (!opportunity.items.length) {
+      return 'Sin productos asociados';
+    }
+
     const preview = opportunity.items.slice(0, 2).map(item => item.productName).join(', ');
     return opportunity.items.length > 2 ? `${preview}...` : preview;
   }
@@ -137,7 +168,7 @@ export class OpportunityListComponent {
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days} dia${days === 1 ? '' : 's'}`;
+      return `${days} día${days === 1 ? '' : 's'}`;
     }
 
     if (hours > 0) {

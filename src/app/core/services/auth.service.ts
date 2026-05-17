@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, from, throwError, of } from 'rxjs';
-import { map, switchMap, catchError, tap } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { AuthSession, LoginCredentials, User, UserRole } from '../../models/auth.model';
 import { SupabaseService } from './supabase.service';
 
@@ -12,8 +12,11 @@ export interface RegisterCredentials extends LoginCredentials {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private _session = signal<AuthSession | null>(null);
+  private _isSessionReady = signal(false);
+  private readonly sessionReadyPromise: Promise<void>;
 
   readonly session = this._session.asReadonly();
+  readonly isSessionReady = this._isSessionReady.asReadonly();
 
   get currentUser(): User | null {
     return this._session()?.user ?? null;
@@ -27,23 +30,42 @@ export class AuthService {
     private router: Router,
     private supabase: SupabaseService
   ) {
-    this.initSession();
+    this.sessionReadyPromise = this.initSession();
     this.onAuthStateChange();
   }
 
-  private async initSession() {
-    const { data: { session }, error } = await this.supabase.client.auth.getSession();
-    if (session && !error) {
+  private async initSession(): Promise<void> {
+    try {
+      const { data: { session }, error } = await this.supabase.client.auth.getSession();
+
+      if (error || !session) {
+        this._session.set(null);
+        return;
+      }
+
       await this.loadUserProfile(session);
+    } finally {
+      this._isSessionReady.set(true);
     }
   }
 
-  onAuthStateChange() {
+  onAuthStateChange(): void {
     this.supabase.client.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session) {
         await this.loadUserProfile(session);
-      } else if (event === 'SIGNED_OUT') {
+        this._isSessionReady.set(true);
+        return;
+      }
+
+      if (event === 'INITIAL_SESSION') {
         this._session.set(null);
+        this._isSessionReady.set(true);
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        this._session.set(null);
+        this._isSessionReady.set(true);
         this.router.navigate(['/login']);
       }
     });
@@ -96,8 +118,7 @@ export class AuthService {
         if (!data.session) {
           return throwError(() => new Error('Error al obtener la sesión'));
         }
-        
-        // Fetch profile to validate role and is_active
+
         return from(this.supabase.client
           .from('profiles')
           .select('*')
@@ -115,12 +136,10 @@ export class AuthService {
               return throwError(() => new Error('Tu cuenta está pendiente de aprobación por un administrador.'));
             }
 
-            const allowedRoles = [UserRole.Admin, UserRole.Manager, UserRole.Tech]; // manager=staff, tech=technician as per our model
-            // Allow string checking as well to be safe
             const allowedStringRoles = ['admin', 'staff', 'technician', 'manager', 'tech'];
             if (!allowedStringRoles.includes(profile.role)) {
-               this.supabase.client.auth.signOut();
-               return throwError(() => new Error('No tienes permisos para acceder a este panel.'));
+              this.supabase.client.auth.signOut();
+              return throwError(() => new Error('No tienes permisos para acceder a este panel.'));
             }
 
             const user: User = {
@@ -142,6 +161,7 @@ export class AuthService {
             };
 
             this._session.set(session);
+            this._isSessionReady.set(true);
             return of(session);
           })
         );
@@ -150,7 +170,6 @@ export class AuthService {
   }
 
   register(credentials: RegisterCredentials): Observable<any> {
-    // We pass full_name in the metadata, in case a trigger uses it to create the profile
     return from(this.supabase.client.auth.signUp({
       email: credentials.email,
       password: credentials.password,
@@ -164,7 +183,6 @@ export class AuthService {
         if (error) {
           throw new Error(error.message);
         }
-        // Do not return a session, just data, user needs approval
         return data;
       })
     );
@@ -184,11 +202,29 @@ export class AuthService {
   async signOut(): Promise<void> {
     await this.supabase.client.auth.signOut();
     this._session.set(null);
+    this._isSessionReady.set(true);
     this.router.navigate(['/login']);
   }
 
   getCurrentUser(): User | null {
     return this.currentUser;
+  }
+
+  async ensureSessionReady(): Promise<void> {
+    await this.sessionReadyPromise.catch(() => undefined);
+  }
+
+  async refreshSessionState(): Promise<AuthSession | null> {
+    const { data: { session }, error } = await this.supabase.client.auth.getSession();
+    if (error || !session) {
+      this._session.set(null);
+      this._isSessionReady.set(true);
+      return null;
+    }
+
+    await this.loadUserProfile(session);
+    this._isSessionReady.set(true);
+    return this._session();
   }
 
   async getSession(): Promise<any> {

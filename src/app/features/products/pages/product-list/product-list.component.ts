@@ -8,9 +8,9 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
-import { ProductsMockService } from '../../services/products.mock.service';
+import { ProductSupabaseService } from '../../services/product.supabase.service';
 import {
-  Product, ProductCategory, ProductStatus, ProductFilters
+  Product, ProductCategory, ProductFilters
 } from '../../../../models/product.model';
 
 @Component({
@@ -24,7 +24,7 @@ import {
   styleUrl: './product-list.component.css'
 })
 export class ProductListComponent implements OnInit {
-  private productsService = inject(ProductsMockService);
+  private productsService = inject(ProductSupabaseService);
 
   products = signal<Product[]>([]);
   isLoading = signal(true);
@@ -46,10 +46,8 @@ export class ProductListComponent implements OnInit {
 
   readonly statuses: { value: string; label: string }[] = [
     { value: '', label: 'Todos los estados' },
-    { value: ProductStatus.Active, label: 'Activo' },
-    { value: ProductStatus.Inactive, label: 'Inactivo' },
-    { value: ProductStatus.Discontinued, label: 'Descontinuado' },
-    { value: ProductStatus.Draft, label: 'Borrador' },
+    { value: 'true', label: 'Activo' },
+    { value: 'false', label: 'Inactivo' },
   ];
 
   ngOnInit(): void {
@@ -61,12 +59,12 @@ export class ProductListComponent implements OnInit {
     const filters: ProductFilters = {
       search: this.searchTerm || undefined,
       category: this.selectedCategory as ProductCategory || undefined,
-      status: this.selectedStatus as ProductStatus || undefined,
+      is_active: this.selectedStatus === '' ? undefined : this.selectedStatus === 'true',
     };
 
     this.productsService.getProducts(filters).subscribe({
       next: (res) => {
-        this.products.set(res.data);
+        this.products.set(res);
         this.isLoading.set(false);
       },
       error: () => this.isLoading.set(false)
@@ -89,18 +87,16 @@ export class ProductListComponent implements OnInit {
   }
 
   deleteProduct(product: Product): void {
-    const confirmed = window.confirm(`Se eliminara el producto ${product.name}. Esta accion es mock pero quitara el registro del catalogo actual. Deseas continuar?`);
+    const confirmed = window.confirm(`Se eliminara el producto ${product.name}. Esta accion eliminara el registro de la base de datos. Deseas continuar?`);
     if (!confirmed) {
       return;
     }
 
     this.deletingId.set(product.id);
     this.productsService.deleteProduct(product.id).subscribe({
-      next: (success) => {
-        if (success) {
-          this.products.update(current => current.filter(item => item.id !== product.id));
-          this.actionMessage.set(`Producto ${product.name} eliminado del catalogo mock.`);
-        }
+      next: () => {
+        this.products.update(current => current.filter(item => item.id !== product.id));
+        this.actionMessage.set(`Producto ${product.name} eliminado del catalogo.`);
         this.deletingId.set('');
       },
       error: () => {
@@ -111,24 +107,23 @@ export class ProductListComponent implements OnInit {
   }
 
   getCategoryLabel(cat: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
-      [ProductCategory.UltrasoundVet]: 'Ultrasonido Vet.',
-      [ProductCategory.UltrasoundHuman]: 'Ultrasonido Hum.',
-      [ProductCategory.Consumables]: 'Consumibles',
-      [ProductCategory.SpareParts]: 'Refacciones',
-      [ProductCategory.Services]: 'Servicios',
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo Médico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido Hum.',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido Vet.',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
     };
     return labels[cat] ?? cat;
   }
 
-  getStatusBadge(status: ProductStatus): { label: string; variant: BadgeVariant } {
-    const map: Record<ProductStatus, { label: string; variant: BadgeVariant }> = {
-      [ProductStatus.Active]: { label: 'Activo', variant: 'success' },
-      [ProductStatus.Inactive]: { label: 'Inactivo', variant: 'neutral' },
-      [ProductStatus.Discontinued]: { label: 'Descontinuado', variant: 'danger' },
-      [ProductStatus.Draft]: { label: 'Borrador', variant: 'warning' },
-    };
-    return map[status] ?? { label: status, variant: 'neutral' };
+  getStatusBadge(isActive: boolean): { label: string; variant: BadgeVariant } {
+    if (isActive) {
+      return { label: 'Activo', variant: 'success' };
+    }
+    return { label: 'Inactivo', variant: 'neutral' };
   }
 
   get hasActiveFilters(): boolean {

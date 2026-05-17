@@ -50,7 +50,7 @@ export class TopOrderedProductsComponent {
   @Input({ required: true }) rows: TopOrderedProductRow[] = [];
 
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',

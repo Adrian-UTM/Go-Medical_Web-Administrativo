@@ -14,7 +14,6 @@
     <a routerLink="/clientes" class="btn-ghost">← Volver</a>
   </bc-page-header>
 
-  <!-- Hero Section -->
   <div class="client-hero">
     <div class="client-hero__main">
       <div class="client-hero__meta">
@@ -30,13 +29,12 @@
       <div class="client-hero__contact" *ngIf="client()!.tradeName">
         <h3>Nombre Comercial: {{ client()!.tradeName }}</h3>
       </div>
-      
+
       <p *ngIf="client()!.notes" class="client-hero__description">
         {{ client()!.notes }}
       </p>
     </div>
 
-    <!-- Quick Contact Card -->
     <div class="client-hero__card">
       <div class="contact-card">
         <span class="contact-card__label">Contacto Principal</span>
@@ -50,7 +48,6 @@
     </div>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs-container">
     <nav class="tabs-nav" role="tablist">
       <button
@@ -65,8 +62,6 @@
     </nav>
 
     <div class="tab-panel" role="tabpanel">
-
-      <!-- TAB: Info general -->
       <ng-container *ngIf="activeTab() === 'info'">
         <div class="info-grid">
           <div class="info-item">
@@ -100,65 +95,31 @@
         </div>
       </ng-container>
 
-      <!-- TAB: Historial Comercial (Mock UI) -->
       <ng-container *ngIf="activeTab() === 'history'">
         <div class="history-mock">
           <div class="history-section">
             <div class="history-section__header">
-              <h3>Equipos Instalados (Próximamente)</h3>
-              <button class="btn-ghost-sm" disabled>+ Registrar equipo</button>
+              <h3>Historial comercial</h3>
             </div>
             <div class="empty-placeholder">
-              <p>Módulo de Inventario e Instalaciones en desarrollo.</p>
+              <p>No hay historial comercial disponible para este cliente.</p>
             </div>
           </div>
 
           <div class="history-section">
             <div class="history-section__header">
-              <h3>Últimos Pedidos / Facturas</h3>
+              <h3>Soporte técnico</h3>
             </div>
-            <table class="table-mock">
-              <thead>
-                <tr>
-                  <th>Folio</th>
-                  <th>Fecha</th>
-                  <th>Monto</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>PED-2024-001</td>
-                  <td>15 Ene 2024</td>
-                  <td>$45,000.00 MXN</td>
-                  <td><span class="badge-mock badge-mock--success">Pagado</span></td>
-                </tr>
-                <tr>
-                  <td>PED-2023-402</td>
-                  <td>02 Nov 2023</td>
-                  <td>$12,500.00 MXN</td>
-                  <td><span class="badge-mock badge-mock--success">Pagado</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          
-          <div class="history-section">
-             <div class="history-section__header">
-              <h3>Tickets de Soporte Técnicos (En desarrollo)</h3>
-             </div>
-             <div class="empty-placeholder">
-              <p>El historial de mantenimiento e incidencias aparecerá aquí.</p>
+            <div class="empty-placeholder">
+              <p>No hay tickets o mantenimientos vinculados para mostrar por ahora.</p>
             </div>
           </div>
         </div>
       </ng-container>
-
     </div>
   </div>
 </ng-container>
 
-<!-- Not found -->
 <div *ngIf="!isLoading() && !client()" class="not-found">
   <p>El cliente no fue encontrado.</p>
   <a routerLink="/clientes" class="btn-ghost">← Volver a clientes</a>

@@ -19,7 +19,7 @@
       <div class="form-col form-col--main">
         <div class="form-section">
           <h2 class="form-section__title">Documento tecnico</h2>
-          <p class="form-section__lead">El modulo de Documentos trabaja sobre productos ya creados en el catalogo y deja preparada la relacion futura con Storage.</p>
+          <p class="form-section__lead">El módulo de Documentos trabaja sobre productos ya creados en el catálogo.</p>
 
           <div class="form-field" [class.form-field--error]="hasError('title')">
             <label class="form-field__label" for="title">Titulo <span class="required">*</span></label>
@@ -77,13 +77,13 @@
         </div>
 
         <div class="form-section">
-          <h2 class="form-section__title">Archivo mock</h2>
+          <h2 class="form-section__title">Archivo registrado</h2>
 
           <div class="form-grid">
             <div class="form-field" [class.form-field--error]="hasError('fileName')">
               <label class="form-field__label" for="fileName">Nombre de archivo <span class="required">*</span></label>
               <input id="fileName" type="text" class="form-field__input" formControlName="fileName" placeholder="manual-alphavet-300-es.pdf">
-              <span *ngIf="hasError('fileName', 'required')" class="form-field__error">Define un nombre de archivo mock.</span>
+              <span *ngIf="hasError('fileName', 'required')" class="form-field__error">Define un nombre de archivo para el registro.</span>
             </div>
 
             <div class="form-field">
@@ -103,7 +103,7 @@
         <div class="form-section">
           <h2 class="form-section__title">Control</h2>
           <div class="summary-note">
-            Esta fase registra solo metadatos mock. La carga real del archivo se conectara despues con Supabase Storage.
+            Esta sección registra los metadatos del documento y su asociación administrativa.
           </div>
         </div>
       </div>
@@ -121,3 +121,7 @@
     </div>
   </form>
 </ng-container>
+
+
+
+

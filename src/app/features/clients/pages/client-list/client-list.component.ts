@@ -5,19 +5,20 @@ import { FormsModule } from '@angular/forms';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
-import { ClientMockService } from '../../services/client.mock.service';
+import { ClientSupabaseService } from '../../services/client.supabase.service';
 import { Client, ClientType, ClientStatus } from '../../../../core/models/client.model';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'bc-client-list',
   standalone: true,
   imports: [
-    CommonModule, 
-    RouterLink, 
+    CommonModule,
+    RouterLink,
     FormsModule,
-    PageHeaderComponent, 
-    StatusBadgeComponent, 
+    PageHeaderComponent,
+    StatusBadgeComponent,
     LoaderComponent,
     CustomSelectComponent
   ],
@@ -25,49 +26,66 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
   styleUrls: ['./client-list.component.css']
 })
 export class ClientListComponent implements OnInit {
-  private clientService = inject(ClientMockService);
+  private clientService = inject(ClientSupabaseService);
 
-  // Estado
   isLoading = signal<boolean>(true);
+  errorMessage = signal<string>('');
   searchQuery = signal<string>('');
   selectedType = signal<string>('all');
-  
-  // Opciones de filtro
+
   clientTypes = Object.values(ClientType);
   typeOptions = [
     { value: 'all', label: 'Todos los Tipos' },
     ...this.clientTypes.map(t => ({ value: t, label: this.getTypeLabel(t) }))
   ];
-  
-  // Título y Breadcrumbs
+
   pageTitle = 'Clientes';
   breadcrumbs = [
     { label: 'Inicio', url: '/dashboard' },
     { label: 'Clientes' }
   ];
 
-  // Datos
+  private _clients = signal<Client[]>([]);
+
   clients = computed(() => {
-    let result = this.clientService.clients();
-    
-    // Filtrar por tipo
+    let result = this._clients();
+
     if (this.selectedType() !== 'all') {
       result = result.filter(c => c.clientType === this.selectedType());
     }
-    
-    // Búsqueda
+
     const search = this.searchQuery().toLowerCase().trim();
     if (search) {
-      result = result.filter(c => 
-        c.businessName.toLowerCase().includes(search) || 
-        c.contactName.toLowerCase().includes(search) ||
+      result = result.filter(c =>
+        (c.businessName?.toLowerCase().includes(search)) ||
+        (c.contactName?.toLowerCase().includes(search)) ||
         (c.tradeName && c.tradeName.toLowerCase().includes(search)) ||
-        c.email.toLowerCase().includes(search)
+        (c.email?.toLowerCase().includes(search))
       );
     }
-    
+
     return result;
   });
+
+  readonly hasActiveFilters = computed(() => !!this.searchQuery().trim() || this.selectedType() !== 'all');
+
+  get emptyStateTitle(): string {
+    if (this.errorMessage()) {
+      return 'No se pudo cargar la información';
+    }
+
+    return this.hasActiveFilters() ? 'No se encontraron clientes' : 'No hay clientes registrados';
+  }
+
+  get emptyStateText(): string {
+    if (this.errorMessage()) {
+      return this.errorMessage();
+    }
+
+    return this.hasActiveFilters()
+      ? 'Intenta ajustar los filtros o el término de búsqueda.'
+      : 'No hay clientes comerciales disponibles en este momento.';
+  }
 
   async ngOnInit() {
     await this.loadClients();
@@ -75,8 +93,17 @@ export class ClientListComponent implements OnInit {
 
   async loadClients() {
     this.isLoading.set(true);
-    await this.clientService.getClients();
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      const data = await firstValueFrom(this.clientService.getClients());
+      this._clients.set(data);
+    } catch (err) {
+      this._clients.set([]);
+      this.errorMessage.set(err instanceof Error ? err.message : 'No fue posible cargar los clientes.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   onSearch(query: string) {

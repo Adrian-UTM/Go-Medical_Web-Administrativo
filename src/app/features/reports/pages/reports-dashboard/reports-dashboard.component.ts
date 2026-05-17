@@ -1,9 +1,6 @@
-// features/reports/pages/reports-dashboard/reports-dashboard.component.ts
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, NgClass, NgIf } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
+import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ReportsMockService } from '../../services/reports-mock.service';
-import { OrderMockService } from '../../../orders/services/order.mock.service';
 import { RevenueSummaryCardsComponent } from '../../components/revenue-summary-cards/revenue-summary-cards.component';
 import { TopProductsTableComponent } from '../../components/top-products-table/top-products-table.component';
 import { LowProductsTableComponent } from '../../components/low-products-table/low-products-table.component';
@@ -19,13 +16,16 @@ import {
   ProductSalesRow,
   ReportFilters,
   ReportKpis,
+  TicketStatusRow,
 } from '../../models/report.model';
+import { ReportsSupabaseService } from '../../services/reports.supabase.service';
 
 @Component({
   selector: 'bc-reports-dashboard',
   standalone: true,
   imports: [
     NgIf,
+    NgFor,
     NgClass,
     DatePipe,
     FormsModule,
@@ -40,34 +40,45 @@ import {
   templateUrl: './reports-dashboard.component.html',
   styleUrl: './reports-dashboard.component.css',
 })
-export class ReportsDashboardComponent implements OnInit {
-  private readonly reportsService = inject(ReportsMockService);
-  private readonly orderService = inject(OrderMockService);
+export class ReportsDashboardComponent {
+  private readonly reportsService = inject(ReportsSupabaseService);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly minReportDate = '2026-01-01';
   readonly maxReportDate = this.toDateInputValue(new Date());
 
-  kpis = signal<ReportKpis | null>(null);
-  topProducts = signal<ProductSalesRow[] | null>(null);
-  lowProducts = signal<ProductLowSalesRow[] | null>(null);
-  topCustomers = signal<CustomerSalesRow[] | null>(null);
-  orderAnalytics = signal<OrderStatsSnapshot | null>(null);
-  orderAnalyticsOrders = signal<Order[]>([]);
-  orderAnalyticsGrouping = signal<OrderStatsGrouping>('day');
-  orderCountSeries = signal<OrderPeriodChartDatum[]>([]);
-  orderRevenueSeries = signal<OrderPeriodChartDatum[]>([]);
+  readonly kpis = signal<ReportKpis | null>(null);
+  readonly topProducts = signal<ProductSalesRow[]>([]);
+  readonly lowProducts = signal<ProductLowSalesRow[]>([]);
+  readonly topCustomers = signal<CustomerSalesRow[]>([]);
+  readonly orderAnalyticsOrders = signal<Order[]>([]);
+  readonly orderAnalytics = signal<OrderStatsSnapshot | null>(null);
+  readonly ticketStatusRows = signal<TicketStatusRow[]>([]);
+  readonly orderAnalyticsGrouping = signal<OrderStatsGrouping>('day');
+  readonly orderCountSeries = signal<OrderPeriodChartDatum[]>([]);
+  readonly orderRevenueSeries = signal<OrderPeriodChartDatum[]>([]);
+
+  readonly hasAnyData = computed(() => {
+    const kpis = this.kpis();
+    return !!kpis && (
+      kpis.totalRevenue > 0 ||
+      kpis.totalOrders > 0 ||
+      this.topProducts().length > 0 ||
+      this.lowProducts().length > 0 ||
+      this.topCustomers().length > 0 ||
+      this.ticketStatusRows().some(row => row.count > 0)
+    );
+  });
 
   filters: ReportFilters = {};
   dateFrom = '';
   dateTo = '';
-
   activeTab: 'top' | 'low' | 'customers' = 'top';
   lastUpdated = new Date().toISOString();
 
-  async ngOnInit(): Promise<void> {
-    await this.loadData();
+  constructor() {
+    void this.loadData();
   }
 
   async applyFilters(): Promise<void> {
@@ -137,35 +148,37 @@ export class ReportsDashboardComponent implements OnInit {
     this.error.set(null);
 
     try {
-      const [kpis, top, low, customers, orders] = await Promise.all([
-        this.reportsService.getKpis(this.filters),
-        this.reportsService.getTopProducts(this.filters),
-        this.reportsService.getLowProducts(this.filters),
-        this.reportsService.getTopCustomers(this.filters),
-        this.orderService.getOrders(),
-      ]);
-
-      this.kpis.set(kpis);
-      this.topProducts.set(top);
-      this.lowProducts.set(low);
-      this.topCustomers.set(customers);
-      this.orderAnalyticsOrders.set(orders);
-      this.rebuildOrderAnalytics();
+      const snapshot = await this.reportsService.getSnapshot(this.filters);
+      this.kpis.set(snapshot.kpis);
+      this.topProducts.set(snapshot.topProducts);
+      this.lowProducts.set(snapshot.lowProducts);
+      this.topCustomers.set(snapshot.topCustomers);
+      this.ticketStatusRows.set(snapshot.ticketStatusRows);
+      this.orderAnalyticsOrders.set(snapshot.orderAnalyticsOrders);
+      this.rebuildOrderAnalytics(snapshot.orderAnalyticsOrders, this.filters.dateFrom, this.filters.dateTo);
       this.lastUpdated = new Date().toISOString();
     } catch (err) {
-      this.error.set('Ocurrió un error al cargar los datos. Intenta de nuevo.');
-      console.error('[ReportsDashboard] Error loading report data:', err);
+      this.error.set(err instanceof Error ? err.message : 'Ocurrio un error al cargar los reportes.');
+      this.kpis.set(null);
+      this.topProducts.set([]);
+      this.lowProducts.set([]);
+      this.topCustomers.set([]);
+      this.ticketStatusRows.set([]);
+      this.orderAnalyticsOrders.set([]);
+      this.orderAnalytics.set(null);
+      this.orderCountSeries.set([]);
+      this.orderRevenueSeries.set([]);
     } finally {
       this.loading.set(false);
     }
   }
 
-  private rebuildOrderAnalytics(): void {
-    const snapshot = buildOrderStatsSnapshot(this.orderAnalyticsOrders(), {
+  private rebuildOrderAnalytics(orders: Order[] = this.orderAnalyticsOrders(), dateFrom?: string, dateTo?: string): void {
+    const snapshot = buildOrderStatsSnapshot(orders, {
       periodPreset: this.dateFrom || this.dateTo ? 'custom' : 'last_30_days',
       grouping: this.orderAnalyticsGrouping(),
-      dateFrom: this.dateFrom || undefined,
-      dateTo: this.dateTo || undefined,
+      dateFrom: dateFrom || this.dateFrom || undefined,
+      dateTo: dateTo || this.dateTo || undefined,
     });
 
     this.orderAnalytics.set(snapshot);
@@ -196,3 +209,6 @@ export class ReportsDashboardComponent implements OnInit {
     return `${year}-${month}-${day}`;
   }
 }
+
+
+

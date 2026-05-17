@@ -56,7 +56,7 @@
 
     <div class="quote-hero__side">
       <div class="action-card">
-        <span class="eyebrow">Acciones mock</span>
+        <span class="eyebrow">Acciones comerciales</span>
         <button type="button" class="btn-primary" (click)="markAsSent()">Marcar como enviada</button>
         <button type="button" class="btn-secondary btn-secondary--block" (click)="approveQuote()">Aprobar</button>
         <button type="button" class="btn-secondary btn-secondary--block" (click)="rejectQuote()">Rechazar</button>
@@ -69,8 +69,8 @@
         <button type="button" class="btn-primary" (click)="downloadPdf()" [disabled]="isGeneratingPdf()">
           {{ isGeneratingPdf() ? 'Generando...' : 'Descargar PDF' }}
         </button>
-        <button type="button" class="btn-secondary btn-secondary--block" (click)="sendByEmailMock()">Enviar por correo</button>
-        <button type="button" class="btn-ghost btn-ghost--block" (click)="sendByWhatsappMock()">Enviar por WhatsApp</button>
+        <button type="button" class="btn-secondary btn-secondary--block" (click)="sendByEmailMock()">Compartir por correo</button>
+        <button type="button" class="btn-ghost btn-ghost--block" (click)="sendByWhatsappMock()">Compartir por WhatsApp</button>
       </div>
     </div>
   </div>
@@ -269,3 +269,6 @@
   <p>La cotizacion no fue encontrada.</p>
   <a routerLink="/cotizaciones" class="btn-ghost">← Volver a cotizaciones</a>
 </div>
+
+
+

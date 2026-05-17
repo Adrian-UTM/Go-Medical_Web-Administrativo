@@ -18,7 +18,7 @@ import {
   QuoteTotals,
   QuoteUpsertPayload,
 } from '../../models/quote.model';
-import { QuotesMockService } from '../../services/quotes.mock.service';
+import { QuoteSupabaseService } from '../../services/quote.supabase.service';
 
 @Component({
   selector: 'bc-quote-form',
@@ -39,7 +39,7 @@ export class QuoteFormComponent {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly quotesService = inject(QuotesMockService);
+  private readonly quotesService = inject(QuoteSupabaseService);
 
   readonly isEditMode = signal(false);
   readonly isLoadingData = signal(true);
@@ -122,21 +122,25 @@ export class QuoteFormComponent {
     const isEditing = !!this.quoteId && this.route.snapshot.url.some(segment => segment.path === 'editar');
     this.isEditMode.set(isEditing);
 
-    const [clients, products] = await Promise.all([
-      this.quotesService.getActiveClients(),
-      this.quotesService.getAvailableProducts(),
-    ]);
+    try {
+      const [clients, products] = await Promise.all([
+        this.quotesService.getActiveClients(),
+        this.quotesService.getAvailableProducts(),
+      ]);
 
-    this.clients.set(clients);
-    this.products.set(products);
+      this.clients.set(clients);
+      this.products.set(products);
 
-    if (isEditing && this.quoteId) {
-      await this.loadQuote(this.quoteId);
-    } else {
-      this.addQuoteLine();
+      if (isEditing && this.quoteId) {
+        await this.loadQuote(this.quoteId);
+      } else {
+        this.addQuoteLine();
+      }
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible preparar el formulario de cotización.');
+    } finally {
+      this.isLoadingData.set(false);
     }
-
-    this.isLoadingData.set(false);
   }
 
   async loadQuote(id: string): Promise<void> {
@@ -215,7 +219,7 @@ export class QuoteFormComponent {
       productId,
       sku: product.sku,
       productName: product.name,
-      unitPrice: product.price_mxn,
+      unitPrice: product.price_mxn ?? product.unit_price_mxn ?? 0,
     }, { emitEvent: false });
 
     this.recalculateTotals();
@@ -248,8 +252,8 @@ export class QuoteFormComponent {
       }
 
       await this.router.navigate(['/cotizaciones', savedQuote.id]);
-    } catch {
-      this.errorMessage.set('Ocurrio un error al guardar la cotizacion. Intenta nuevamente.');
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Ocurrio un error al guardar la cotizacion. Intenta nuevamente.');
     } finally {
       this.isSaving.set(false);
     }

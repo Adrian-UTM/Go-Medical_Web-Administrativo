@@ -26,8 +26,8 @@
 
   <div class="product-hero">
     <div class="product-hero__main">
-      <div class="product-hero__image" *ngIf="product()!.image_url; else emptyProductImage">
-        <img [src]="product()!.image_url" [alt]="product()!.name">
+      <div class="product-hero__image" *ngIf="product()!.media?.length; else emptyProductImage">
+        <img [src]="product()!.media![0].file_path" [alt]="product()!.name">
       </div>
       <ng-template #emptyProductImage>
         <div class="product-hero__image product-hero__image--empty">
@@ -38,8 +38,8 @@
       <div class="product-hero__meta">
         <span class="product-hero__sku">{{ product()!.sku }}</span>
         <bc-status-badge
-          [label]="getStatusBadge(product()!.status).label"
-          [variant]="getStatusBadge(product()!.status).variant"
+          [label]="getStatusBadge(product()!.is_active).label"
+          [variant]="getStatusBadge(product()!.is_active).variant"
           [showDot]="true">
         </bc-status-badge>
         <span class="product-hero__category">{{ getCategoryLabel(product()!.category) }}</span>
@@ -49,8 +49,8 @@
         {{ product()!.description }}
       </p>
 
-      <div class="product-hero__tags" *ngIf="product()!.tags?.length">
-        <span *ngFor="let tag of product()!.tags" class="product-tag">{{ tag }}</span>
+      <div class="product-hero__tags" *ngIf="product()!.application">
+        <span class="product-tag">{{ product()!.application }}</span>
       </div>
     </div>
 
@@ -58,10 +58,10 @@
       <div class="product-price-card">
         <span class="product-price-card__label">Precio MXN</span>
         <span class="product-price-card__value">
-          {{ product()!.price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
+          {{ product()!.unit_price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
         </span>
-        <span *ngIf="product()!.price_usd" class="product-price-card__ref">
-          Ref. USD {{ product()!.price_usd | currency:'USD':'symbol':'1.0-0' }}
+        <span *ngIf="product()!.reference_price_usd" class="product-price-card__ref">
+          Ref. USD {{ product()!.reference_price_usd | currency:'USD':'symbol':'1.0-0' }}
         </span>
         <div class="product-price-card__info" *ngIf="product()!.brand">
           <span>{{ product()!.brand }}</span>
@@ -97,11 +97,11 @@
         </div>
         <div class="info-item">
           <span class="info-item__label">Precio MXN</span>
-          <span class="info-item__value">{{ product()!.price_mxn | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+          <span class="info-item__value">{{ product()!.unit_price_mxn | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
         </div>
-        <div class="info-item" *ngIf="product()!.price_usd">
+        <div class="info-item" *ngIf="product()!.reference_price_usd">
           <span class="info-item__label">Ref. USD</span>
-          <span class="info-item__value">{{ product()!.price_usd | currency:'USD':'symbol':'1.2-2' }}</span>
+          <span class="info-item__value">{{ product()!.reference_price_usd | currency:'USD':'symbol':'1.2-2' }}</span>
         </div>
         <div class="info-item">
           <span class="info-item__label">Creado</span>
@@ -161,10 +161,10 @@
           <div class="document-card__actions">
             <a [routerLink]="['/documentos', doc.id]" class="btn-ghost-sm">Ver detalle</a>
             <button type="button" class="btn-ghost-sm" (click)="downloadDocument(doc)" [disabled]="processingDocumentId() === doc.id">
-              Descargar mock
+              Abrir documento
             </button>
             <button type="button" class="btn-ghost-sm" (click)="archiveDocument(doc)" [disabled]="doc.status === 'archived' || processingDocumentId() === doc.id">
-              Archivar mock
+              Archivar documento
             </button>
           </div>
         </article>
@@ -185,7 +185,7 @@
         <table class="spec-table">
           <tbody>
             <tr *ngFor="let spec of getSpecsByGroup(product()!, group)" class="spec-table__row">
-              <td class="spec-table__name">{{ spec.spec_name }}</td>
+              <td class="spec-table__name">{{ spec.spec_key }}</td>
               <td class="spec-table__value">{{ spec.spec_value }}</td>
             </tr>
           </tbody>
@@ -199,3 +199,5 @@
   <p>El producto no fue encontrado.</p>
   <a routerLink="/productos" class="btn-ghost">← Volver a productos</a>
 </div>
+
+

@@ -8,7 +8,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Product } from '../../../../models/product.model';
-import { DocumentsMockService } from '../../services/documents.mock.service';
+import { DocumentsSupabaseService } from '../../services/documents.supabase.service';
 import { DocumentStatus, DocumentType, SystemDocument } from '../../models/document.model';
 
 @Component({
@@ -29,7 +29,7 @@ import { DocumentStatus, DocumentType, SystemDocument } from '../../models/docum
   styleUrl: './document-list.component.css',
 })
 export class DocumentListComponent {
-  private readonly documentsService = inject(DocumentsMockService);
+  private readonly documentsService = inject(DocumentsSupabaseService);
 
   readonly isLoading = signal(true);
   readonly isProcessing = signal<string | null>(null);
@@ -97,13 +97,22 @@ export class DocumentListComponent {
 
   async loadData(): Promise<void> {
     this.isLoading.set(true);
-    const [documents, products] = await Promise.all([
-      this.documentsService.getDocuments(),
-      this.documentsService.getAvailableProducts(),
-    ]);
-    this.documents.set(documents);
-    this.products.set(products);
-    this.isLoading.set(false);
+    this.actionMessage.set('');
+
+    try {
+      const [documents, products] = await Promise.all([
+        this.documentsService.getDocuments(),
+        this.documentsService.getAvailableProducts(),
+      ]);
+      this.documents.set(documents);
+      this.products.set(products);
+    } catch (error) {
+      this.documents.set([]);
+      this.products.set([]);
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los documentos técnicos.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {
@@ -118,7 +127,9 @@ export class DocumentListComponent {
 
     try {
       await this.documentsService.triggerMockDownload(systemDocument);
-      this.actionMessage.set(`Descarga mock preparada para ${systemDocument.fileName}.`);
+      this.actionMessage.set(`Documento abierto para ${systemDocument.fileName}.`);
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible abrir el documento.');
     } finally {
       this.isProcessing.set(null);
     }
@@ -138,7 +149,9 @@ export class DocumentListComponent {
       }
 
       this.documents.update(current => current.map(item => item.id === updated.id ? updated : item));
-      this.actionMessage.set(`Documento ${updated.title} archivado en flujo mock.`);
+      this.actionMessage.set(`Documento ${updated.title} archivado correctamente.`);
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible archivar el documento.');
     } finally {
       this.isProcessing.set(null);
     }

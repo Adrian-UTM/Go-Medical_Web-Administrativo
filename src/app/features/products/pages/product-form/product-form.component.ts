@@ -6,8 +6,8 @@ import { NgFor, NgIf } from '@angular/common';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
-import { ProductsMockService } from '../../services/products.mock.service';
-import { ProductCategory, ProductStatus } from '../../../../models/product.model';
+import { ProductSupabaseService } from '../../services/product.supabase.service';
+import { ProductCategory, ProductApplication, StockUnit } from '../../../../models/product.model';
 
 @Component({
   selector: 'bc-product-form',
@@ -23,7 +23,7 @@ export class ProductFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fb = inject(FormBuilder);
-  private productsService = inject(ProductsMockService);
+  private productsService = inject(ProductSupabaseService);
 
   isEditMode = false;
   productId: string | null = null;
@@ -37,28 +37,47 @@ export class ProductFormComponent implements OnInit {
     name: ['', [Validators.required, Validators.maxLength(150)]],
     description: ['', Validators.maxLength(500)],
     category: ['', Validators.required],
-    status: [ProductStatus.Active, Validators.required],
+    application: [ProductApplication.General, Validators.required],
+    is_active: [true, Validators.required],
     brand: ['', Validators.maxLength(80)],
     model: ['', Validators.maxLength(80)],
-    image_url: [''],
-    price_mxn: [null, [Validators.required, Validators.min(0)]],
-    price_usd: [null, Validators.min(0)],
-    tags_raw: [''],
+    unit_price_mxn: [0, [Validators.required, Validators.min(0)]],
+    cost_price_mxn: [0, [Validators.required, Validators.min(0)]],
+    reference_price_usd: [null, Validators.min(0)],
+    currency: ['MXN', Validators.required],
+    unit: [StockUnit.Pieza, Validators.required],
   });
 
   readonly categories = [
-    { value: ProductCategory.UltrasoundVet, label: 'Ultrasonido Veterinario' },
-    { value: ProductCategory.UltrasoundHuman, label: 'Ultrasonido Humano' },
-    { value: ProductCategory.Consumables, label: 'Consumibles' },
-    { value: ProductCategory.SpareParts, label: 'Refacciones' },
-    { value: ProductCategory.Services, label: 'Servicios' },
+    { value: ProductCategory.EquipoMedico, label: 'Equipo Médico' },
+    { value: ProductCategory.UltrasonidoHumano, label: 'Ultrasonido Humano' },
+    { value: ProductCategory.UltrasonidoVeterinario, label: 'Ultrasonido Veterinario' },
+    { value: ProductCategory.Consumible, label: 'Consumibles' },
+    { value: ProductCategory.Refaccion, label: 'Refacciones' },
+    { value: ProductCategory.Accesorio, label: 'Accesorios' },
+    { value: ProductCategory.Servicio, label: 'Servicios' },
+  ];
+
+  readonly applications = [
+    { value: ProductApplication.Humano, label: 'Uso Humano' },
+    { value: ProductApplication.Veterinario, label: 'Uso Veterinario' },
+    { value: ProductApplication.Ambos, label: 'Ambos' },
+    { value: ProductApplication.General, label: 'General' },
+  ];
+
+  readonly units = [
+    { value: StockUnit.Pieza, label: 'Pieza' },
+    { value: StockUnit.Caja, label: 'Caja' },
+    { value: StockUnit.Unidad, label: 'Unidad' },
+    { value: StockUnit.Litro, label: 'Litro' },
+    { value: StockUnit.Rollo, label: 'Rollo' },
+    { value: StockUnit.Paquete, label: 'Paquete' },
+    { value: StockUnit.Servicio, label: 'Servicio' },
   ];
 
   readonly statuses = [
-    { value: ProductStatus.Active, label: 'Activo' },
-    { value: ProductStatus.Draft, label: 'Borrador' },
-    { value: ProductStatus.Inactive, label: 'Inactivo' },
-    { value: ProductStatus.Discontinued, label: 'Descontinuado' },
+    { value: 'true', label: 'Activo' },
+    { value: 'false', label: 'Inactivo' },
   ];
 
   get pageTitle(): string {
@@ -79,14 +98,13 @@ export class ProductFormComponent implements OnInit {
 
     if (this.isEditMode && this.productId) {
       this.isLoadingData.set(true);
-      this.productsService.getProduct(this.productId).subscribe({
+      this.productsService.getProductById(this.productId).subscribe({
         next: (product) => {
           if (product) {
             this.form.patchValue({
               ...product,
-              tags_raw: (product.tags ?? []).join(', '),
+              is_active: product.is_active ? 'true' : 'false'
             });
-            this.imagePreview.set(product.image_url ?? '');
           }
           this.isLoadingData.set(false);
         },
@@ -132,15 +150,12 @@ export class ProductFormComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    const { tags_raw, ...rest } = this.form.value;
     const dto = {
-      ...rest,
-      image_url: rest.image_url || undefined,
-      tags: tags_raw
-        ? (tags_raw as string).split(',').map((t: string) => t.trim()).filter(Boolean)
-        : [],
-      price_mxn: Number(rest.price_mxn),
-      price_usd: rest.price_usd ? Number(rest.price_usd) : undefined,
+      ...this.form.value,
+      is_active: this.form.value.is_active === 'true',
+      unit_price_mxn: Number(this.form.value.unit_price_mxn),
+      cost_price_mxn: Number(this.form.value.cost_price_mxn),
+      reference_price_usd: this.form.value.reference_price_usd ? Number(this.form.value.reference_price_usd) : undefined,
     };
 
     const operation = this.isEditMode && this.productId

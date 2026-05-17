@@ -5,7 +5,7 @@ import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/componen
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { ProductCategory } from '../../../../models/product.model';
-import { DocumentsMockService } from '../../services/documents.mock.service';
+import { DocumentsSupabaseService } from '../../services/documents.supabase.service';
 import { DocumentStatus, DocumentType, RelatedEntityType, SystemDocument } from '../../models/document.model';
 
 @Component({
@@ -24,7 +24,7 @@ import { DocumentStatus, DocumentType, RelatedEntityType, SystemDocument } from 
 })
 export class DocumentDetailComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly documentsService = inject(DocumentsMockService);
+  private readonly documentsService = inject(DocumentsSupabaseService);
 
   readonly isLoading = signal(true);
   readonly isProcessing = signal(false);
@@ -53,22 +53,27 @@ export class DocumentDetailComponent {
     }
 
     this.isLoading.set(true);
-    const systemDocument = await this.documentsService.getDocumentById(id);
 
-    if (!systemDocument) {
+    try {
+      const systemDocument = await this.documentsService.getDocumentById(id);
+
+      if (!systemDocument) {
+        this.documentRecord.set(null);
+        return;
+      }
+
+      this.documentRecord.set(systemDocument);
+
+      if (systemDocument.productId) {
+        const product = await this.documentsService.getProductById(systemDocument.productId);
+        this.productCategoryLabel.set(product ? this.getCategoryLabel(product.category) : '');
+      }
+    } catch (error) {
       this.documentRecord.set(null);
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar el documento.');
+    } finally {
       this.isLoading.set(false);
-      return;
     }
-
-    this.documentRecord.set(systemDocument);
-
-    if (systemDocument.productId) {
-      const product = await this.documentsService.getProductById(systemDocument.productId);
-      this.productCategoryLabel.set(product ? this.getCategoryLabel(product.category) : '');
-    }
-
-    this.isLoading.set(false);
   }
 
   async downloadDocument(): Promise<void> {
@@ -81,7 +86,9 @@ export class DocumentDetailComponent {
 
     try {
       await this.documentsService.triggerMockDownload(systemDocument);
-      this.actionMessage.set(`Descarga mock preparada para ${systemDocument.fileName}.`);
+      this.actionMessage.set(`Documento abierto para ${systemDocument.fileName}.`);
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible abrir el documento.');
     } finally {
       this.isProcessing.set(false);
     }
@@ -102,7 +109,9 @@ export class DocumentDetailComponent {
       }
 
       this.documentRecord.set(updated);
-      this.actionMessage.set(`Documento ${updated.title} archivado en flujo mock.`);
+      this.actionMessage.set(`Documento ${updated.title} archivado correctamente.`);
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible archivar el documento.');
     } finally {
       this.isProcessing.set(false);
     }
@@ -146,7 +155,14 @@ export class DocumentDetailComponent {
   }
 
   private getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -154,6 +170,6 @@ export class DocumentDetailComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 }

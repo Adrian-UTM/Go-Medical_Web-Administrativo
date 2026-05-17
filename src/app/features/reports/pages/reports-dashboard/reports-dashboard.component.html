@@ -1,5 +1,3 @@
-<!-- reports-dashboard.component.html -->
-
 <div class="page-header">
   <div class="page-header__left">
     <nav class="breadcrumb" aria-label="Navegación">
@@ -8,7 +6,7 @@
       <span class="breadcrumb__item breadcrumb__item--active">Reportes</span>
     </nav>
     <h1 class="page-title">Reportes Comerciales</h1>
-    <p class="page-subtitle">Análisis de ventas, productos y rendimiento comercial de Go Medical.</p>
+    <p class="page-subtitle">Análisis operativo y comercial del negocio.</p>
   </div>
   <div class="page-header__actions">
     <span class="last-updated">
@@ -33,7 +31,7 @@
   <div class="filters-panel__row">
     <div class="filter-group">
       <label class="filter-label">Desde</label>
-      <div class="date-picker-shell" #fromPickerShell>
+      <div class="date-picker-shell">
         <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(fromDateInput)">
           <span>{{ formatFilterDate(dateFrom) }}</span>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -97,9 +95,13 @@
   <bc-revenue-summary-cards [kpis]="null" />
 </section>
 
-<section class="section-block" *ngIf="!loading() && kpis()">
+<section class="section-block" *ngIf="!loading()">
   <bc-revenue-summary-cards [kpis]="kpis()" />
 </section>
+
+<div class="empty-report-note" *ngIf="!loading() && !hasAnyData()">
+  No hay información suficiente para generar este reporte.
+</div>
 
 <div class="section-divider" *ngIf="!loading()">
   <span class="section-divider__label">Análisis detallado</span>
@@ -107,32 +109,13 @@
 
 <div class="tables-block" *ngIf="!loading()">
   <div class="tab-nav">
-    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'top'"
-            (click)="setTab('top')" id="tab-top">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-        <polyline points="16 7 22 7 22 13"/>
-      </svg>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'top'" (click)="setTab('top')">
       Más vendidos
     </button>
-    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'low'"
-            (click)="setTab('low')" id="tab-low">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>
-        <polyline points="16 17 22 17 22 11"/>
-      </svg>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'low'" (click)="setTab('low')">
       Menos vendidos
     </button>
-    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'customers'"
-            (click)="setTab('customers')" id="tab-customers">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'customers'" (click)="setTab('customers')">
       Clientes principales
     </button>
   </div>
@@ -142,7 +125,7 @@
       <div class="table-header">
         <div>
           <h2 class="table-title">Productos más vendidos</h2>
-          <p class="table-subtitle">Ordenados por unidades vendidas en pedidos completados.</p>
+          <p class="table-subtitle">Ordenados por unidades vendidas en pedidos pagados, enviados o entregados.</p>
         </div>
       </div>
       <bc-top-products-table [rows]="topProducts()" />
@@ -152,7 +135,7 @@
       <div class="table-header">
         <div>
           <h2 class="table-title">Productos de baja rotación</h2>
-          <p class="table-subtitle">Productos con menor movimiento de ventas. Candidatos a revisión de stock o estrategia.</p>
+          <p class="table-subtitle">Cruce de ventas e inventario para detectar bajo movimiento.</p>
         </div>
       </div>
       <bc-low-products-table [rows]="lowProducts()" />
@@ -162,7 +145,7 @@
       <div class="table-header">
         <div>
           <h2 class="table-title">Clientes principales</h2>
-          <p class="table-subtitle">Ordenados por volumen de compra total en el período seleccionado.</p>
+          <p class="table-subtitle">Ordenados por volumen de compra dentro del periodo seleccionado.</p>
         </div>
       </div>
       <bc-top-customers-table [rows]="topCustomers()" />
@@ -174,7 +157,7 @@
   <div class="order-analytics__header">
     <div>
       <h2 class="table-title">Analítica de pedidos</h2>
-      <p class="table-subtitle">Serie temporal y comportamiento operativo de pedidos dentro del módulo de Reportes.</p>
+      <p class="table-subtitle">Serie temporal y comportamiento operativo de los pedidos.</p>
     </div>
     <div class="order-analytics__controls">
       <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'day'" (click)="setOrderAnalyticsGrouping('day')">Día</button>
@@ -188,14 +171,14 @@
   <div class="order-analytics__charts">
     <bc-order-period-chart
       title="Pedidos por periodo"
-      subtitle="Comportamiento de volumen segun la agrupacion seleccionada"
+      subtitle="Comportamiento de volumen según la agrupación seleccionada"
       [series]="orderCountSeries()"
       valueType="count">
     </bc-order-period-chart>
 
     <bc-order-period-chart
       title="Ingresos por periodo"
-      subtitle="Suma de totales no cancelados por periodo"
+      subtitle="Suma de totales de pedidos no cancelados por periodo"
       [series]="orderRevenueSeries()"
       valueType="currency">
     </bc-order-period-chart>
@@ -207,11 +190,27 @@
   </div>
 </section>
 
+<section class="ticket-status-panel" *ngIf="!loading()">
+  <div class="table-header">
+    <div>
+      <h2 class="table-title">Tickets por estado</h2>
+      <p class="table-subtitle">Distribución actual de soporte técnico.</p>
+    </div>
+  </div>
+
+  <div class="ticket-status-grid">
+    <article *ngFor="let row of ticketStatusRows()" class="ticket-status-card">
+      <span class="ticket-status-card__label">{{ row.label }}</span>
+      <strong class="ticket-status-card__value">{{ row.count }}</strong>
+    </article>
+  </div>
+</section>
+
 <div class="dev-note" *ngIf="!loading()">
   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
     <line x1="12" y1="16" x2="12.01" y2="16"/>
   </svg>
-  <span><strong>Datos mock.</strong> Al conectar Supabase, los KPIs se calcularán con RPCs o Edge Functions con agregaciones SQL (GROUP BY, SUM) sobre las tablas <code>orders</code>, <code>order_items</code>, <code>products</code> e <code>inventory_stocks</code>.</span>
+  <span>Si una sección aparece vacía, no hay información disponible para el periodo seleccionado.</span>
 </div>

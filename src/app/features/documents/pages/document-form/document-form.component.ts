@@ -8,7 +8,7 @@ import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/componen
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Product, ProductCategory } from '../../../../models/product.model';
-import { DocumentsMockService } from '../../services/documents.mock.service';
+import { DocumentsSupabaseService } from '../../services/documents.supabase.service';
 import { DocumentStatus, DocumentType, RelatedEntityType } from '../../models/document.model';
 
 @Component({
@@ -30,7 +30,7 @@ export class DocumentFormComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly documentsService = inject(DocumentsMockService);
+  private readonly documentsService = inject(DocumentsSupabaseService);
 
   readonly isLoadingData = signal(true);
   readonly isSaving = signal(false);
@@ -100,21 +100,27 @@ export class DocumentFormComponent {
 
   async initialize(): Promise<void> {
     this.isLoadingData.set(true);
-    this.products.set(await this.documentsService.getAvailableProducts());
 
-    const preselectedEntity = this.route.snapshot.queryParamMap.get('relatedEntityType');
-    const preselectedProductId = this.route.snapshot.queryParamMap.get('productId');
+    try {
+      this.products.set(await this.documentsService.getAvailableProducts());
 
-    if (preselectedEntity && Object.values(RelatedEntityType).includes(preselectedEntity as RelatedEntityType)) {
-      this.form.patchValue({ relatedEntityType: preselectedEntity as RelatedEntityType });
+      const preselectedEntity = this.route.snapshot.queryParamMap.get('relatedEntityType');
+      const preselectedProductId = this.route.snapshot.queryParamMap.get('productId');
+
+      if (preselectedEntity && Object.values(RelatedEntityType).includes(preselectedEntity as RelatedEntityType)) {
+        this.form.patchValue({ relatedEntityType: preselectedEntity as RelatedEntityType });
+      }
+
+      if (preselectedProductId) {
+        this.form.patchValue({ productId: preselectedProductId });
+        this.onProductSelected(preselectedProductId);
+      }
+    } catch (error) {
+      this.products.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible preparar el formulario de documentos.');
+    } finally {
+      this.isLoadingData.set(false);
     }
-
-    if (preselectedProductId) {
-      this.form.patchValue({ productId: preselectedProductId });
-      this.onProductSelected(preselectedProductId);
-    }
-
-    this.isLoadingData.set(false);
   }
 
   onProductSelected(productId: string): void {
@@ -147,8 +153,8 @@ export class DocumentFormComponent {
       });
 
       await this.router.navigate(['/documentos', created.id]);
-    } catch {
-      this.errorMessage.set('No fue posible registrar el documento mock. Intenta nuevamente.');
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible registrar el documento.');
     } finally {
       this.isSaving.set(false);
     }
@@ -164,7 +170,14 @@ export class DocumentFormComponent {
   }
 
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -172,7 +185,7 @@ export class DocumentFormComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 
   private updateProductRequirement(entityType: RelatedEntityType): void {

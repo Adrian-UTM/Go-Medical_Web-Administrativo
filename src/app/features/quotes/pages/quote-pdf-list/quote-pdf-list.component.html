@@ -18,7 +18,7 @@
 </bc-page-header>
 
 <div class="info-banner info-banner--soft">
-  Mientras no exista almacenamiento en backend, esta vista regenera el PDF en frontend usando la informacion mock actual de la cotizacion.
+  Mientras no exista almacenamiento en backend, esta vista regenera el PDF en frontend usando la informacion actual de la cotizacion.
 </div>
 
 <div *ngIf="actionMessage()" class="info-banner">
@@ -116,7 +116,7 @@
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.63 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.29a2 2 0 0 1 2.11-.45c.84.3 1.72.51 2.62.63A2 2 0 0 1 22 16.92z"/>
               </svg>
             </button>
-            <button type="button" class="btn-icon" (click)="sendByEmailMock(quote)" aria-label="Enviar por correo" title="Enviar por correo">
+            <button type="button" class="btn-icon" (click)="sendByEmailMock(quote)" aria-label="Compartir por correo" title="Compartir por correo">
               <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
@@ -132,4 +132,6 @@
     <span class="table-count">{{ filteredQuotes().length }} PDF{{ filteredQuotes().length !== 1 ? 's' : '' }} disponible{{ filteredQuotes().length !== 1 ? 's' : '' }} para regeneracion</span>
   </div>
 </div>
+
+
 

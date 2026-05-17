@@ -1,33 +1,29 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink, Router } from '@angular/router';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
-import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
-import { ClientMockService } from '../../services/client.mock.service';
-import { Client, ClientType, ClientStatus } from '../../../../core/models/client.model';
+import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
+import { ClientSupabaseService } from '../../services/client.supabase.service';
+import { Client, ClientStatus, ClientType } from '../../../../core/models/client.model';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'bc-client-detail',
   standalone: true,
-  imports: [
-    CommonModule, 
-    RouterLink, 
-    PageHeaderComponent, 
-    StatusBadgeComponent, 
-    LoaderComponent
-  ],
+  imports: [CommonModule, RouterLink, PageHeaderComponent, LoaderComponent, StatusBadgeComponent],
   templateUrl: './client-detail.component.html',
   styleUrls: ['./client-detail.component.css']
 })
 export class ClientDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private clientService = inject(ClientMockService);
+  private clientService = inject(ClientSupabaseService);
 
+  // Estado
   isLoading = signal<boolean>(true);
   client = signal<Client | null>(null);
-  
+
   // Tabs for the detail view
   activeTab = signal<'info' | 'history'>('info');
   tabs = [
@@ -39,7 +35,7 @@ export class ClientDetailComponent implements OnInit {
     return [
       { label: 'Inicio', url: '/dashboard' },
       { label: 'Clientes', url: '/clientes' },
-      { label: this.client() ? this.client()!.businessName : 'Detalle' }
+      { label: this.client() ? (this.client()!.businessName || this.client()!.business_name || 'Sin nombre') : 'Detalle' }
     ];
   }
 
@@ -47,25 +43,33 @@ export class ClientDetailComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       await this.loadClient(id);
+    } else {
+      this.router.navigate(['/clientes']);
     }
   }
 
   async loadClient(id: string) {
     this.isLoading.set(true);
-    const client = await this.clientService.getClientById(id);
-    if (client) {
-      this.client.set(client);
-    } else {
+    try {
+      const data = await firstValueFrom(this.clientService.getClientById(id));
+      if (data) {
+        this.client.set(data);
+      } else {
+        this.router.navigate(['/clientes']);
+      }
+    } catch (err) {
+      console.error('Error loading client detail:', err);
       this.router.navigate(['/clientes']);
+    } finally {
+      this.isLoading.set(false);
     }
-    this.isLoading.set(false);
   }
 
   setTab(tabId: 'info' | 'history') {
     this.activeTab.set(tabId);
   }
 
-  getTypeLabel(type: ClientType): string {
+  getTypeLabel(type: ClientType | string): string {
     switch (type) {
       case ClientType.Clinica: return 'Clínica';
       case ClientType.Medico: return 'Médico';

@@ -1,6 +1,3 @@
-// features/reports/models/report.model.ts
-// Modelos para el módulo de Reportes Comerciales / Analítica
-
 export interface ReportKpis {
   totalRevenue: number;
   estimatedProfit: number;
@@ -18,7 +15,6 @@ export interface ProductSalesRow {
   unitsSold: number;
   totalRevenue: number;
   estimatedProfit: number;
-  /** Margen estimado 0–1 */
   marginPct: number;
 }
 
@@ -40,6 +36,12 @@ export interface CustomerSalesRow {
   lastPurchaseDate: string;
 }
 
+export interface TicketStatusRow {
+  status: string;
+  label: string;
+  count: number;
+}
+
 export interface ReportFilters {
   dateFrom?: string;
   dateTo?: string;
@@ -47,7 +49,13 @@ export interface ReportFilters {
   orderStatus?: string;
 }
 
-// Porcentaje de costo estimado sobre precio de venta (mock — sin costo real en este stage)
-// Documentado aquí para fácil reemplazo cuando exista costPrice en el modelo de producto.
-// Equivale a margen bruto ~40% sobre precio de venta.
-export const MOCK_COST_RATIO = 0.60;
+export interface ReportsSnapshot {
+  kpis: ReportKpis;
+  topProducts: ProductSalesRow[];
+  lowProducts: ProductLowSalesRow[];
+  topCustomers: CustomerSalesRow[];
+  orderAnalyticsOrders: import('../../../models/order.model').Order[];
+  ticketStatusRows: TicketStatusRow[];
+}
+
+export const ESTIMATED_COST_RATIO = 0.60;

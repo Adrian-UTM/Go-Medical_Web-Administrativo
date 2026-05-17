@@ -92,8 +92,8 @@
             </ng-template>
             <div>
               <span class="product-name">{{ product.name }}</span>
-              <span *ngIf="product.tags?.length" class="product-tags">
-                <span *ngFor="let tag of product.tags!.slice(0,2)" class="product-tag">{{ tag }}</span>
+              <span class="product-tags">
+                <span class="product-tag">{{ product.application }}</span>
               </span>
             </div>
           </div>
@@ -106,12 +106,12 @@
           <span *ngIf="product.model"> / {{ product.model }}</span>
         </td>
         <td class="text-right data-table__price">
-          {{ product.price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
+          {{ product.unit_price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
         </td>
         <td>
           <bc-status-badge
-            [label]="getStatusBadge(product.status).label"
-            [variant]="getStatusBadge(product.status).variant"
+            [label]="getStatusBadge(product.is_active ?? false).label"
+            [variant]="getStatusBadge(product.is_active ?? false).variant"
             [showDot]="true">
           </bc-status-badge>
         </td>

@@ -8,7 +8,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { ProductCategory } from '../../../../models/product.model';
-import { InventoryMockService } from '../../services/inventory.mock.service';
+import { InventorySupabaseService } from '../../services/inventory.supabase.service';
 import { InventoryStock, InventoryStockStatus } from '../../../../models/inventory.model';
 
 @Component({
@@ -28,9 +28,10 @@ import { InventoryStock, InventoryStockStatus } from '../../../../models/invento
   styleUrl: './stock-list.component.css',
 })
 export class StockListComponent {
-  private readonly inventoryService = inject(InventoryMockService);
+  private readonly inventoryService = inject(InventorySupabaseService);
 
   readonly isLoading = signal(true);
+  readonly errorMessage = signal('');
   readonly stocks = signal<InventoryStock[]>([]);
   readonly searchQuery = signal('');
   readonly selectedCategory = signal<ProductCategory | ''>('');
@@ -38,10 +39,13 @@ export class StockListComponent {
 
   readonly categoryOptions = [
     { value: '', label: 'Todas las categorias' },
-    { value: ProductCategory.UltrasoundVet, label: 'Ultrasonido veterinario' },
-    { value: ProductCategory.UltrasoundHuman, label: 'Ultrasonido humano' },
-    { value: ProductCategory.Consumables, label: 'Consumibles' },
-    { value: ProductCategory.SpareParts, label: 'Refacciones' },
+    { value: ProductCategory.EquipoMedico, label: 'Equipo medico' },
+    { value: ProductCategory.UltrasonidoHumano, label: 'Ultrasonido humano' },
+    { value: ProductCategory.UltrasonidoVeterinario, label: 'Ultrasonido veterinario' },
+    { value: ProductCategory.Consumible, label: 'Consumibles' },
+    { value: ProductCategory.Refaccion, label: 'Refacciones' },
+    { value: ProductCategory.Accesorio, label: 'Accesorios' },
+    { value: ProductCategory.Servicio, label: 'Servicios' },
   ];
 
   readonly stockStatusOptions = [
@@ -80,8 +84,16 @@ export class StockListComponent {
 
   async loadStocks(): Promise<void> {
     this.isLoading.set(true);
-    this.stocks.set(await this.inventoryService.getStocks());
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      this.stocks.set(await this.inventoryService.getStocks());
+    } catch (error) {
+      this.stocks.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar el inventario.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {
@@ -90,8 +102,29 @@ export class StockListComponent {
     this.selectedStockStatus.set('');
   }
 
+  get emptyStateTitle(): string {
+    return this.errorMessage() ? 'Inventario no disponible' : 'Sin registros de inventario';
+  }
+
+  get emptyStateDescription(): string {
+    if (this.errorMessage()) {
+      return this.errorMessage();
+    }
+
+    return this.hasActiveFilters()
+      ? 'No se encontraron existencias con los filtros aplicados.'
+      : 'No hay existencias registradas para mostrar en este módulo.';
+  }
+
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -99,7 +132,7 @@ export class StockListComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 
   getStockStatusBadge(stock: InventoryStock): { label: string; variant: BadgeVariant } {
@@ -113,3 +146,4 @@ export class StockListComponent {
     return map[status];
   }
 }
+

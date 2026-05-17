@@ -1,8 +1,9 @@
 export enum ClientType {
-  Clinica = 'clínica',
-  Medico = 'médico',
+  Clinica = 'clinica',
+  Medico = 'medico',
   Veterinario = 'veterinario',
-  Institucion = 'institución'
+  Institucion = 'institucion',
+  Otro = 'otro'
 }
 
 export enum ClientStatus {
@@ -11,30 +12,61 @@ export enum ClientStatus {
 }
 
 export interface Client {
-  id: string; // UUID mock
-  clientType: ClientType;
+  id: string; 
+  client_type: ClientType;
   status: ClientStatus;
   
   // Datos fiscales / comerciales
-  businessName: string; // razón social
-  tradeName?: string; // nombre comercial (opcional)
+  business_name: string; 
+  trade_name?: string; 
   rfc: string;
   
   // Contacto Principal
-  contactName: string;
-  contactPosition?: string; // opcional
+  contact_name: string;
+  contact_position?: string; 
   email: string;
-  billingEmail?: string; // opcional
+  billing_email?: string; 
   phone: string;
-  
-  // Ubicación
-  address: string;
-  shippingAddress?: string; // opcional
-  city: string;
-  state: string;
   
   // Metadatos
   notes?: string;
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  created_at?: string; 
+  updated_at?: string; 
+
+  // Direcciones (Asociadas desde client_addresses)
+  addresses?: ClientAddress[];
+
+  // Campos Legacy para mocks (eliminar al final)
+  clientType: ClientType;
+  businessName: string;
+  tradeName?: string;
+  contactName: string;
+  contactPosition?: string;
+  billingEmail?: string;
+  address: string;
+  shippingAddress?: string;
+  city: string;
+  state: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ClientAddress {
+  id: string;
+  client_id: string;
+  label?: string;
+  address: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  latitude?: number;
+  longitude?: number;
+  is_default?: boolean;
+  created_at?: string;
+}
+
+export interface ClientFilters {
+  search?: string;
+  clientType?: ClientType;
+  status?: ClientStatus;
 }

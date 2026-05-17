@@ -4,9 +4,10 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
-import { ClientMockService } from '../../services/client.mock.service';
+import { ClientSupabaseService } from '../../services/client.supabase.service';
 import { ClientType, ClientStatus } from '../../../../core/models/client.model';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'bc-client-form',
@@ -24,7 +25,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 })
 export class ClientFormComponent implements OnInit {
   private fb = inject(FormBuilder);
-  private clientService = inject(ClientMockService);
+  private clientService = inject(ClientSupabaseService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -87,31 +88,35 @@ export class ClientFormComponent implements OnInit {
 
   async loadClient(id: string) {
     this.isLoading.set(true);
-    const client = await this.clientService.getClientById(id);
-    
-    if (client) {
-      this.clientForm.patchValue({
-        clientType: client.clientType,
-        status: client.status,
-        businessName: client.businessName,
-        tradeName: client.tradeName,
-        rfc: client.rfc,
-        contactName: client.contactName,
-        contactPosition: client.contactPosition,
-        email: client.email,
-        billingEmail: client.billingEmail,
-        phone: client.phone,
-        address: client.address,
-        shippingAddress: client.shippingAddress,
-        city: client.city,
-        state: client.state,
-        notes: client.notes
-      });
-    } else {
-      // Cliente no encontrado
+    try {
+      const client = await firstValueFrom(this.clientService.getClientById(id));
+      if (client) {
+        this.clientForm.patchValue({
+          clientType: client.clientType || client.client_type,
+          status: client.status,
+          businessName: client.businessName || client.business_name,
+          tradeName: client.tradeName || client.trade_name,
+          rfc: client.rfc,
+          contactName: client.contactName || client.contact_name,
+          contactPosition: client.contactPosition || client.contact_position,
+          email: client.email,
+          billingEmail: client.billingEmail || client.billing_email,
+          phone: client.phone,
+          address: client.address,
+          shippingAddress: client.shippingAddress || client.address,
+          city: client.city,
+          state: client.state,
+          notes: client.notes
+        });
+      } else {
+        this.router.navigate(['/clientes']);
+      }
+    } catch (err) {
+      console.error('Error loading client:', err);
       this.router.navigate(['/clientes']);
+    } finally {
+      this.isLoading.set(false);
     }
-    this.isLoading.set(false);
   }
 
   async onSubmit() {
@@ -125,9 +130,9 @@ export class ClientFormComponent implements OnInit {
 
     try {
       if (this.isEditMode() && this.clientId()) {
-        await this.clientService.updateClient(this.clientId()!, formData);
+        await firstValueFrom(this.clientService.updateClient(this.clientId()!, formData));
       } else {
-        await this.clientService.createClient(formData);
+        await firstValueFrom(this.clientService.createClient(formData));
       }
       this.router.navigate(['/clientes']);
     } catch (error) {

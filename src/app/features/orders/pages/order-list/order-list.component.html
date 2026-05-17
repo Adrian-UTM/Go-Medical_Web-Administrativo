@@ -91,7 +91,7 @@
 <bc-empty-state
   *ngIf="!isLoading() && filteredOrders().length === 0"
   title="Sin pedidos"
-  description="No se encontraron pedidos con los filtros aplicados."
+  [description]="emptyStateDescription"
   [hasAction]="hasActiveFilters()">
   <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>
@@ -153,3 +153,4 @@
     <span class="table-count">{{ filteredOrders().length }} pedido{{ filteredOrders().length !== 1 ? 's' : '' }}</span>
   </div>
 </div>
+

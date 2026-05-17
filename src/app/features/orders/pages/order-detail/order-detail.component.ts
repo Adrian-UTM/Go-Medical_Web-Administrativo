@@ -7,7 +7,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { Client } from '../../../../core/models/client.model';
 import { ProductCategory } from '../../../../models/product.model';
 import { Order, OrderStatus } from '../../../../models/order.model';
-import { OrderMockService } from '../../services/order.mock.service';
+import { OrderSupabaseService } from '../../services/order.supabase.service';
 
 @Component({
   selector: 'bc-order-detail',
@@ -24,7 +24,7 @@ import { OrderMockService } from '../../services/order.mock.service';
 })
 export class OrderDetailComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly orderService = inject(OrderMockService);
+  private readonly orderService = inject(OrderSupabaseService);
 
   readonly isLoading = signal(true);
   readonly order = signal<Order | null>(null);
@@ -52,26 +52,33 @@ export class OrderDetailComponent {
     }
 
     this.isLoading.set(true);
-    const order = await this.orderService.getOrderById(id);
 
-    if (!order) {
+    try {
+      const order = await this.orderService.getOrderById(id);
+
+      if (!order) {
+        this.order.set(null);
+        this.client.set(null);
+        return;
+      }
+
+      this.order.set(order);
+      this.client.set(await this.orderService.getClientById(order.clientId) ?? null);
+    } catch (error) {
       this.order.set(null);
       this.client.set(null);
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar el pedido.');
+    } finally {
       this.isLoading.set(false);
-      return;
     }
-
-    this.order.set(order);
-    this.client.set(await this.orderService.getClientById(order.clientId) ?? null);
-    this.isLoading.set(false);
   }
 
   async markAsPaid(): Promise<void> {
-    await this.updateStatus(OrderStatus.Paid, 'Pedido marcado como pagado en flujo mock.');
+    await this.updateStatus(OrderStatus.Paid, 'Pedido marcado como pagado.');
   }
 
   async markAsShipped(): Promise<void> {
-    await this.updateStatus(OrderStatus.Shipped, 'Pedido marcado como enviado en flujo mock.');
+    await this.updateStatus(OrderStatus.Shipped, 'Pedido marcado como enviado.');
   }
 
   printOrder(): void {
@@ -94,7 +101,14 @@ export class OrderDetailComponent {
   }
 
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -102,7 +116,7 @@ export class OrderDetailComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 
   getShippingAddress(): string {
@@ -123,12 +137,16 @@ export class OrderDetailComponent {
       return;
     }
 
-    const updatedOrder = await this.orderService.updateOrderStatus(this.order()!.id, status);
-    if (!updatedOrder) {
-      return;
-    }
+    try {
+      const updatedOrder = await this.orderService.updateOrderStatus(this.order()!.id, status);
+      if (!updatedOrder) {
+        return;
+      }
 
-    this.order.set(updatedOrder);
-    this.actionMessage.set(message);
+      this.order.set(updatedOrder);
+      this.actionMessage.set(message);
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible actualizar el estado del pedido.');
+    }
   }
 }

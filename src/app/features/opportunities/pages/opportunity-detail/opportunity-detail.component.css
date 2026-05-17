@@ -1,4 +1,5 @@
 .info-banner {
+
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
   border-radius: var(--radius-md);
@@ -6,6 +7,12 @@
   border: 1px solid rgba(45, 106, 159, 0.16);
   color: var(--color-primary);
   font-size: var(--font-size-sm);
+}
+
+.info-banner--error {
+  background-color: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
 .opportunity-hero {
@@ -321,3 +328,4 @@
     flex-direction: column;
   }
 }
+

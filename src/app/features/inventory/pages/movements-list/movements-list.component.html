@@ -1,6 +1,6 @@
 <bc-page-header
   title="Movimientos de inventario"
-  subtitle="Trazabilidad operativa de entradas, salidas y ajustes mock"
+  subtitle="Trazabilidad operativa de entradas, salidas y ajustes reales"
   [breadcrumbs]="[
     { label: 'Inicio', routerLink: '/dashboard' },
     { label: 'Inventario', routerLink: '/inventario' },
@@ -56,7 +56,7 @@
 <bc-empty-state
   *ngIf="!isLoading() && filteredMovements().length === 0"
   title="Sin movimientos"
-  description="No existen movimientos que coincidan con los filtros seleccionados."
+  [description]="emptyStateDescription"
   [hasAction]="hasActiveFilters()">
   <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>

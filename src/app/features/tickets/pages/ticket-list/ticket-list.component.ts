@@ -8,7 +8,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { ServiceTicket, TicketPriority, TicketStatus, TicketType } from '../../models/ticket.model';
-import { TicketsMockService } from '../../services/tickets.mock.service';
+import { TicketSupabaseService } from '../../services/ticket.supabase.service';
 
 @Component({
   selector: 'bc-ticket-list',
@@ -28,9 +28,10 @@ import { TicketsMockService } from '../../services/tickets.mock.service';
   styleUrl: './ticket-list.component.css',
 })
 export class TicketListComponent {
-  private readonly ticketsService = inject(TicketsMockService);
+  private readonly ticketsService = inject(TicketSupabaseService);
 
   readonly isLoading = signal(true);
+  readonly errorMessage = signal('');
   readonly tickets = signal<ServiceTicket[]>([]);
   readonly searchQuery = signal('');
   readonly selectedStatus = signal<TicketStatus | ''>('');
@@ -100,8 +101,16 @@ export class TicketListComponent {
 
   async loadTickets(): Promise<void> {
     this.isLoading.set(true);
-    this.tickets.set(await this.ticketsService.getTickets());
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      this.tickets.set(await this.ticketsService.getTickets());
+    } catch (error) {
+      this.tickets.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los tickets.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {

@@ -8,7 +8,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Product, ProductCategory } from '../../../../models/product.model';
-import { InventoryMockService } from '../../services/inventory.mock.service';
+import { InventorySupabaseService } from '../../services/inventory.supabase.service';
 import { InventoryMovement, MovementType, ReferenceType } from '../../../../models/inventory.model';
 
 @Component({
@@ -29,10 +29,11 @@ import { InventoryMovement, MovementType, ReferenceType } from '../../../../mode
   styleUrl: './movements-list.component.css',
 })
 export class MovementsListComponent {
-  private readonly inventoryService = inject(InventoryMockService);
+  private readonly inventoryService = inject(InventorySupabaseService);
   private readonly route = inject(ActivatedRoute);
 
   readonly isLoading = signal(true);
+  readonly errorMessage = signal('');
   readonly movements = signal<InventoryMovement[]>([]);
   readonly products = signal<Product[]>([]);
   readonly selectedMovementType = signal<MovementType | ''>('');
@@ -54,10 +55,13 @@ export class MovementsListComponent {
 
   readonly categoryOptions = [
     { value: '', label: 'Todas las categorias' },
-    { value: ProductCategory.UltrasoundVet, label: 'Ultrasonido veterinario' },
-    { value: ProductCategory.UltrasoundHuman, label: 'Ultrasonido humano' },
-    { value: ProductCategory.Consumables, label: 'Consumibles' },
-    { value: ProductCategory.SpareParts, label: 'Refacciones' },
+    { value: ProductCategory.EquipoMedico, label: 'Equipo medico' },
+    { value: ProductCategory.UltrasonidoHumano, label: 'Ultrasonido humano' },
+    { value: ProductCategory.UltrasonidoVeterinario, label: 'Ultrasonido veterinario' },
+    { value: ProductCategory.Consumible, label: 'Consumibles' },
+    { value: ProductCategory.Refaccion, label: 'Refacciones' },
+    { value: ProductCategory.Accesorio, label: 'Accesorios' },
+    { value: ProductCategory.Servicio, label: 'Servicios' },
   ];
 
   readonly sortOptions = [
@@ -102,21 +106,28 @@ export class MovementsListComponent {
 
   async initialize(): Promise<void> {
     this.isLoading.set(true);
+    this.errorMessage.set('');
 
-    const [products, movements] = await Promise.all([
-      this.inventoryService.getInventoryProducts(),
-      this.inventoryService.getMovements(),
-    ]);
+    try {
+      const [products, movements] = await Promise.all([
+        this.inventoryService.getInventoryProducts(),
+        this.inventoryService.getMovements(),
+      ]);
 
-    this.products.set(products);
-    this.movements.set(movements);
+      this.products.set(products);
+      this.movements.set(movements);
 
-    const productId = this.route.snapshot.queryParamMap.get('productId');
-    if (productId) {
-      this.selectedProductId.set(productId);
+      const productId = this.route.snapshot.queryParamMap.get('productId');
+      if (productId) {
+        this.selectedProductId.set(productId);
+      }
+    } catch (error) {
+      this.products.set([]);
+      this.movements.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los movimientos de inventario.');
+    } finally {
+      this.isLoading.set(false);
     }
-
-    this.isLoading.set(false);
   }
 
   clearFilters(): void {
@@ -126,8 +137,25 @@ export class MovementsListComponent {
     this.sortDirection.set('desc');
   }
 
+  get emptyStateDescription(): string {
+    if (this.errorMessage()) {
+      return this.errorMessage();
+    }
+
+    return this.hasActiveFilters()
+      ? 'No existen movimientos que coincidan con los filtros seleccionados.'
+      : 'No hay movimientos de inventario registrados.';
+  }
+
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -135,22 +163,7 @@ export class MovementsListComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
-  }
-
-  getMovementTypeLabel(type: MovementType): string {
-    const labels: Record<MovementType, string> = {
-      [MovementType.InitialLoad]: 'Carga inicial',
-      [MovementType.Entry]: 'Entrada',
-      [MovementType.Exit]: 'Salida',
-      [MovementType.Adjustment]: 'Ajuste',
-      [MovementType.OrderReserve]: 'Reserva de pedido',
-      [MovementType.OrderDiscount]: 'Descuento por pedido',
-      [MovementType.Return]: 'Devolucion',
-      [MovementType.ServiceUsage]: 'Uso en servicio',
-    };
-
-    return labels[type];
+    return labels[category] ?? 'Sin categoria';
   }
 
   getReferenceLabel(type: ReferenceType): string {
@@ -180,3 +193,4 @@ export class MovementsListComponent {
     return map[type];
   }
 }
+

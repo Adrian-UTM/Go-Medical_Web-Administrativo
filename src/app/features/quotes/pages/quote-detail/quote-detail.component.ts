@@ -7,7 +7,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { Client } from '../../../../core/models/client.model';
 import { Quote, QuoteStatus } from '../../models/quote.model';
 import { QuotePdfService } from '../../services/quote-pdf.service';
-import { QuotesMockService } from '../../services/quotes.mock.service';
+import { QuoteSupabaseService } from '../../services/quote.supabase.service';
 
 @Component({
   selector: 'bc-quote-detail',
@@ -26,7 +26,7 @@ import { QuotesMockService } from '../../services/quotes.mock.service';
 })
 export class QuoteDetailComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly quotesService = inject(QuotesMockService);
+  private readonly quotesService = inject(QuoteSupabaseService);
   private readonly quotePdfService = inject(QuotePdfService);
 
   readonly isLoading = signal(true);
@@ -57,30 +57,37 @@ export class QuoteDetailComponent {
     }
 
     this.isLoading.set(true);
-    const quote = await this.quotesService.getQuoteById(id);
 
-    if (!quote) {
+    try {
+      const quote = await this.quotesService.getQuoteById(id);
+
+      if (!quote) {
+        this.quote.set(null);
+        this.client.set(null);
+        return;
+      }
+
+      this.quote.set(quote);
+      this.client.set(await this.quotesService.getClientById(quote.clientId) ?? null);
+    } catch (error) {
       this.quote.set(null);
       this.client.set(null);
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar la cotización.');
+    } finally {
       this.isLoading.set(false);
-      return;
     }
-
-    this.quote.set(quote);
-    this.client.set(await this.quotesService.getClientById(quote.clientId) ?? null);
-    this.isLoading.set(false);
   }
 
   async markAsSent(): Promise<void> {
-    await this.updateStatus(QuoteStatus.Sent, 'Cotizacion marcada como enviada en flujo mock.');
+    await this.updateStatus(QuoteStatus.Sent, 'Cotizacion marcada como enviada.');
   }
 
   async approveQuote(): Promise<void> {
-    await this.updateStatus(QuoteStatus.Approved, 'Cotizacion aprobada en flujo mock.');
+    await this.updateStatus(QuoteStatus.Approved, 'Cotizacion aprobada.');
   }
 
   async rejectQuote(): Promise<void> {
-    await this.updateStatus(QuoteStatus.Rejected, 'Cotizacion marcada como rechazada en flujo mock.');
+    await this.updateStatus(QuoteStatus.Rejected, 'Cotizacion marcada como rechazada.');
   }
 
   async convertToOrder(): Promise<void> {
@@ -217,13 +224,17 @@ export class QuoteDetailComponent {
       return;
     }
 
-    const updatedQuote = await this.quotesService.updateQuoteStatus(currentQuote.id, status);
-    if (!updatedQuote) {
-      return;
-    }
+    try {
+      const updatedQuote = await this.quotesService.updateQuoteStatus(currentQuote.id, status);
+      if (!updatedQuote) {
+        return;
+      }
 
-    this.quote.set(updatedQuote);
-    this.actionMessage.set(message);
+      this.quote.set(updatedQuote);
+      this.actionMessage.set(message);
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible actualizar la cotización.');
+    }
   }
 
   private buildEmailBody(quote: Quote, client: Client | null): string {

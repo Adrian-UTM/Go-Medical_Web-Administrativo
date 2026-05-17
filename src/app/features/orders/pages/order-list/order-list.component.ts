@@ -7,7 +7,7 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
-import { OrderMockService } from '../../services/order.mock.service';
+import { OrderSupabaseService } from '../../services/order.supabase.service';
 import { Order, OrderStatsPeriodPreset, OrderStatus } from '../../../../models/order.model';
 import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
 
@@ -30,9 +30,10 @@ import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
   styleUrl: './order-list.component.css',
 })
 export class OrderListComponent {
-  private readonly orderService = inject(OrderMockService);
+  private readonly orderService = inject(OrderSupabaseService);
 
   readonly isLoading = signal(true);
+  readonly errorMessage = signal('');
   readonly orders = signal<Order[]>([]);
   readonly searchQuery = signal('');
   readonly selectedStatus = signal<OrderStatus | ''>('');
@@ -79,8 +80,16 @@ export class OrderListComponent {
 
   async loadOrders(): Promise<void> {
     this.isLoading.set(true);
-    this.orders.set(await this.orderService.getOrders());
-    this.isLoading.set(false);
+    this.errorMessage.set('');
+
+    try {
+      this.orders.set(await this.orderService.getOrders());
+    } catch (error) {
+      this.orders.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los pedidos.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {
@@ -90,6 +99,16 @@ export class OrderListComponent {
 
   setQuickPreset(preset: OrderStatsPeriodPreset): void {
     this.quickPreset.set(preset);
+  }
+
+  get emptyStateDescription(): string {
+    if (this.errorMessage()) {
+      return this.errorMessage();
+    }
+
+    return this.hasActiveFilters()
+      ? 'No se encontraron pedidos con los filtros aplicados.'
+      : 'No hay pedidos registrados por el momento.';
   }
 
   getStatusBadge(status: OrderStatus): { label: string; variant: BadgeVariant } {
@@ -111,3 +130,4 @@ export class OrderListComponent {
     return order.items.reduce((sum, item) => sum + item.quantity, 0);
   }
 }
+

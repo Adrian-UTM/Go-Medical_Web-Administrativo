@@ -12,7 +12,7 @@ import {
   InventoryStock,
   MovementType,
 } from '../../../../models/inventory.model';
-import { InventoryMockService } from '../../services/inventory.mock.service';
+import { InventorySupabaseService } from '../../services/inventory.supabase.service';
 
 @Component({
   selector: 'bc-inventory-adjustment-form',
@@ -32,7 +32,7 @@ export class InventoryAdjustmentFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly inventoryService = inject(InventoryMockService);
+  private readonly inventoryService = inject(InventorySupabaseService);
 
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
@@ -110,7 +110,7 @@ export class InventoryAdjustmentFormComponent {
   }
 
   get projectedWarehouse(): string {
-    return this.currentStock()?.warehouseName ?? 'Almacen General';
+    return this.currentStock()?.warehouseName ?? 'Almacen general';
   }
 
   get emptyPreviewMessage(): string {
@@ -127,15 +127,23 @@ export class InventoryAdjustmentFormComponent {
 
   async initialize(): Promise<void> {
     this.isLoading.set(true);
-    this.products.set(await this.inventoryService.getInventoryProducts());
+    this.errorMessage.set('');
 
-    const productId = this.route.snapshot.queryParamMap.get('productId');
-    if (productId) {
-      this.form.patchValue({ productId }, { emitEvent: true });
+    try {
+      this.products.set(await this.inventoryService.getInventoryProducts());
+
+      const productId = this.route.snapshot.queryParamMap.get('productId');
+      if (productId) {
+        this.form.patchValue({ productId }, { emitEvent: true });
+      }
+
+      await this.syncPreview();
+    } catch (error) {
+      this.products.set([]);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible preparar el formulario de inventario.');
+    } finally {
+      this.isLoading.set(false);
     }
-
-    this.isLoading.set(false);
-    await this.syncPreview();
   }
 
   async onSubmit(): Promise<void> {
@@ -166,7 +174,7 @@ export class InventoryAdjustmentFormComponent {
       });
 
       await this.refreshCurrentStock(movement.productId);
-      this.projectedStock.set(this.currentStock()?.currentStock ?? 0);
+      this.projectedStock.set(movement.resultingStock);
       this.successMessage.set(`Movimiento registrado correctamente. Stock resultante: ${movement.resultingStock}.`);
       this.form.patchValue({
         movementType: MovementType.Entry,
@@ -205,11 +213,25 @@ export class InventoryAdjustmentFormComponent {
     }
 
     await this.refreshCurrentStock(productId);
-    this.projectedStock.set(this.inventoryService.getProjectedStock(productId, movementType, quantity));
+    const baseStock = this.currentStock()?.currentStock ?? 0;
+    this.projectedStock.set(this.calculateProjectedStock(baseStock, movementType, quantity));
   }
 
   private async refreshCurrentStock(productId: string): Promise<void> {
     this.currentStock.set(await this.inventoryService.getStockByProductId(productId) ?? null);
   }
-}
 
+  private calculateProjectedStock(currentStock: number, movementType: MovementType, quantity: number): number {
+    const normalized = Math.abs(Number(quantity) || 0);
+
+    if (movementType === MovementType.Adjustment) {
+      return currentStock + (Number(quantity) || 0);
+    }
+
+    if (movementType === MovementType.Exit) {
+      return currentStock - normalized;
+    }
+
+    return currentStock + normalized;
+  }
+}

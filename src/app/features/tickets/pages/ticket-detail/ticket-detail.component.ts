@@ -9,7 +9,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { Client } from '../../../../core/models/client.model';
 import { ProductCategory } from '../../../../models/product.model';
 import { ServiceTicket, TicketHistoryItem, TicketPriority, TicketStatus, TicketType } from '../../models/ticket.model';
-import { TicketsMockService } from '../../services/tickets.mock.service';
+import { TicketSupabaseService } from '../../services/ticket.supabase.service';
 
 @Component({
   selector: 'bc-ticket-detail',
@@ -29,7 +29,7 @@ import { TicketsMockService } from '../../services/tickets.mock.service';
 })
 export class TicketDetailComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly ticketsService = inject(TicketsMockService);
+  private readonly ticketsService = inject(TicketSupabaseService);
 
   readonly isLoading = signal(true);
   readonly isProcessing = signal(false);
@@ -38,7 +38,7 @@ export class TicketDetailComponent {
   readonly productCategoryLabel = signal('');
   readonly actionMessage = signal('');
   readonly selectedTechnician = signal('');
-  readonly technicianOptions = this.ticketsService.technicians().map(name => ({ value: name, label: name }));
+  readonly technicianOptions = computed(() => this.ticketsService.technicians().map(name => ({ value: name, label: name })));
 
   readonly sortedHistory = computed(() => {
     const currentTicket = this.ticket();
@@ -70,25 +70,31 @@ export class TicketDetailComponent {
     }
 
     this.isLoading.set(true);
-    const currentTicket = await this.ticketsService.getTicketById(id);
 
-    if (!currentTicket) {
+    try {
+      const currentTicket = await this.ticketsService.getTicketById(id);
+
+      if (!currentTicket) {
+        this.ticket.set(null);
+        this.client.set(null);
+        return;
+      }
+
+      this.ticket.set(currentTicket);
+      this.client.set(await this.ticketsService.getClientById(currentTicket.clientId) ?? null);
+      this.selectedTechnician.set(currentTicket.assignedTechnicianName || this.technicianOptions()[0]?.value || '');
+
+      if (currentTicket.productId) {
+        const product = await this.ticketsService.getAvailableProducts().then(products => products.find(item => item.id === currentTicket.productId));
+        this.productCategoryLabel.set(product ? this.getCategoryLabel(product.category) : '');
+      }
+    } catch (error) {
       this.ticket.set(null);
       this.client.set(null);
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar el ticket.');
+    } finally {
       this.isLoading.set(false);
-      return;
     }
-
-    this.ticket.set(currentTicket);
-    this.client.set(await this.ticketsService.getClientById(currentTicket.clientId) ?? null);
-    this.selectedTechnician.set(currentTicket.assignedTechnicianName || this.technicianOptions[0]?.value || '');
-
-    if (currentTicket.productId) {
-      const product = await this.ticketsService.getAvailableProducts().then(products => products.find(item => item.id === currentTicket.productId));
-      this.productCategoryLabel.set(product ? this.getCategoryLabel(product.category) : '');
-    }
-
-    this.isLoading.set(false);
   }
 
   async assignTechnician(): Promise<void> {
@@ -123,7 +129,7 @@ export class TicketDetailComponent {
   }
 
   async cancelTicket(): Promise<void> {
-    await this.changeStatus(TicketStatus.Canceled, 'Ticket cancelado en flujo mock por reasignacion o cierre administrativo.');
+    await this.changeStatus(TicketStatus.Canceled, 'Ticket cancelado por cierre administrativo.');
   }
 
   getStatusBadge(status: TicketStatus): { label: string; variant: BadgeVariant } {
@@ -216,13 +222,22 @@ export class TicketDetailComponent {
       if (updated.assignedTechnicianName) {
         this.selectedTechnician.set(updated.assignedTechnicianName);
       }
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible actualizar el ticket.');
     } finally {
       this.isProcessing.set(false);
     }
   }
 
   private getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -230,6 +245,6 @@ export class TicketDetailComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 }

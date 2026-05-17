@@ -11,6 +11,10 @@
     {{ actionMessage() }}
   </div>
 
+  <div *ngIf="errorMessage()" class="info-banner info-banner--error">
+    {{ errorMessage() }}
+  </div>
+
   <div class="opportunity-hero">
     <div class="opportunity-hero__main">
       <div class="opportunity-hero__meta">
@@ -38,18 +42,18 @@
         </div>
         <div class="summary-item">
           <span class="summary-item__label">Correo</span>
-          <span class="summary-item__value">{{ opportunity()!.contact.email }}</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.email || 'No disponible' }}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-item__label">Telefono</span>
-          <span class="summary-item__value">{{ opportunity()!.contact.phone }}</span>
+          <span class="summary-item__label">Teléfono</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.phone || 'No disponible' }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-item__label">Responsable</span>
           <span class="summary-item__value">{{ opportunity()!.assignedTo }}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-item__label">Ultima actividad</span>
+          <span class="summary-item__label">Última actividad</span>
           <span class="summary-item__value">{{ opportunity()!.lastActivityAt | date:'dd/MM/yyyy HH:mm' }}</span>
         </div>
       </div>
@@ -57,12 +61,12 @@
 
     <div class="opportunity-hero__side">
       <div class="action-card">
-        <span class="action-card__label">Acciones mock</span>
+        <span class="action-card__label">Acciones</span>
         <button type="button" class="btn-primary" (click)="markAsContacted()">Marcar como contactado</button>
         <button type="button" class="btn-secondary" (click)="markAsInterested()">Marcar como interesado</button>
-        <button type="button" class="btn-secondary" (click)="markAsNoResponse()">Marcar como no respondio</button>
+        <button type="button" class="btn-secondary" (click)="markAsNoResponse()">Marcar como no respondió</button>
         <button type="button" class="btn-secondary" (click)="convertToOrder()">Convertir a pedido</button>
-        <button type="button" class="btn-secondary" (click)="convertToQuote()">Convertir a cotizacion</button>
+        <button type="button" class="btn-secondary" (click)="convertToQuote()">Convertir a cotización</button>
         <button type="button" class="btn-ghost" (click)="closeOpportunity()">Cerrar oportunidad</button>
       </div>
     </div>
@@ -73,16 +77,16 @@
       <section class="detail-card">
         <div class="detail-card__header">
           <h2 class="detail-card__title">Productos del carrito</h2>
-          <span class="detail-card__subtitle">Resumen del carrito abandonado o recuperado</span>
+          <span class="detail-card__subtitle">Resumen comercial asociado a la oportunidad</span>
         </div>
 
-        <div class="table-wrapper">
+        <div class="table-wrapper" *ngIf="opportunity()!.items.length > 0; else emptyItems">
           <table class="data-table" aria-label="Productos del carrito">
             <thead>
               <tr>
                 <th scope="col">SKU</th>
                 <th scope="col">Producto</th>
-                <th scope="col">Categoria</th>
+                <th scope="col">Categoría</th>
                 <th scope="col" class="text-center">Cantidad</th>
                 <th scope="col" class="text-right">Precio</th>
                 <th scope="col" class="text-right">Total</th>
@@ -100,15 +104,19 @@
             </tbody>
           </table>
         </div>
+
+        <ng-template #emptyItems>
+          <div class="not-found">No hay productos asociados a esta oportunidad.</div>
+        </ng-template>
       </section>
 
       <section class="detail-card">
         <div class="detail-card__header">
           <h2 class="detail-card__title">Historial de seguimiento</h2>
-          <span class="detail-card__subtitle">Registro comercial mock de interacciones</span>
+          <span class="detail-card__subtitle">Registro de actividades comerciales</span>
         </div>
 
-        <div class="timeline">
+        <div class="timeline" *ngIf="opportunity()!.followUps.length > 0; else emptyFollowUps">
           <div *ngFor="let followUp of opportunity()!.followUps" class="timeline-item">
             <div class="timeline-item__content">
               <div class="timeline-item__top">
@@ -120,6 +128,10 @@
             </div>
           </div>
         </div>
+
+        <ng-template #emptyFollowUps>
+          <div class="not-found">No hay seguimiento registrado para esta oportunidad.</div>
+        </ng-template>
       </section>
     </div>
 
@@ -141,13 +153,13 @@
         <div class="detail-card__header detail-card__header--compact">
           <h2 class="detail-card__title">Notas comerciales</h2>
         </div>
-        <p class="commercial-notes">{{ opportunity()!.commercialNotes }}</p>
+        <p class="commercial-notes">{{ opportunity()!.commercialNotes || 'Sin notas registradas.' }}</p>
       </section>
     </aside>
   </div>
 </ng-container>
 
 <div *ngIf="!isLoading() && !opportunity()" class="not-found">
-  <p>La oportunidad no fue encontrada.</p>
+  <p>{{ errorMessage() || 'La oportunidad no fue encontrada.' }}</p>
   <a routerLink="/oportunidades" class="btn-ghost">← Volver a oportunidades</a>
 </div>

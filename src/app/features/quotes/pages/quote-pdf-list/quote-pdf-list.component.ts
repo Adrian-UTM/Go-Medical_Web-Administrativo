@@ -10,7 +10,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { Client } from '../../../../core/models/client.model';
 import { Quote, QuoteStatus } from '../../models/quote.model';
 import { QuotePdfService } from '../../services/quote-pdf.service';
-import { QuotesMockService } from '../../services/quotes.mock.service';
+import { QuoteSupabaseService } from '../../services/quote.supabase.service';
 
 @Component({
   selector: 'bc-quote-pdf-list',
@@ -31,7 +31,7 @@ import { QuotesMockService } from '../../services/quotes.mock.service';
   styleUrl: './quote-pdf-list.component.css',
 })
 export class QuotePdfListComponent {
-  private readonly quotesService = inject(QuotesMockService);
+  private readonly quotesService = inject(QuoteSupabaseService);
   private readonly quotePdfService = inject(QuotePdfService);
 
   readonly isLoading = signal(true);
@@ -76,8 +76,15 @@ export class QuotePdfListComponent {
 
   async loadQuotes(): Promise<void> {
     this.isLoading.set(true);
-    this.quotes.set(await this.quotesService.getQuotes());
-    this.isLoading.set(false);
+
+    try {
+      this.quotes.set(await this.quotesService.getQuotes());
+    } catch (error) {
+      this.quotes.set([]);
+      this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los PDFs generados.');
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 
   clearFilters(): void {

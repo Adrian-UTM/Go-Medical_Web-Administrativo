@@ -18,7 +18,7 @@ import {
   OrderTotals,
   OrderUpsertPayload,
 } from '../../../../models/order.model';
-import { OrderMockService } from '../../services/order.mock.service';
+import { OrderSupabaseService } from '../../services/order.supabase.service';
 
 @Component({
   selector: 'bc-order-form',
@@ -39,7 +39,7 @@ export class OrderFormComponent {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly orderService = inject(OrderMockService);
+  private readonly orderService = inject(OrderSupabaseService);
 
   readonly isEditMode = signal(false);
   readonly isLoadingData = signal(true);
@@ -121,21 +121,25 @@ export class OrderFormComponent {
     const isEditing = !!this.orderId && this.route.snapshot.url.some(segment => segment.path === 'editar');
     this.isEditMode.set(isEditing);
 
-    const [clients, products] = await Promise.all([
-      this.orderService.getActiveClients(),
-      this.orderService.getAvailableProducts(),
-    ]);
+    try {
+      const [clients, products] = await Promise.all([
+        this.orderService.getActiveClients(),
+        this.orderService.getAvailableProducts(),
+      ]);
 
-    this.clients.set(clients);
-    this.products.set(products);
+      this.clients.set(clients);
+      this.products.set(products);
 
-    if (isEditing && this.orderId) {
-      await this.loadOrder(this.orderId);
-    } else {
-      this.addOrderLine();
+      if (isEditing && this.orderId) {
+        await this.loadOrder(this.orderId);
+      } else {
+        this.addOrderLine();
+      }
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible preparar el formulario del pedido.');
+    } finally {
+      this.isLoadingData.set(false);
     }
-
-    this.isLoadingData.set(false);
   }
 
   async loadOrder(id: string): Promise<void> {
@@ -212,7 +216,7 @@ export class OrderFormComponent {
       sku: product.sku,
       productName: product.name,
       productCategory: product.category,
-      unitPrice: product.price_mxn,
+      unitPrice: product.price_mxn ?? product.unit_price_mxn ?? 0,
     }, { emitEvent: false });
 
     this.recalculateTotals();
@@ -245,8 +249,8 @@ export class OrderFormComponent {
       }
 
       await this.router.navigate(['/pedidos', savedOrder.id]);
-    } catch {
-      this.errorMessage.set('Ocurrio un error al guardar el pedido. Intenta nuevamente.');
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Ocurrio un error al guardar el pedido. Intenta nuevamente.');
     } finally {
       this.isSaving.set(false);
     }
@@ -284,7 +288,14 @@ export class OrderFormComponent {
   }
 
   getCategoryLabel(category: ProductCategory): string {
-    const labels: Record<ProductCategory, string> = {
+    const labels: Record<string, string> = {
+      [ProductCategory.EquipoMedico]: 'Equipo medico',
+      [ProductCategory.UltrasonidoHumano]: 'Ultrasonido humano',
+      [ProductCategory.UltrasonidoVeterinario]: 'Ultrasonido veterinario',
+      [ProductCategory.Consumible]: 'Consumibles',
+      [ProductCategory.Refaccion]: 'Refacciones',
+      [ProductCategory.Accesorio]: 'Accesorios',
+      [ProductCategory.Servicio]: 'Servicios',
       [ProductCategory.UltrasoundVet]: 'Ultrasonido veterinario',
       [ProductCategory.UltrasoundHuman]: 'Ultrasonido humano',
       [ProductCategory.Consumables]: 'Consumibles',
@@ -292,7 +303,7 @@ export class OrderFormComponent {
       [ProductCategory.Services]: 'Servicios',
     };
 
-    return labels[category];
+    return labels[category] ?? 'Sin categoria';
   }
 
   private syncSelectedClient(clientId: string, clientNameSnapshot?: string): void {
