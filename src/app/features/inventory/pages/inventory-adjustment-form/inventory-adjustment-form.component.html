@@ -7,10 +7,6 @@
     <a routerLink="/inventario" class="btn-ghost">Cancelar</a>
   </bc-page-header>
 
-  <div class="feedback-banner feedback-banner--info">
-    El inventario se administra sobre productos ya creados en el catalogo.
-  </div>
-
   <div *ngIf="errorMessage()" class="feedback-banner feedback-banner--error">
     {{ errorMessage() }}
   </div>
@@ -24,10 +20,6 @@
       <div class="form-col form-col--main">
         <div class="form-section">
           <h2 class="form-section__title">Datos del movimiento</h2>
-
-          <div class="inline-help">
-            Desde aqui solo se registran movimientos sobre productos existentes. La creacion de productos se hace en el modulo Productos.
-          </div>
 
           <div class="form-field" [class.form-field--error]="hasError('productId')">
             <label class="form-field__label">Producto <span class="required">*</span></label>
@@ -66,7 +58,7 @@
               class="form-field__textarea"
               formControlName="notes"
               rows="4"
-              placeholder="Motivo del ajuste, entrada o salida manual..."></textarea>
+              placeholder="Motivo del movimiento o referencia operativa..."></textarea>
           </div>
         </div>
       </div>
@@ -114,12 +106,8 @@
             </div>
           </ng-template>
 
-          <div *ngIf="isInitialLoadSelected" class="inline-help inline-help--accent">
-            La carga inicial sirve para registrar existencias de un producto del catalogo que aun no tiene stock en inventario.
-          </div>
-
           <div *ngIf="projectedStockInvalid" class="inline-warning">
-            El resultado proyectado no es valido porque dejaria el stock en negativo.
+            El resultado proyectado no es válido porque dejaría el stock en negativo.
           </div>
         </div>
       </div>
@@ -137,3 +125,5 @@
     </div>
   </form>
 </ng-container>
+
+

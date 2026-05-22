@@ -10,6 +10,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { Product, ProductCategory } from '../../../../models/product.model';
 import { DocumentsSupabaseService } from '../../services/documents.supabase.service';
 import { DocumentStatus, DocumentType, RelatedEntityType } from '../../models/document.model';
+import { AuthService } from '../../../../core/services/auth.service';
 
 @Component({
   selector: 'bc-document-form',
@@ -31,6 +32,7 @@ export class DocumentFormComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly documentsService = inject(DocumentsSupabaseService);
+  private readonly authService = inject(AuthService);
 
   readonly isLoadingData = signal(true);
   readonly isSaving = signal(false);
@@ -149,7 +151,7 @@ export class DocumentFormComponent {
         fileName: raw.fileName ?? '',
         status: raw.status ?? DocumentStatus.Available,
         notes: raw.notes ?? '',
-        uploadedBy: 'Usuario administrativo',
+        uploadedBy: this.authService.currentUserId() ?? undefined,
       });
 
       await this.router.navigate(['/documentos', created.id]);

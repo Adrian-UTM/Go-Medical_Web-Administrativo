@@ -1,8 +1,8 @@
-/* revenue-summary-cards.component.css */
+/* revenue-summary-cards.component.css — Diseño pastel premium */
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-4);
 }
 
@@ -12,38 +12,50 @@
   align-items: flex-start;
   gap: var(--space-4);
   padding: var(--space-5);
-  background-color: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  border: none;
+  transition: transform 200ms ease, box-shadow 200ms ease;
   position: relative;
   overflow: hidden;
-}
 
-.kpi-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  /* Default */
+  background-color: var(--card-blue-bg);
+  color: var(--card-blue-text);
 }
 
 .kpi-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.10);
 }
 
-/* ---- Accent lines ---- */
-.kpi-card--primary::before  { background: var(--color-accent); }
-.kpi-card--success::before  { background: #22c55e; }
-.kpi-card--info::before     { background: #3b82f6; }
-.kpi-card--accent::before   { background: #8b5cf6; }
-.kpi-card--warning::before  { background: #f59e0b; }
+/* Accents por variante */
+.kpi-card--primary {
+  background-color: var(--card-blue-bg);
+  color: var(--card-blue-text);
+}
 
-/* ---- Icon ---- */
+.kpi-card--success {
+  background-color: var(--card-green-bg);
+  color: var(--card-green-text);
+}
+
+.kpi-card--info {
+  background-color: var(--card-sky-bg);
+  color: var(--card-sky-text);
+}
+
+/* Morado / lavanda para Ticket Promedio */
+.kpi-card--accent {
+  background-color: #EDE9FE;
+  color: #4C1D95;
+}
+
+.kpi-card--warning {
+  background-color: var(--card-beige-bg);
+  color: var(--card-beige-text);
+}
+
+/* ---- Ícono — hereda el color del card ---- */
 .kpi-card__icon {
   display: flex;
   align-items: center;
@@ -52,47 +64,52 @@
   height: 44px;
   border-radius: var(--radius-lg);
   flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
 }
 
-.kpi-card__icon--revenue { background: rgba(45,106,159,0.12); color: var(--color-accent); }
-.kpi-card__icon--profit  { background: rgba(34,197,94,0.12);  color: #16a34a; }
-.kpi-card__icon--orders  { background: rgba(59,130,246,0.12); color: #2563eb; }
-.kpi-card__icon--ticket  { background: rgba(139,92,246,0.12); color: #7c3aed; }
-.kpi-card__icon--opp     { background: rgba(245,158,11,0.12); color: #d97706; }
+.kpi-card__icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  display: block;
+}
 
 /* ---- Body ---- */
 .kpi-card__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
 .kpi-card__label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  opacity: 0.70;
 }
 
 .kpi-card__value {
-  font-size: 1.45rem;
+  font-size: 1.5rem;
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
   line-height: 1.2;
   white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 
 .kpi-card__sub {
   font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  margin-top: var(--space-1);
+  opacity: 0.65;
+  margin-top: 2px;
 }
 
 /* ---- Skeleton ---- */
 .kpi-skeleton {
   min-height: 100px;
+  border-radius: var(--radius-xl);
   background: linear-gradient(
     90deg,
     var(--color-gray-100) 25%,

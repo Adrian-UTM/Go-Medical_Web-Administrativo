@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
@@ -10,6 +11,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { OrderSupabaseService } from '../../services/order.supabase.service';
 import { Order, OrderStatsPeriodPreset, OrderStatus } from '../../../../models/order.model';
 import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-order-list',
@@ -29,15 +31,20 @@ import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
   templateUrl: './order-list.component.html',
   styleUrl: './order-list.component.css',
 })
-export class OrderListComponent {
+export class OrderListComponent implements OnInit {
   private readonly orderService = inject(OrderSupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly isLoading = signal(true);
+  private loadInFlight = false;
+
+  readonly isLoading = signal(false);
   readonly errorMessage = signal('');
   readonly orders = signal<Order[]>([]);
   readonly searchQuery = signal('');
   readonly selectedStatus = signal<OrderStatus | ''>('');
   readonly quickPreset = signal<OrderStatsPeriodPreset>('today');
+  readonly cancelingOrderId = signal<string | null>(null);
 
   readonly statusOptions: { value: OrderStatus | ''; label: string }[] = [
     { value: '', label: 'Todos los estados' },
@@ -74,11 +81,22 @@ export class OrderListComponent {
 
   readonly hasActiveFilters = computed(() => !!this.searchQuery().trim() || !!this.selectedStatus());
 
-  constructor() {
+  ngOnInit(): void {
     void this.loadOrders();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        void this.loadOrders();
+      });
   }
 
   async loadOrders(): Promise<void> {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.isLoading.set(true);
     this.errorMessage.set('');
 
@@ -88,6 +106,7 @@ export class OrderListComponent {
       this.orders.set([]);
       this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los pedidos.');
     } finally {
+      this.loadInFlight = false;
       this.isLoading.set(false);
     }
   }
@@ -99,6 +118,31 @@ export class OrderListComponent {
 
   setQuickPreset(preset: OrderStatsPeriodPreset): void {
     this.quickPreset.set(preset);
+  }
+
+  async cancelOrder(order: Order): Promise<void> {
+    if (this.cancelingOrderId() || order.status === OrderStatus.Canceled) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Se cancelara el pedido ${order.folio}. El pedido permanecera visible en el historial.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.cancelingOrderId.set(order.id);
+    this.errorMessage.set('');
+
+    try {
+      const updatedOrder = await this.orderService.cancelOrder(order.id);
+      if (updatedOrder) {
+        this.orders.set(this.orders().map(item => item.id === order.id ? updatedOrder : item));
+      }
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No se pudo cancelar el pedido.');
+    } finally {
+      this.cancelingOrderId.set(null);
+    }
   }
 
   get emptyStateDescription(): string {
@@ -130,4 +174,5 @@ export class OrderListComponent {
     return order.items.reduce((sum, item) => sum + item.quantity, 0);
   }
 }
+
 

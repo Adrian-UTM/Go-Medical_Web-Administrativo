@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
@@ -10,6 +11,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { Product } from '../../../../models/product.model';
 import { DocumentsSupabaseService } from '../../services/documents.supabase.service';
 import { DocumentStatus, DocumentType, SystemDocument } from '../../models/document.model';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-document-list',
@@ -28,10 +30,14 @@ import { DocumentStatus, DocumentType, SystemDocument } from '../../models/docum
   templateUrl: './document-list.component.html',
   styleUrl: './document-list.component.css',
 })
-export class DocumentListComponent {
+export class DocumentListComponent implements OnInit {
   private readonly documentsService = inject(DocumentsSupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly isLoading = signal(true);
+  private loadInFlight = false;
+
+  readonly isLoading = signal(false);
   readonly isProcessing = signal<string | null>(null);
   readonly documents = signal<SystemDocument[]>([]);
   readonly products = signal<Product[]>([]);
@@ -91,11 +97,22 @@ export class DocumentListComponent {
     !!this.searchQuery().trim() || !!this.selectedType() || !!this.selectedStatus() || !!this.selectedProductId()
   );
 
-  constructor() {
+  ngOnInit(): void {
     void this.loadData();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        void this.loadData();
+      });
   }
 
   async loadData(): Promise<void> {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.isLoading.set(true);
     this.actionMessage.set('');
 
@@ -111,6 +128,7 @@ export class DocumentListComponent {
       this.products.set([]);
       this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible cargar los documentos técnicos.');
     } finally {
+      this.loadInFlight = false;
       this.isLoading.set(false);
     }
   }

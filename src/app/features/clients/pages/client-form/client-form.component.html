@@ -4,164 +4,330 @@
   <bc-page-header
     [title]="pageTitle"
     [breadcrumbs]="breadcrumbs">
-    <button type="submit" form="clientForm" class="btn-primary" [disabled]="isSaving()">
-      <span *ngIf="isSaving()">Guardando...</span>
-      <span *ngIf="!isSaving()">{{ isEditMode() ? 'Guardar Cambios' : 'Crear Cliente' }}</span>
-    </button>
     <a routerLink="/clientes" class="btn-ghost">← Volver</a>
   </bc-page-header>
 
-  <form id="clientForm" [formGroup]="clientForm" (ngSubmit)="onSubmit()" class="form-layout">
-    
-    <!-- Lado izquierdo: Formularios -->
-    <div class="form-main">
-      
-      <!-- Panel 1: Datos Generales -->
-      <div class="form-panel">
-        <h2 class="form-panel__title">1. Datos Comerciales / Fiscales</h2>
-        
-        <div class="form-row form-row--2">
-          <div class="form-group">
-            <label for="businessName" class="form-label">Razón Social o Nombre Activo *</label>
-            <input type="text" id="businessName" class="form-control" formControlName="businessName" 
-                   [class.is-invalid]="isFieldInvalid('businessName')" placeholder="Ej. Unidad de Diagnóstico... o Dr. Juan...">
-            <div class="form-error" *ngIf="isFieldInvalid('businessName')">
-              Este campo es obligatorio
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label for="rfc" class="form-label">RFC *</label>
-            <input type="text" id="rfc" class="form-control" formControlName="rfc" 
-                   [class.is-invalid]="isFieldInvalid('rfc')" placeholder="Ej. XAXX010101000">
-            <div class="form-error" *ngIf="isFieldInvalid('rfc')">
-              El RFC es obligatorio (máx 13 caracteres)
-            </div>
-          </div>
-        </div>
+  <div *ngIf="saveErrorMessage()" class="form-alert" role="alert">
+    {{ saveErrorMessage() }}
+  </div>
 
-        <div class="form-group">
-          <label for="tradeName" class="form-label">Nombre Comercial (Opcional)</label>
-          <input type="text" id="tradeName" class="form-control" formControlName="tradeName" 
-                 placeholder="Ej. Clínica San Lucas">
-        </div>
+  <form id="clientForm" [formGroup]="clientForm" (ngSubmit)="onSubmit()" class="client-form">
+    <div class="form-layout">
+      <div class="form-main">
+        <section class="form-panel">
+          <div class="form-panel__header">
+            <h2 class="form-panel__title">Datos comerciales y fiscales</h2>
+            <p class="form-panel__subtitle">Información principal del cliente para facturación y operación comercial.</p>
+          </div>
+
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="businessName" class="form-label">Razón social o nombre *</label>
+              <input
+                type="text"
+                id="businessName"
+                class="form-control"
+                formControlName="businessName"
+                [class.is-invalid]="isFieldInvalid('businessName')"
+                maxlength="100"
+                placeholder="Ej. Unidad de Diagnóstico Avanzado S.A. de C.V.">
+              <div class="form-feedback">
+                <span class="form-error" *ngIf="isFieldInvalid('businessName')">Este campo es obligatorio.</span>
+                <span class="form-counter">{{ (clientForm.get('businessName')?.value?.length || 0) + '/100' }}</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="rfc" class="form-label">RFC *</label>
+              <input
+                type="text"
+                id="rfc"
+                class="form-control"
+                formControlName="rfc"
+                [class.is-invalid]="isFieldInvalid('rfc')"
+                maxlength="13"
+                placeholder="Ej. XAXX010101000">
+              <div class="form-feedback">
+                <span class="form-error" *ngIf="isFieldInvalid('rfc')">Ingresa un RFC válido.</span>
+                <span class="form-counter">{{ (clientForm.get('rfc')?.value?.length || 0) + '/13' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="tradeName" class="form-label">Nombre comercial</label>
+              <input
+                type="text"
+                id="tradeName"
+                class="form-control"
+                formControlName="tradeName"
+                maxlength="100"
+                placeholder="Ej. Clínica San Lucas">
+              <div class="form-feedback form-feedback--compact">
+                <span class="form-counter">{{ (clientForm.get('tradeName')?.value?.length || 0) + '/100' }}</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="clientType" class="form-label">Tipo de cliente *</label>
+              <bc-custom-select formControlName="clientType" [options]="typeOptions" placeholder="Selecciona un tipo"></bc-custom-select>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-panel">
+          <div class="form-panel__header">
+            <h2 class="form-panel__title">Contacto principal</h2>
+            <p class="form-panel__subtitle">Persona responsable y medios de contacto del cliente.</p>
+          </div>
+
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="contactName" class="form-label">Nombre del contacto *</label>
+              <input
+                type="text"
+                id="contactName"
+                class="form-control"
+                formControlName="contactName"
+                [class.is-invalid]="isFieldInvalid('contactName')"
+                maxlength="100"
+                placeholder="Ej. Dra. Mariana Canto">
+              <div class="form-feedback">
+                <span class="form-error" *ngIf="isFieldInvalid('contactName')">El nombre del contacto es obligatorio.</span>
+                <span class="form-counter">{{ (clientForm.get('contactName')?.value?.length || 0) + '/100' }}</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="contactPosition" class="form-label">Cargo o puesto</label>
+              <input
+                type="text"
+                id="contactPosition"
+                class="form-control"
+                formControlName="contactPosition"
+                maxlength="100"
+                placeholder="Ej. Directora médica">
+              <div class="form-feedback form-feedback--compact">
+                <span class="form-counter">{{ (clientForm.get('contactPosition')?.value?.length || 0) + '/100' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="email" class="form-label">Correo electrónico *</label>
+              <input
+                type="email"
+                id="email"
+                class="form-control"
+                formControlName="email"
+                [class.is-invalid]="isFieldInvalid('email')"
+                maxlength="100"
+                placeholder="cliente@gmail.com">
+              <div class="form-feedback">
+                <span class="form-error" *ngIf="isFieldInvalid('email')">Ingresa un correo electrónico válido.</span>
+                <span class="form-counter">{{ (clientForm.get('email')?.value?.length || 0) + '/100' }}</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="phone" class="form-label">Teléfono *</label>
+              <input
+                type="tel"
+                id="phone"
+                class="form-control"
+                formControlName="phone"
+                [class.is-invalid]="isFieldInvalid('phone')"
+                maxlength="20"
+                placeholder="9991234567">
+              <div class="form-feedback">
+                <span class="form-error" *ngIf="isFieldInvalid('phone')">El teléfono es obligatorio.</span>
+                <span class="form-counter">{{ (clientForm.get('phone')?.value?.length || 0) + '/20' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="billingEmail" class="form-label">Correo de facturación</label>
+            <input
+              type="email"
+              id="billingEmail"
+              class="form-control"
+              formControlName="billingEmail"
+              [class.is-invalid]="isFieldInvalid('billingEmail')"
+              maxlength="100"
+              placeholder="facturacion@empresa.com">
+            <div class="form-feedback">
+              <span class="form-error" *ngIf="isFieldInvalid('billingEmail')">Ingresa un correo electrónico válido.</span>
+              <span class="form-counter">{{ (clientForm.get('billingEmail')?.value?.length || 0) + '/100' }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-panel" formGroupName="billingAddress">
+          <div class="form-panel__header">
+            <h2 class="form-panel__title">Dirección fiscal / principal</h2>
+            <p class="form-panel__subtitle">Captura solo calle, número, colonia y datos geográficos en sus campos correspondientes.</p>
+          </div>
+
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="billingStreet" class="form-label">Calle *</label>
+              <input id="billingStreet" type="text" class="form-control" formControlName="street" [class.is-invalid]="isFieldInvalid('billingAddress.street')" maxlength="120" placeholder="Ej. Calle 179A x 92 y 94">
+              <span class="form-error" *ngIf="isFieldInvalid('billingAddress.street')">La calle es obligatoria.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Número exterior / interior *</label>
+              <div class="address-numbers">
+                <div>
+                  <input type="text" class="form-control" formControlName="exteriorNumber" [class.is-invalid]="isFieldInvalid('billingAddress.exteriorNumber')" maxlength="20" placeholder="S/N">
+                  <span class="form-error" *ngIf="isFieldInvalid('billingAddress.exteriorNumber')">Obligatorio.</span>
+                </div>
+                <div>
+                  <input type="text" class="form-control" formControlName="interiorNumber" maxlength="20" placeholder="2A">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="billingNeighborhood" class="form-label">Colonia *</label>
+              <input id="billingNeighborhood" type="text" class="form-control" formControlName="neighborhood" [class.is-invalid]="isFieldInvalid('billingAddress.neighborhood')" maxlength="100" placeholder="San Antonio Xluch">
+              <span class="form-hint">No incluyas ciudad, estado ni código postal aquí.</span>
+              <span class="form-error" *ngIf="isFieldInvalid('billingAddress.neighborhood')">La colonia es obligatoria.</span>
+            </div>
+
+            <div class="form-group">
+              <label for="billingPostalCode" class="form-label">Código postal *</label>
+              <input id="billingPostalCode" type="text" class="form-control" formControlName="postalCode" [class.is-invalid]="isFieldInvalid('billingAddress.postalCode')" maxlength="10" placeholder="97297">
+              <span class="form-error" *ngIf="isFieldInvalid('billingAddress.postalCode')">El código postal es obligatorio.</span>
+            </div>
+          </div>
+
+          <div class="form-row form-row--3">
+            <div class="form-group">
+              <label for="billingCity" class="form-label">Ciudad *</label>
+              <input id="billingCity" type="text" class="form-control" formControlName="city" [class.is-invalid]="isFieldInvalid('billingAddress.city')" maxlength="100" placeholder="Mérida">
+              <span class="form-error" *ngIf="isFieldInvalid('billingAddress.city')">La ciudad es obligatoria.</span>
+            </div>
+
+            <div class="form-group">
+              <label for="billingState" class="form-label">Estado *</label>
+              <input id="billingState" type="text" class="form-control" formControlName="state" [class.is-invalid]="isFieldInvalid('billingAddress.state')" maxlength="100" placeholder="Yucatán">
+              <span class="form-error" *ngIf="isFieldInvalid('billingAddress.state')">El estado es obligatorio.</span>
+            </div>
+
+            <div class="form-group">
+              <label for="billingCountry" class="form-label">País *</label>
+              <input id="billingCountry" type="text" class="form-control" formControlName="country" [class.is-invalid]="isFieldInvalid('billingAddress.country')" maxlength="100" placeholder="México">
+              <span class="form-error" *ngIf="isFieldInvalid('billingAddress.country')">El país es obligatorio.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-panel">
+          <div class="form-panel__title-row">
+            <div>
+              <h2 class="form-panel__title form-panel__title--no-border">Dirección de entrega</h2>
+              <p class="form-panel__subtitle">Puedes usar la misma dirección fiscal o registrar una distinta.</p>
+            </div>
+            <label class="toggle-field">
+              <input type="checkbox" formControlName="useSameShippingAddress">
+              <span>Usar la misma dirección fiscal</span>
+            </label>
+          </div>
+
+          <div class="address-block" formGroupName="shippingAddress">
+            <div class="form-row form-row--2">
+              <div class="form-group">
+                <label for="shippingStreet" class="form-label">Calle *</label>
+                <input id="shippingStreet" type="text" class="form-control" formControlName="street" [class.is-invalid]="isFieldInvalid('shippingAddress.street')" maxlength="120" placeholder="Ej. Calle 179A x 92 y 94">
+                <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.street')">La calle es obligatoria.</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Número exterior / interior *</label>
+                <div class="address-numbers">
+                  <div>
+                    <input type="text" class="form-control" formControlName="exteriorNumber" [class.is-invalid]="isFieldInvalid('shippingAddress.exteriorNumber')" maxlength="20" placeholder="S/N">
+                    <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.exteriorNumber')">Obligatorio.</span>
+                  </div>
+                  <div>
+                    <input type="text" class="form-control" formControlName="interiorNumber" maxlength="20" placeholder="2A">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row form-row--2">
+              <div class="form-group">
+                <label for="shippingNeighborhood" class="form-label">Colonia *</label>
+                <input id="shippingNeighborhood" type="text" class="form-control" formControlName="neighborhood" [class.is-invalid]="isFieldInvalid('shippingAddress.neighborhood')" maxlength="100" placeholder="San Antonio Xluch">
+                <span class="form-hint">No incluyas ciudad, estado ni código postal aquí.</span>
+                <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.neighborhood')">La colonia es obligatoria.</span>
+              </div>
+
+              <div class="form-group">
+                <label for="shippingPostalCode" class="form-label">Código postal *</label>
+                <input id="shippingPostalCode" type="text" class="form-control" formControlName="postalCode" [class.is-invalid]="isFieldInvalid('shippingAddress.postalCode')" maxlength="10" placeholder="97297">
+                <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.postalCode')">El código postal es obligatorio.</span>
+              </div>
+            </div>
+
+            <div class="form-row form-row--3">
+              <div class="form-group">
+                <label for="shippingCity" class="form-label">Ciudad *</label>
+                <input id="shippingCity" type="text" class="form-control" formControlName="city" [class.is-invalid]="isFieldInvalid('shippingAddress.city')" maxlength="100" placeholder="Mérida">
+                <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.city')">La ciudad es obligatoria.</span>
+              </div>
+
+              <div class="form-group">
+                <label for="shippingState" class="form-label">Estado *</label>
+                <input id="shippingState" type="text" class="form-control" formControlName="state" [class.is-invalid]="isFieldInvalid('shippingAddress.state')" maxlength="100" placeholder="Yucatán">
+                <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.state')">El estado es obligatorio.</span>
+              </div>
+
+              <div class="form-group">
+                <label for="shippingCountry" class="form-label">País *</label>
+                <input id="shippingCountry" type="text" class="form-control" formControlName="country" [class.is-invalid]="isFieldInvalid('shippingAddress.country')" maxlength="100" placeholder="México">
+                <span class="form-error" *ngIf="isFieldInvalid('shippingAddress.country')">El país es obligatorio.</span>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <!-- Panel 2: Contacto -->
-      <div class="form-panel">
-        <h2 class="form-panel__title">2. Datos de Contacto</h2>
-
-        <div class="form-row form-row--2">
+      <aside class="form-sidebar">
+        <section class="form-panel form-panel--sticky">
+          <h2 class="form-panel__title">Estado de la cuenta</h2>
           <div class="form-group">
-            <label for="contactName" class="form-label">Nombre del Contacto *</label>
-            <input type="text" id="contactName" class="form-control" formControlName="contactName" 
-                   [class.is-invalid]="isFieldInvalid('contactName')">
-            <div class="form-error" *ngIf="isFieldInvalid('contactName')">
-              El nombre completo es obligatorio
+            <label for="status" class="form-label">Estado *</label>
+            <bc-custom-select formControlName="status" [options]="statusOptions" placeholder="Selecciona un estado"></bc-custom-select>
+          </div>
+        </section>
+
+        <section class="form-panel">
+          <h2 class="form-panel__title">Notas internas</h2>
+          <div class="form-group">
+            <label class="form-label" for="notes">Observaciones</label>
+            <textarea id="notes" class="form-control form-control--textarea" rows="6" formControlName="notes" maxlength="500" placeholder="Comentarios administrativos o comerciales del cliente."></textarea>
+            <div class="form-feedback form-feedback--compact">
+              <span class="form-counter">{{ (clientForm.get('notes')?.value?.length || 0) + '/500' }}</span>
             </div>
           </div>
-          
-          <div class="form-group">
-            <label for="contactPosition" class="form-label">Cargo / Puesto (Opcional)</label>
-            <input type="text" id="contactPosition" class="form-control" formControlName="contactPosition" 
-                   placeholder="Ej. Director, Médico Titular">
-          </div>
-        </div>
-
-        <div class="form-row form-row--2">
-          <div class="form-group">
-            <label for="email" class="form-label">Email de Contacto *</label>
-            <input type="email" id="email" class="form-control" formControlName="email" 
-                   [class.is-invalid]="isFieldInvalid('email')" placeholder="correo@ejemplo.com">
-            <div class="form-error" *ngIf="isFieldInvalid('email')">
-              Por favor ingresa un correo electrónico válido
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label for="phone" class="form-label">Teléfono *</label>
-            <input type="tel" id="phone" class="form-control" formControlName="phone" 
-                   [class.is-invalid]="isFieldInvalid('phone')" placeholder="10 dígitos">
-            <div class="form-error" *ngIf="isFieldInvalid('phone')">
-              El teléfono es obligatorio
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="billingEmail" class="form-label">Email para Facturación (Opcional)</label>
-          <input type="email" id="billingEmail" class="form-control" formControlName="billingEmail" 
-                 [class.is-invalid]="isFieldInvalid('billingEmail')" placeholder="Dejar vacío si es el mismo">
-          <div class="form-error" *ngIf="isFieldInvalid('billingEmail')">
-            Debe ser un correo electrónico válido
-          </div>
-        </div>
-      </div>
-
-      <!-- Panel 3: Ubicación -->
-      <div class="form-panel">
-        <h2 class="form-panel__title">3. Ubicación</h2>
-
-        <div class="form-group">
-          <label for="address" class="form-label">Dirección Fiscal / Principal *</label>
-          <input type="text" id="address" class="form-control" formControlName="address" 
-                 [class.is-invalid]="isFieldInvalid('address')" placeholder="Calle, Número, Colonia, C.P.">
-          <div class="form-error" *ngIf="isFieldInvalid('address')">
-            La dirección es obligatoria
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="shippingAddress" class="form-label">Dirección de Entrega de Equipos (Opcional)</label>
-          <input type="text" id="shippingAddress" class="form-control" formControlName="shippingAddress" 
-                 placeholder="Dejar vacío si es la misma que la fiscal">
-        </div>
-
-        <div class="form-row form-row--2">
-          <div class="form-group">
-            <label for="city" class="form-label">Ciudad *</label>
-            <input type="text" id="city" class="form-control" formControlName="city" 
-                   [class.is-invalid]="isFieldInvalid('city')" placeholder="Ej. Mérida">
-            <div class="form-error" *ngIf="isFieldInvalid('city')">Obligatorio</div>
-          </div>
-          
-          <div class="form-group">
-            <label for="state" class="form-label">Estado *</label>
-            <input type="text" id="state" class="form-control" formControlName="state" 
-                   [class.is-invalid]="isFieldInvalid('state')" placeholder="Ej. Yucatán">
-            <div class="form-error" *ngIf="isFieldInvalid('state')">Obligatorio</div>
-          </div>
-        </div>
-      </div>
-      
+        </section>
+      </aside>
     </div>
 
-    <!-- Lado derecho: Meta info -->
-    <div class="form-sidebar">
-      
-      <div class="form-panel">
-        <h2 class="form-panel__title">Clasificación</h2>
-        
-        <div class="form-group">
-          <label for="clientType" class="form-label">Tipo de Cliente *</label>
-          <bc-custom-select formControlName="clientType" [options]="typeOptions" placeholder="Selecciona un tipo"></bc-custom-select>
-        </div>
-        
-        <div class="form-group">
-          <label for="status" class="form-label">Estado de la cuenta *</label>
-          <bc-custom-select formControlName="status" [options]="statusOptions" placeholder="Selecciona estado"></bc-custom-select>
-        </div>
-      </div>
-
-      <div class="form-panel">
-        <h2 class="form-panel__title">Notas Internas</h2>
-        <div class="form-group">
-          <label class="form-label text-muted">¿Algún comentario administrativo?</label>
-          <textarea id="notes" class="form-control" rows="5" formControlName="notes" 
-                    placeholder="Escribe aquí... (Opcional)"></textarea>
-        </div>
-      </div>
-
+    <div class="form-actions-bar">
+      <a routerLink="/clientes" class="btn-ghost">Cancelar</a>
+      <button type="submit" class="btn-primary" [disabled]="isSaving()">
+        <span *ngIf="isSaving()">Guardando...</span>
+        <span *ngIf="!isSaving()">{{ isEditMode() ? 'Guardar cambios' : 'Guardar cliente' }}</span>
+      </button>
     </div>
   </form>
 </ng-container>

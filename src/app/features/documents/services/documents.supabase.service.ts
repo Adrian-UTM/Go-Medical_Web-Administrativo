@@ -104,14 +104,13 @@ export class DocumentsSupabaseService {
     const insertPayload = {
       title: payload.title.trim(),
       product_id: payload.productId ?? null,
-      document_type: payload.documentType,
+      document_type: this.mapDocumentTypeToDb(payload.documentType),
       status: payload.status ?? DocumentStatus.Available,
       file_name: payload.fileName.trim(),
       file_extension: extension,
       notes: payload.notes?.trim() || null,
-      uploaded_by: payload.uploadedBy?.trim() || 'Usuario administrativo',
-      equipment_serial_number: payload.equipmentSerialNumber?.trim() || null,
-      file_path: null,
+      uploaded_by: (payload as any).uploadedBy ?? undefined,
+      file_path: (payload as any).fileUrl || 'sin_archivo',
     };
 
     const { data, error } = await this.supabase.client
@@ -121,6 +120,14 @@ export class DocumentsSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Documents] Error creating document', {
+        payload: insertPayload,
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       throw this.toAppError(error.message, 'No fue posible registrar el documento técnico.');
     }
 
@@ -167,14 +174,13 @@ export class DocumentsSupabaseService {
     return {
       id: String(row.id),
       title: row.title ?? 'Documento sin título',
-      documentType: (row.document_type ?? DocumentType.Other) as DocumentType,
+      documentType: this.mapDocumentTypeFromDb(row.document_type),
       status: (row.status ?? DocumentStatus.Available) as DocumentStatus,
       relatedEntityType: relatedType,
       relatedEntityId: row.related_entity_id ?? row.product_id ?? undefined,
       relatedEntityName: productName ?? this.getRelatedEntityName(relatedType),
       productId: row.product_id ?? undefined,
       productNameSnapshot: productName,
-      equipmentSerialNumber: row.equipment_serial_number ?? undefined,
       fileName,
       fileExtension,
       fileSizeLabel: this.formatFileSizeLabel(row.file_size_bytes),
@@ -193,10 +199,6 @@ export class DocumentsSupabaseService {
 
     if (row.product_id || product) {
       return RelatedEntityType.Product;
-    }
-
-    if (row.equipment_serial_number) {
-      return RelatedEntityType.Equipment;
     }
 
     return RelatedEntityType.General;
@@ -264,7 +266,35 @@ export class DocumentsSupabaseService {
       return new Error('No tienes permisos para consultar o modificar documentos técnicos.');
     }
 
-    return new Error(message || fallback);
+    return new Error(fallback);
+  }
+
+  private mapDocumentTypeToDb(type: DocumentType | string): string {
+    switch (type) {
+      case DocumentType.UserManual: return 'manual';
+      case DocumentType.TechnicalSheet: return 'ficha_tecnica';
+      case DocumentType.Certificate: return 'certificado';
+      case DocumentType.Warranty: return 'otro';
+      case DocumentType.MaintenanceGuide: return 'manual';
+      case DocumentType.ServiceReport: return 'reporte_servicio';
+      case DocumentType.ProductImage: return 'imagen';
+      case DocumentType.Other: return 'otro';
+      default: return 'otro';
+    }
+  }
+
+  private mapDocumentTypeFromDb(type: string): DocumentType {
+    switch (type) {
+      case 'manual': return DocumentType.UserManual;
+      case 'ficha_tecnica': return DocumentType.TechnicalSheet;
+      case 'certificado': return DocumentType.Certificate;
+      case 'cotizacion_pdf': return DocumentType.Other;
+      case 'reporte_servicio': return DocumentType.ServiceReport;
+      case 'imagen': return DocumentType.ProductImage;
+      case 'otro': return DocumentType.Other;
+      default: return DocumentType.Other;
+    }
   }
 }
+
 

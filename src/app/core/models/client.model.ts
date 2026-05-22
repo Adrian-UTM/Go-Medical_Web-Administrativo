@@ -12,31 +12,31 @@ export enum ClientStatus {
 }
 
 export interface Client {
-  id: string; 
+  id: string;
   client_type: ClientType;
   status: ClientStatus;
-  
+
   // Datos fiscales / comerciales
-  business_name: string; 
-  trade_name?: string; 
+  business_name: string;
+  trade_name?: string;
   rfc: string;
-  
+
   // Contacto Principal
   contact_name: string;
-  contact_position?: string; 
+  contact_position?: string;
   email: string;
-  billing_email?: string; 
+  billing_email?: string;
   phone: string;
-  
+
   // Metadatos
   notes?: string;
-  created_at?: string; 
-  updated_at?: string; 
+  created_at?: string;
+  updated_at?: string;
 
   // Direcciones (Asociadas desde client_addresses)
   addresses?: ClientAddress[];
 
-  // Campos Legacy para mocks (eliminar al final)
+  // Campos Legacy para compatibilidad con vistas actuales
   clientType: ClientType;
   businessName: string;
   tradeName?: string;
@@ -47,6 +47,12 @@ export interface Client {
   shippingAddress?: string;
   city: string;
   state: string;
+  country?: string;
+  formattedBillingAddress?: string;
+  formattedShippingAddress?: string;
+  billingAddressDetails?: ClientAddressDetails;
+  shippingAddressDetails?: ClientAddressDetails;
+  useBillingAddressForShipping?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -59,10 +65,22 @@ export interface ClientAddress {
   city?: string;
   state?: string;
   postal_code?: string;
+  country?: string;
   latitude?: number;
   longitude?: number;
   is_default?: boolean;
   created_at?: string;
+}
+
+export interface ClientAddressDetails {
+  street: string;
+  exteriorNumber: string;
+  interiorNumber?: string;
+  neighborhood: string;
+  postalCode: string;
+  city: string;
+  state: string;
+  country: string;
 }
 
 export interface ClientFilters {

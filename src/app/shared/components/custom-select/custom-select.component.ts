@@ -24,6 +24,7 @@ export interface SelectOption {
 export class CustomSelectComponent implements ControlValueAccessor {
   @Input() options: SelectOption[] = [];
   @Input() placeholder: string = 'Seleccionar...';
+  @Input() selectId: string | null = null;
   @Input() disabled: boolean = false;
   
   @Output() selectionChange = new EventEmitter<any>();
@@ -80,3 +81,4 @@ export class CustomSelectComponent implements ControlValueAccessor {
     this.disabled = isDisabled;
   }
 }
+

@@ -271,3 +271,17 @@
     grid-template-columns: 1fr;
   }
 }
+
+.form-meta,
+.form-field__meta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-1);
+}
+
+.form-counter,
+.form-field__counter {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: 1;
+}

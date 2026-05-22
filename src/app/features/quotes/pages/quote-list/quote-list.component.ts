@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
@@ -9,6 +10,7 @@ import { EmptyStateComponent } from '../../../../shared/components/empty-state/e
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Quote, QuoteStatus } from '../../models/quote.model';
 import { QuoteSupabaseService } from '../../services/quote.supabase.service';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-quote-list',
@@ -28,10 +30,14 @@ import { QuoteSupabaseService } from '../../services/quote.supabase.service';
   templateUrl: './quote-list.component.html',
   styleUrl: './quote-list.component.css',
 })
-export class QuoteListComponent {
+export class QuoteListComponent implements OnInit {
   private readonly quotesService = inject(QuoteSupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly isLoading = signal(true);
+  private loadInFlight = false;
+
+  readonly isLoading = signal(false);
   readonly errorMessage = signal('');
   readonly quotes = signal<Quote[]>([]);
   readonly searchQuery = signal('');
@@ -66,11 +72,22 @@ export class QuoteListComponent {
 
   readonly hasActiveFilters = computed(() => !!this.searchQuery().trim() || !!this.selectedStatus());
 
-  constructor() {
+  ngOnInit(): void {
     void this.loadQuotes();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        void this.loadQuotes();
+      });
   }
 
   async loadQuotes(): Promise<void> {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.isLoading.set(true);
     this.errorMessage.set('');
 
@@ -80,6 +97,7 @@ export class QuoteListComponent {
       this.quotes.set([]);
       this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar las cotizaciones.');
     } finally {
+      this.loadInFlight = false;
       this.isLoading.set(false);
     }
   }

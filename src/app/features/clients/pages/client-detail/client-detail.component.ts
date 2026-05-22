@@ -20,15 +20,15 @@ export class ClientDetailComponent implements OnInit {
   private router = inject(Router);
   private clientService = inject(ClientSupabaseService);
 
-  // Estado
   isLoading = signal<boolean>(true);
+  isDeleting = signal<boolean>(false);
+  actionError = signal<string>('');
   client = signal<Client | null>(null);
 
-  // Tabs for the detail view
   activeTab = signal<'info' | 'history'>('info');
   tabs = [
-    { id: 'info' as const, label: 'Información General' },
-    { id: 'history' as const, label: 'Historial Comercial' }
+    { id: 'info' as const, label: 'Informacion general' },
+    { id: 'history' as const, label: 'Historial comercial' }
   ];
 
   get breadcrumbs() {
@@ -44,22 +44,23 @@ export class ClientDetailComponent implements OnInit {
     if (id) {
       await this.loadClient(id);
     } else {
-      this.router.navigate(['/clientes']);
+      await this.router.navigate(['/clientes']);
     }
   }
 
   async loadClient(id: string) {
     this.isLoading.set(true);
+    this.actionError.set('');
+
     try {
       const data = await firstValueFrom(this.clientService.getClientById(id));
       if (data) {
         this.client.set(data);
       } else {
-        this.router.navigate(['/clientes']);
+        await this.router.navigate(['/clientes']);
       }
-    } catch (err) {
-      console.error('Error loading client detail:', err);
-      this.router.navigate(['/clientes']);
+    } catch {
+      await this.router.navigate(['/clientes']);
     } finally {
       this.isLoading.set(false);
     }
@@ -69,12 +70,37 @@ export class ClientDetailComponent implements OnInit {
     this.activeTab.set(tabId);
   }
 
+  async onDeleteClient() {
+    const currentClient = this.client();
+    if (!currentClient || this.isDeleting()) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Se eliminara el cliente "${currentClient.businessName}". Esta accion no se puede deshacer.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.isDeleting.set(true);
+    this.actionError.set('');
+
+    try {
+      await firstValueFrom(this.clientService.deleteClient(currentClient.id));
+      await this.router.navigate(['/clientes']);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No fue posible eliminar el cliente.';
+      this.actionError.set(message);
+    } finally {
+      this.isDeleting.set(false);
+    }
+  }
+
   getTypeLabel(type: ClientType | string): string {
     switch (type) {
-      case ClientType.Clinica: return 'Clínica';
-      case ClientType.Medico: return 'Médico';
+      case ClientType.Clinica: return 'Clinica';
+      case ClientType.Medico: return 'Medico';
       case ClientType.Veterinario: return 'Veterinario';
-      case ClientType.Institucion: return 'Institución';
+      case ClientType.Institucion: return 'Institucion';
       default: return type;
     }
   }

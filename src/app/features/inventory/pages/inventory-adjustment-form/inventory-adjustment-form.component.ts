@@ -13,6 +13,7 @@ import {
   MovementType,
 } from '../../../../models/inventory.model';
 import { InventorySupabaseService } from '../../services/inventory.supabase.service';
+import { AuthService } from '../../../../core/services/auth.service';
 
 @Component({
   selector: 'bc-inventory-adjustment-form',
@@ -33,6 +34,7 @@ export class InventoryAdjustmentFormComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly inventoryService = inject(InventorySupabaseService);
+  private readonly authService = inject(AuthService);
 
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
@@ -91,7 +93,7 @@ export class InventoryAdjustmentFormComponent {
     }
 
     if (movementType === MovementType.InitialLoad) {
-      return 'Usa carga inicial para productos del catalogo que aun no tienen existencias registradas.';
+      return 'Usa carga inicial para registrar existencias iniciales.';
     }
 
     return 'Captura un valor positivo. El sistema aplicara la direccion del movimiento.';
@@ -115,7 +117,7 @@ export class InventoryAdjustmentFormComponent {
 
   get emptyPreviewMessage(): string {
     if (this.hasSelectedProductWithoutStock) {
-      return 'Este producto existe en el catalogo pero aun no tiene stock registrado. Puedes usar una carga inicial para darlo de alta en inventario.';
+      return 'Este producto aun no tiene existencias registradas. Puedes usar una carga inicial para comenzar su control de stock.';
     }
 
     return 'Selecciona un producto para visualizar el stock actual y el resultado esperado.';
@@ -149,7 +151,7 @@ export class InventoryAdjustmentFormComponent {
   async onSubmit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.errorMessage.set('Completa los campos requeridos para registrar el ajuste.');
+      this.errorMessage.set('Completa los campos requeridos para registrar el movimiento.');
       this.successMessage.set('');
       return;
     }
@@ -170,7 +172,7 @@ export class InventoryAdjustmentFormComponent {
         movementType: this.form.get('movementType')?.value ?? MovementType.Entry,
         quantity: Number(this.form.get('quantity')?.value ?? 0),
         notes: this.form.get('notes')?.value ?? '',
-        createdBy: 'Administrador Go Medical',
+        createdBy: this.authService.currentUserId() ?? undefined,
       });
 
       await this.refreshCurrentStock(movement.productId);
@@ -235,3 +237,4 @@ export class InventoryAdjustmentFormComponent {
     return currentStock + normalized;
   }
 }
+

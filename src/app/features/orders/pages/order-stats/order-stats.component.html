@@ -47,7 +47,7 @@
 <bc-empty-state
   *ngIf="!isLoading() && orders().length === 0"
   title="Sin pedidos para analizar"
-  description="Aun no hay pedidos mock suficientes para construir estadisticas de este modulo."
+  description="No hay información disponible para este periodo."
   [hasAction]="false">
 </bc-empty-state>
 
@@ -87,11 +87,4 @@
     <bc-order-status-summary [rows]="snapshot().statusSummary"></bc-order-status-summary>
     <bc-top-ordered-products [rows]="snapshot().topOrderedProducts"></bc-top-ordered-products>
   </section>
-
-  <div class="dev-note">
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-    <span><strong>Datos mock.</strong> Al conectar Supabase, esta vista puede consultar agregados reales desde <code>orders</code> y <code>order_items</code>, ya sea con SQL agrupado, vistas materializadas o RPCs para KPIs y series temporales.</span>
-  </div>
 </ng-container>

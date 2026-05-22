@@ -1,17 +1,17 @@
-// features/products/pages/product-list/product-list.component.ts
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgFor, NgIf, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { ProductSupabaseService } from '../../services/product.supabase.service';
-import {
-  Product, ProductCategory, ProductFilters
-} from '../../../../models/product.model';
+import { Product, ProductCategory, ProductFilters } from '../../../../models/product.model';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-product-list',
@@ -25,9 +25,13 @@ import {
 })
 export class ProductListComponent implements OnInit {
   private productsService = inject(ProductSupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  private loadInFlight = false;
 
   products = signal<Product[]>([]);
-  isLoading = signal(true);
+  isLoading = signal(false);
   deletingId = signal('');
   actionMessage = signal('');
 
@@ -52,9 +56,20 @@ export class ProductListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadProducts();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.loadProducts();
+      });
   }
 
   loadProducts(): void {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.isLoading.set(true);
     const filters: ProductFilters = {
       search: this.searchTerm || undefined,
@@ -62,13 +77,22 @@ export class ProductListComponent implements OnInit {
       is_active: this.selectedStatus === '' ? undefined : this.selectedStatus === 'true',
     };
 
-    this.productsService.getProducts(filters).subscribe({
-      next: (res) => {
-        this.products.set(res);
-        this.isLoading.set(false);
-      },
-      error: () => this.isLoading.set(false)
-    });
+    this.productsService.getProducts(filters)
+      .pipe(
+        finalize(() => {
+          this.loadInFlight = false;
+          this.isLoading.set(false);
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        next: (res) => {
+          this.products.set(res);
+        },
+        error: () => {
+          this.products.set([]);
+        }
+      });
   }
 
   onSearch(): void {

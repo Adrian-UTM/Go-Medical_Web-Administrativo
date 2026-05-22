@@ -91,7 +91,7 @@ export class QuoteDetailComponent {
   }
 
   async convertToOrder(): Promise<void> {
-    await this.updateStatus(QuoteStatus.Converted, 'La cotizacion se marco como convertida. La conversion real a pedido se conectara en una fase posterior.');
+    await this.updateStatus(QuoteStatus.Converted, 'Cotizacion marcada como convertida.');
   }
 
   openPdfPreview(): void {
@@ -112,9 +112,9 @@ export class QuoteDetailComponent {
 
     try {
       await this.quotePdfService.downloadQuotePdf(currentQuote, this.client());
-      this.actionMessage.set('PDF generado y descargado correctamente en flujo local.');
+      this.actionMessage.set('PDF generado y descargado correctamente.');
     } catch {
-      this.actionMessage.set('No fue posible generar el PDF. Revisa la configuracion local del proyecto.');
+      this.actionMessage.set('No fue posible generar el PDF. Intenta nuevamente.');
     } finally {
       this.isGeneratingPdf.set(false);
     }

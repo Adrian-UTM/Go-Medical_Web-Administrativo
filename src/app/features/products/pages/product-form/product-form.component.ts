@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { NgFor, NgIf } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
@@ -31,6 +32,7 @@ export class ProductFormComponent implements OnInit {
   isSaving = signal(false);
   errorMessage = signal('');
   imagePreview = signal('');
+  selectedFile: File | null = null;
 
   form: FormGroup = this.fb.group({
     sku: ['', [Validators.required, Validators.maxLength(50)]],
@@ -46,6 +48,7 @@ export class ProductFormComponent implements OnInit {
     reference_price_usd: [null, Validators.min(0)],
     currency: ['MXN', Validators.required],
     unit: [StockUnit.Pieza, Validators.required],
+    image_url: [''],
   });
 
   readonly categories = [
@@ -105,6 +108,13 @@ export class ProductFormComponent implements OnInit {
               ...product,
               is_active: product.is_active ? 'true' : 'false'
             });
+
+            // Cargar imagen si existe
+            const primaryMedia = product.media?.find(m => m.is_primary) || product.media?.[0];
+            if (primaryMedia) {
+              this.imagePreview.set(primaryMedia.file_path);
+              this.form.patchValue({ image_url: primaryMedia.file_path });
+            }
           }
           this.isLoadingData.set(false);
         },
@@ -122,10 +132,12 @@ export class ProductFormComponent implements OnInit {
     }
 
     if (!file.type.startsWith('image/')) {
-      this.errorMessage.set('Selecciona un archivo de imagen valido para el producto.');
+      this.errorMessage.set('Selecciona un archivo de imagen válido para el producto.');
       input.value = '';
       return;
     }
+
+    this.selectedFile = file;
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -137,11 +149,12 @@ export class ProductFormComponent implements OnInit {
   }
 
   clearImage(): void {
+    this.selectedFile = null;
     this.form.patchValue({ image_url: '' });
     this.imagePreview.set('');
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -152,28 +165,35 @@ export class ProductFormComponent implements OnInit {
 
     const dto = {
       ...this.form.value,
-      is_active: this.form.value.is_active === 'true',
+      is_active: this.form.value.is_active === true || this.form.value.is_active === 'true',
       unit_price_mxn: Number(this.form.value.unit_price_mxn),
       cost_price_mxn: Number(this.form.value.cost_price_mxn),
-      reference_price_usd: this.form.value.reference_price_usd ? Number(this.form.value.reference_price_usd) : undefined,
+      reference_price_usd: this.form.value.reference_price_usd === null || this.form.value.reference_price_usd === ''
+        ? null
+        : Number(this.form.value.reference_price_usd),
     };
 
-    const operation = this.isEditMode && this.productId
-      ? this.productsService.updateProduct(this.productId, dto)
-      : this.productsService.createProduct(dto);
+    delete dto.image_url;
 
-    operation.subscribe({
-      next: (result) => {
-        this.isSaving.set(false);
-        if (result) {
-          this.router.navigate(['/productos']);
-        }
-      },
-      error: () => {
-        this.isSaving.set(false);
-        this.errorMessage.set('Ocurrio un error al guardar. Intenta de nuevo.');
+    try {
+      const result = this.isEditMode && this.productId
+        ? await firstValueFrom(this.productsService.updateProduct(this.productId, dto))
+        : await firstValueFrom(this.productsService.createProduct(dto));
+
+      if (result?.id && this.selectedFile) {
+        const publicUrl = await firstValueFrom(this.productsService.uploadProductImage(result.id, this.selectedFile));
+        await firstValueFrom(this.productsService.saveProductMedia(result.id, publicUrl));
+      } else if (result?.id && this.isEditMode && !this.imagePreview()) {
+        await firstValueFrom(this.productsService.deleteProductMedia(result.id));
       }
-    });
+
+      await this.router.navigate(['/productos']);
+    } catch (error) {
+      console.error('[Products] save failed', error);
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible guardar el producto.');
+    } finally {
+      this.isSaving.set(false);
+    }
   }
 
   hasError(ctrl: string, error?: string): boolean {
@@ -182,3 +202,4 @@ export class ProductFormComponent implements OnInit {
     return error ? control.hasError(error) : control.invalid;
   }
 }
+

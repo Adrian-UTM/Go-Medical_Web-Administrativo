@@ -1,216 +1,218 @@
-<div class="page-header">
-  <div class="page-header__left">
-    <nav class="breadcrumb" aria-label="Navegación">
-      <span class="breadcrumb__item">Inicio</span>
-      <span class="breadcrumb__sep">›</span>
-      <span class="breadcrumb__item breadcrumb__item--active">Reportes</span>
-    </nav>
-    <h1 class="page-title">Reportes Comerciales</h1>
-    <p class="page-subtitle">Análisis operativo y comercial del negocio.</p>
-  </div>
-  <div class="page-header__actions">
-    <span class="last-updated">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
-      Actualizado: {{ lastUpdated | date:'dd/MM/yyyy HH:mm' }}
-    </span>
-    <button class="btn-refresh" (click)="applyFilters()" title="Actualizar datos">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10"/>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-      </svg>
-      Refrescar
-    </button>
-  </div>
-</div>
-
-<div class="filters-panel">
-  <div class="filters-panel__row">
-    <div class="filter-group">
-      <label class="filter-label">Desde</label>
-      <div class="date-picker-shell">
-        <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(fromDateInput)">
-          <span>{{ formatFilterDate(dateFrom) }}</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        </button>
-        <input
-          #fromDateInput
-          class="date-picker-shell__native"
-          type="date"
-          [ngModel]="dateFrom"
-          (ngModelChange)="onDateInputChange('from', $event)"
-          [min]="minReportDate"
-          [max]="maxReportDate"
-          inputmode="none"
-          (keydown)="$event.preventDefault()"
-          (click)="openDatePicker(fromDateInput)">
-      </div>
+<div class="reports-shell">
+  <section class="reports-hero">
+    <div class="reports-hero__content">
+      <nav class="breadcrumb" aria-label="Navegación">
+        <span class="breadcrumb__item">Inicio</span>
+        <span class="breadcrumb__sep">›</span>
+        <span class="breadcrumb__item breadcrumb__item--active">Reportes</span>
+      </nav>
+      <h1 class="page-title">Reportes Comerciales</h1>
+      <p class="page-subtitle">Visión ejecutiva del comportamiento comercial y operativo de Go Medical.</p>
     </div>
 
-    <div class="filter-group">
-      <label class="filter-label">Hasta</label>
-      <div class="date-picker-shell">
-        <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(toDateInput)">
-          <span>{{ formatFilterDate(dateTo) }}</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        </button>
-        <input
-          #toDateInput
-          class="date-picker-shell__native"
-          type="date"
-          [ngModel]="dateTo"
-          (ngModelChange)="onDateInputChange('to', $event)"
-          [min]="minReportDate"
-          [max]="maxReportDate"
-          inputmode="none"
-          (keydown)="$event.preventDefault()"
-          (click)="openDatePicker(toDateInput)">
-      </div>
+    <div class="reports-hero__meta">
+      <span class="last-updated">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Actualizado: {{ lastUpdated | date:'dd/MM/yyyy HH:mm' }}
+      </span>
+      <button class="btn-refresh" (click)="applyFilters()" title="Actualizar datos">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Actualizar
+      </button>
     </div>
+  </section>
 
-    <div class="filter-actions">
-      <button class="btn-primary" (click)="applyFilters()">Aplicar filtros</button>
-      <button class="btn-ghost" (click)="clearFilters()">Limpiar</button>
-    </div>
-  </div>
-</div>
-
-<div class="error-banner" *ngIf="error()">
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
-    <line x1="12" y1="16" x2="12.01" y2="16"/>
-  </svg>
-  {{ error() }}
-</div>
-
-<section class="section-block" *ngIf="loading()">
-  <bc-revenue-summary-cards [kpis]="null" />
-</section>
-
-<section class="section-block" *ngIf="!loading()">
-  <bc-revenue-summary-cards [kpis]="kpis()" />
-</section>
-
-<div class="empty-report-note" *ngIf="!loading() && !hasAnyData()">
-  No hay información suficiente para generar este reporte.
-</div>
-
-<div class="section-divider" *ngIf="!loading()">
-  <span class="section-divider__label">Análisis detallado</span>
-</div>
-
-<div class="tables-block" *ngIf="!loading()">
-  <div class="tab-nav">
-    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'top'" (click)="setTab('top')">
-      Más vendidos
-    </button>
-    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'low'" (click)="setTab('low')">
-      Menos vendidos
-    </button>
-    <button class="tab-btn" [class.tab-btn--active]="activeTab === 'customers'" (click)="setTab('customers')">
-      Clientes principales
-    </button>
-  </div>
-
-  <div class="table-panel">
-    <div *ngIf="activeTab === 'top'">
-      <div class="table-header">
-        <div>
-          <h2 class="table-title">Productos más vendidos</h2>
-          <p class="table-subtitle">Ordenados por unidades vendidas en pedidos pagados, enviados o entregados.</p>
+  <section class="filters-panel">
+    <div class="filters-panel__row">
+      <div class="filter-group">
+        <label class="filter-label">Desde</label>
+        <div class="date-picker-shell">
+          <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(fromDateInput)">
+            <span>{{ formatFilterDate(dateFrom) }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </button>
+          <input
+            #fromDateInput
+            class="date-picker-shell__native"
+            type="date"
+            [ngModel]="dateFrom"
+            (ngModelChange)="onDateInputChange('from', $event)"
+            [min]="minReportDate"
+            [max]="maxReportDate"
+            inputmode="none"
+            (keydown)="$event.preventDefault()"
+            (click)="openDatePicker(fromDateInput)">
         </div>
       </div>
-      <bc-top-products-table [rows]="topProducts()" />
-    </div>
 
-    <div *ngIf="activeTab === 'low'">
-      <div class="table-header">
-        <div>
-          <h2 class="table-title">Productos de baja rotación</h2>
-          <p class="table-subtitle">Cruce de ventas e inventario para detectar bajo movimiento.</p>
+      <div class="filter-group">
+        <label class="filter-label">Hasta</label>
+        <div class="date-picker-shell">
+          <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(toDateInput)">
+            <span>{{ formatFilterDate(dateTo) }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </button>
+          <input
+            #toDateInput
+            class="date-picker-shell__native"
+            type="date"
+            [ngModel]="dateTo"
+            (ngModelChange)="onDateInputChange('to', $event)"
+            [min]="minReportDate"
+            [max]="maxReportDate"
+            inputmode="none"
+            (keydown)="$event.preventDefault()"
+            (click)="openDatePicker(toDateInput)">
         </div>
       </div>
-      <bc-low-products-table [rows]="lowProducts()" />
-    </div>
 
-    <div *ngIf="activeTab === 'customers'">
-      <div class="table-header">
-        <div>
-          <h2 class="table-title">Clientes principales</h2>
-          <p class="table-subtitle">Ordenados por volumen de compra dentro del periodo seleccionado.</p>
-        </div>
+      <div class="filter-actions">
+        <button class="btn-primary" (click)="applyFilters()">Aplicar filtros</button>
+        <button class="btn-ghost" (click)="clearFilters()">Limpiar</button>
       </div>
-      <bc-top-customers-table [rows]="topCustomers()" />
     </div>
-  </div>
-</div>
+  </section>
 
-<section class="order-analytics" *ngIf="!loading() && orderAnalytics()">
-  <div class="order-analytics__header">
-    <div>
-      <h2 class="table-title">Analítica de pedidos</h2>
-      <p class="table-subtitle">Serie temporal y comportamiento operativo de los pedidos.</p>
-    </div>
-    <div class="order-analytics__controls">
-      <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'day'" (click)="setOrderAnalyticsGrouping('day')">Día</button>
-      <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'week'" (click)="setOrderAnalyticsGrouping('week')">Semana</button>
-      <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'month'" (click)="setOrderAnalyticsGrouping('month')">Mes</button>
-    </div>
+  <div class="error-banner" *ngIf="error()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    {{ error() }}
   </div>
 
-  <div class="order-analytics__label">{{ orderAnalytics()!.periodLabel }}</div>
-
-  <div class="order-analytics__charts">
-    <bc-order-period-chart
-      title="Pedidos por periodo"
-      subtitle="Comportamiento de volumen según la agrupación seleccionada"
-      [series]="orderCountSeries()"
-      valueType="count">
-    </bc-order-period-chart>
-
-    <bc-order-period-chart
-      title="Ingresos por periodo"
-      subtitle="Suma de totales de pedidos no cancelados por periodo"
-      [series]="orderRevenueSeries()"
-      valueType="currency">
-    </bc-order-period-chart>
-  </div>
-
-  <div class="order-analytics__tables">
-    <bc-order-status-summary [rows]="orderAnalytics()!.statusSummary"></bc-order-status-summary>
-    <bc-top-ordered-products [rows]="orderAnalytics()!.topOrderedProducts"></bc-top-ordered-products>
-  </div>
-</section>
-
-<section class="ticket-status-panel" *ngIf="!loading()">
-  <div class="table-header">
-    <div>
-      <h2 class="table-title">Tickets por estado</h2>
-      <p class="table-subtitle">Distribución actual de soporte técnico.</p>
-    </div>
-  </div>
-
-  <div class="ticket-status-grid">
-    <article *ngFor="let row of ticketStatusRows()" class="ticket-status-card">
-      <span class="ticket-status-card__label">{{ row.label }}</span>
-      <strong class="ticket-status-card__value">{{ row.count }}</strong>
+  <section class="highlights-grid" *ngIf="!loading() && reportHighlights().length">
+    <article *ngFor="let highlight of reportHighlights()" class="highlight-card" [attr.data-tone]="highlight.tone">
+      <span class="highlight-card__label">{{ highlight.label }}</span>
+      <strong class="highlight-card__value">{{ highlight.value }}</strong>
     </article>
-  </div>
-</section>
+  </section>
 
-<div class="dev-note" *ngIf="!loading()">
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
-       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
-    <line x1="12" y1="16" x2="12.01" y2="16"/>
-  </svg>
-  <span>Si una sección aparece vacía, no hay información disponible para el periodo seleccionado.</span>
+  <section class="section-block" *ngIf="loading()">
+    <bc-revenue-summary-cards [kpis]="null" />
+  </section>
+
+  <section class="section-block" *ngIf="!loading()">
+    <bc-revenue-summary-cards [kpis]="kpis()" />
+  </section>
+
+  <div class="empty-report-note" *ngIf="!loading() && !hasAnyData()">
+    <strong>No hay información suficiente para generar este reporte.</strong>
+    <span>Prueba con otro rango o espera a que exista más actividad operativa.</span>
+  </div>
+
+  <div class="section-divider" *ngIf="!loading()">
+    <span class="section-divider__label">Análisis detallado</span>
+  </div>
+
+  <div class="tables-block" *ngIf="!loading()">
+    <div class="tab-nav">
+      <button class="tab-btn" [class.tab-btn--active]="activeTab === 'top'" (click)="setTab('top')">
+        Más vendidos
+      </button>
+      <button class="tab-btn" [class.tab-btn--active]="activeTab === 'low'" (click)="setTab('low')">
+        Menor rotación
+      </button>
+      <button class="tab-btn" [class.tab-btn--active]="activeTab === 'customers'" (click)="setTab('customers')">
+        Clientes principales
+      </button>
+    </div>
+
+    <div class="table-panel">
+      <div *ngIf="activeTab === 'top'">
+        <div class="table-header">
+          <div>
+            <h2 class="table-title">Productos más vendidos</h2>
+            <p class="table-subtitle">Concentrado por unidades vendidas dentro del periodo seleccionado.</p>
+          </div>
+        </div>
+        <bc-top-products-table [rows]="topProducts()" />
+      </div>
+
+      <div *ngIf="activeTab === 'low'">
+        <div class="table-header">
+          <div>
+            <h2 class="table-title">Productos de menor rotación</h2>
+            <p class="table-subtitle">Cruce entre ventas e inventario para identificar bajo movimiento.</p>
+          </div>
+        </div>
+        <bc-low-products-table [rows]="lowProducts()" />
+      </div>
+
+      <div *ngIf="activeTab === 'customers'">
+        <div class="table-header">
+          <div>
+            <h2 class="table-title">Clientes principales</h2>
+            <p class="table-subtitle">Clientes con mayor volumen de compra dentro del rango analizado.</p>
+          </div>
+        </div>
+        <bc-top-customers-table [rows]="topCustomers()" />
+      </div>
+    </div>
+  </div>
+
+  <section class="order-analytics" *ngIf="!loading() && orderAnalytics()">
+    <div class="order-analytics__header">
+      <div>
+        <h2 class="table-title">Analítica de pedidos</h2>
+        <p class="table-subtitle">Comparativa de volumen e ingresos según la agrupación seleccionada.</p>
+      </div>
+      <div class="order-analytics__controls">
+        <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'day'" (click)="setOrderAnalyticsGrouping('day')">Día</button>
+        <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'week'" (click)="setOrderAnalyticsGrouping('week')">Semana</button>
+        <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'month'" (click)="setOrderAnalyticsGrouping('month')">Mes</button>
+      </div>
+    </div>
+
+    <div class="order-analytics__label">{{ orderAnalytics()!.periodLabel }}</div>
+
+    <div class="order-analytics__charts">
+      <bc-order-period-chart
+        title="Pedidos por periodo"
+        subtitle="Volumen registrado según el rango seleccionado"
+        [series]="orderCountSeries()"
+        valueType="count">
+      </bc-order-period-chart>
+
+      <bc-order-period-chart
+        title="Ingresos por periodo"
+        subtitle="Importe total registrado por periodo"
+        [series]="orderRevenueSeries()"
+        valueType="currency">
+      </bc-order-period-chart>
+    </div>
+
+    <div class="order-analytics__tables">
+      <bc-order-status-summary [rows]="orderAnalytics()!.statusSummary"></bc-order-status-summary>
+      <bc-top-ordered-products [rows]="orderAnalytics()!.topOrderedProducts"></bc-top-ordered-products>
+    </div>
+  </section>
+
+  <section class="ticket-status-panel" *ngIf="!loading()">
+    <div class="table-header">
+      <div>
+        <h2 class="table-title">Tickets por estado</h2>
+        <p class="table-subtitle">Distribución actual del soporte técnico.</p>
+      </div>
+    </div>
+
+    <div class="ticket-status-grid">
+      <article *ngFor="let row of ticketStatusRows()" class="ticket-status-card">
+        <span class="ticket-status-card__label">{{ row.label }}</span>
+        <strong class="ticket-status-card__value">{{ row.count }}</strong>
+      </article>
+    </div>
+  </section>
 </div>

@@ -50,7 +50,8 @@ export class QuoteSupabaseService {
     }
 
     const itemsByQuoteId = this.groupItemsByParent(itemsResponse.data ?? [], 'quote_id');
-    const quotes = (quoteResponse.data ?? []).map(row => this.mapQuote(row, itemsByQuoteId.get(row.id) ?? []));
+    const clientMap = await this.getClientMap((quoteResponse.data ?? []).map((row: any) => row.client_id).filter(Boolean));
+    const quotes = (quoteResponse.data ?? []).map(row => this.mapQuote(row, itemsByQuoteId.get(row.id) ?? [], clientMap.get(String(row.client_id ?? ''))));
     return this.applyFilters(quotes, filters);
   }
 
@@ -80,7 +81,8 @@ export class QuoteSupabaseService {
       throw this.toAppError(itemsResponse.error.message, 'No fue posible cargar los conceptos de la cotización.');
     }
 
-    return this.mapQuote(quoteResponse.data, itemsResponse.data ?? []);
+    const client = quoteResponse.data?.client_id ? await this.getClientById(String(quoteResponse.data.client_id)) : undefined;
+    return this.mapQuote(quoteResponse.data, itemsResponse.data ?? [], client);
   }
 
   async getActiveClients(): Promise<Client[]> {
@@ -103,8 +105,6 @@ export class QuoteSupabaseService {
       quote_number: await this.generateNextQuoteNumber(),
       client_id: payload.clientId,
       client_name_snapshot: payload.clientNameSnapshot ?? client?.businessName ?? '',
-      client_rfc_snapshot: payload.clientRfcSnapshot ?? client?.rfc ?? '',
-      client_address_snapshot: payload.clientAddressSnapshot ?? (client ? `${client.shippingAddress || client.address}, ${client.city}, ${client.state}` : ''),
       status: payload.status ?? QuoteStatus.Draft,
       subtotal: totals.subtotal,
       tax_pct: payload.tax_pct ?? DEFAULT_QUOTE_TAX_PCT,
@@ -112,7 +112,6 @@ export class QuoteSupabaseService {
       total: totals.total,
       valid_until: payload.validUntil,
       notes: payload.notes ?? '',
-      conditions: payload.conditions ?? '',
     };
 
     const { data, error } = await this.supabase.client
@@ -122,14 +121,17 @@ export class QuoteSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Quotes] Error creating quote', { payload: insertPayload, error });
       throw this.toAppError(error.message, 'No fue posible crear la cotización.');
     }
 
+    const itemPayloads = normalizedItems.map(item => this.mapQuoteItemInsertPayload(data.id, item));
     const itemsInsertResponse = await this.supabase.client
       .from(this.quoteItemsTable)
-      .insert(normalizedItems.map(item => this.mapQuoteItemInsertPayload(data.id, item)));
+      .insert(itemPayloads);
 
     if (itemsInsertResponse.error) {
+      console.error('[Quotes] Error creating quote items', { payload: itemPayloads, error: itemsInsertResponse.error });
       throw this.toAppError(itemsInsertResponse.error.message, 'No fue posible guardar los conceptos de la cotización.');
     }
 
@@ -149,8 +151,6 @@ export class QuoteSupabaseService {
     const updatePayload = {
       client_id: payload.clientId,
       client_name_snapshot: payload.clientNameSnapshot ?? existing.clientNameSnapshot,
-      client_rfc_snapshot: payload.clientRfcSnapshot ?? existing.clientRfcSnapshot,
-      client_address_snapshot: payload.clientAddressSnapshot ?? existing.clientAddressSnapshot,
       status: payload.status ?? existing.status,
       subtotal: totals.subtotal,
       tax_pct: payload.tax_pct ?? existing.tax_pct,
@@ -158,7 +158,6 @@ export class QuoteSupabaseService {
       total: totals.total,
       valid_until: payload.validUntil,
       notes: payload.notes ?? '',
-      conditions: payload.conditions ?? '',
       updated_at: new Date().toISOString(),
     };
 
@@ -168,6 +167,7 @@ export class QuoteSupabaseService {
       .eq('id', id);
 
     if (error) {
+      console.error('[Quotes] Error updating quote', { payload: updatePayload, error });
       throw this.toAppError(error.message, 'No fue posible actualizar la cotización.');
     }
 
@@ -177,15 +177,18 @@ export class QuoteSupabaseService {
       .eq('quote_id', id);
 
     if (deleteResponse.error) {
+      console.error('[Quotes] Error deleting quote items', { quoteId: id, error: deleteResponse.error });
       throw this.toAppError(deleteResponse.error.message, 'No fue posible reemplazar los conceptos de la cotización.');
     }
 
     if (normalizedItems.length > 0) {
+      const itemPayloads = normalizedItems.map(item => this.mapQuoteItemInsertPayload(id, item));
       const itemsInsertResponse = await this.supabase.client
         .from(this.quoteItemsTable)
-        .insert(normalizedItems.map(item => this.mapQuoteItemInsertPayload(id, item)));
+        .insert(itemPayloads);
 
       if (itemsInsertResponse.error) {
+        console.error('[Quotes] Error updating quote items', { payload: itemPayloads, error: itemsInsertResponse.error });
         throw this.toAppError(itemsInsertResponse.error.message, 'No fue posible guardar los conceptos actualizados de la cotización.');
       }
     }
@@ -231,14 +234,34 @@ export class QuoteSupabaseService {
     }
   }
 
-  private mapQuote(row: any, itemRows: any[]): Quote {
+  private async getClientMap(clientIds: string[]): Promise<Map<string, Client>> {
+    const uniqueIds = new Set(clientIds.map(id => String(id)).filter(Boolean));
+    if (uniqueIds.size === 0) {
+      return new Map();
+    }
+
+    const clients = await firstValueFrom(this.clientsService.getClients());
+    return new Map(clients.filter(client => uniqueIds.has(client.id)).map(client => [client.id, client]));
+  }
+
+  private formatClientAddress(client?: Client): string {
+    if (!client) {
+      return '';
+    }
+
+    const address = client.formattedBillingAddress || client.address || client.shippingAddress || '';
+    const location = [client.city, client.state, client.country].filter(Boolean).join(', ');
+    return [address, location].filter(Boolean).join(', ');
+  }
+
+  private mapQuote(row: any, itemRows: any[], client?: Client): Quote {
     return {
       id: String(row.id),
       quoteNumber: row.quote_number ?? row.quoteNumber ?? 'Sin folio',
       clientId: String(row.client_id ?? ''),
-      clientNameSnapshot: row.client_name_snapshot ?? 'Cliente no disponible',
-      clientRfcSnapshot: row.client_rfc_snapshot ?? '',
-      clientAddressSnapshot: row.client_address_snapshot ?? '',
+      clientNameSnapshot: row.client_name_snapshot ?? client?.businessName ?? 'Cliente no disponible',
+      clientRfcSnapshot: row.client_rfc_snapshot ?? client?.rfc ?? '',
+      clientAddressSnapshot: row.client_address_snapshot ?? this.formatClientAddress(client),
       status: (row.status ?? QuoteStatus.Draft) as QuoteStatus,
       items: itemRows.map(item => this.mapQuoteItem(item)),
       subtotal: Number(row.subtotal ?? 0),
@@ -294,8 +317,9 @@ export class QuoteSupabaseService {
     return {
       quote_id: quoteId,
       product_id: item.productId,
-      sku: item.sku ?? '',
-      product_name: item.productName ?? '',
+      sku_snapshot: item.sku ?? '',
+      product_name_snapshot: item.productName ?? '',
+      product_category_snapshot: (item as any).productCategory ?? null,
       quantity,
       unit_price: unitPrice,
       discount,
@@ -362,7 +386,10 @@ export class QuoteSupabaseService {
       return new Error('No tienes permisos para consultar o modificar cotizaciones.');
     }
 
-    return new Error(message || fallback);
+    return new Error(fallback);
   }
 }
+
+
+
 

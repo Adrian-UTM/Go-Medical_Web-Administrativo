@@ -1,6 +1,6 @@
 <bc-page-header
   title="PDFs generados"
-  subtitle="Consulta rapida de cotizaciones listas para regenerar, descargar y compartir desde frontend"
+  subtitle="Consulta rápida de cotizaciones listas para descargar o compartir nuevamente"
   [breadcrumbs]="[
     { label: 'Inicio', routerLink: '/dashboard' },
     { label: 'Cotizaciones', routerLink: '/cotizaciones' },
@@ -16,10 +16,6 @@
     Nueva cotizacion
   </a>
 </bc-page-header>
-
-<div class="info-banner info-banner--soft">
-  Mientras no exista almacenamiento en backend, esta vista regenera el PDF en frontend usando la informacion actual de la cotizacion.
-</div>
 
 <div *ngIf="actionMessage()" class="info-banner">
   {{ actionMessage() }}
@@ -62,7 +58,7 @@
 <bc-empty-state
   *ngIf="!isLoading() && filteredQuotes().length === 0"
   title="Sin PDFs generados"
-  description="No se encontraron cotizaciones listas para regenerar PDF con los filtros aplicados."
+  description="No se encontraron cotizaciones con los filtros aplicados."
   [hasAction]="hasActiveFilters()">
   <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>
@@ -129,9 +125,6 @@
   </table>
 
   <div class="table-footer">
-    <span class="table-count">{{ filteredQuotes().length }} PDF{{ filteredQuotes().length !== 1 ? 's' : '' }} disponible{{ filteredQuotes().length !== 1 ? 's' : '' }} para regeneracion</span>
+    <span class="table-count">{{ filteredQuotes().length }} PDF{{ filteredQuotes().length !== 1 ? 's' : '' }} disponible{{ filteredQuotes().length !== 1 ? 's' : '' }}</span>
   </div>
 </div>
-
-
-

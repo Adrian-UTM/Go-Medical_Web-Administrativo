@@ -121,7 +121,7 @@ export class TicketSupabaseService {
     const client = await this.getClientById(payload.clientId);
     const product = payload.productId ? (await this.getAvailableProducts()).find(item => item.id === payload.productId) : undefined;
 
-    const insertPayload = {
+    const insertPayload: Record<string, unknown> = {
       ticket_number: await this.generateNextTicketNumber(),
       client_id: payload.clientId,
       client_name_snapshot: payload.clientNameSnapshot?.trim() || client?.businessName || '',
@@ -132,13 +132,15 @@ export class TicketSupabaseService {
       type: payload.type,
       product_id: payload.productId || null,
       product_name_snapshot: payload.productNameSnapshot?.trim() || product?.name || null,
-      equipment_serial_number: payload.equipmentSerialNumber?.trim() || null,
-      assigned_technician_name: payload.assignedTechnicianName?.trim() || null,
       requested_at: new Date().toISOString(),
       scheduled_at: payload.scheduledAt || null,
       notes: payload.notes?.trim() || '',
       attachments: payload.attachments ?? null,
     };
+
+    // Use actual DB columns if present in payload
+    if ('assignedTechnicianId' in payload) insertPayload['assigned_technician_id'] = (payload as any).assignedTechnicianId;
+    if ('equipmentUnitId' in payload) insertPayload['equipment_unit_id'] = (payload as any).equipmentUnitId;
 
     const { data, error } = await this.supabase.client
       .from(this.tableName)
@@ -147,6 +149,7 @@ export class TicketSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Tickets] Error creating ticket', { payload: insertPayload, error });
       throw this.toAppError(error.message, 'No fue posible crear el ticket.');
     }
 
@@ -175,13 +178,14 @@ export class TicketSupabaseService {
       type: payload.type,
       product_id: payload.productId || null,
       product_name_snapshot: payload.productNameSnapshot || null,
-      equipment_serial_number: payload.equipmentSerialNumber || null,
-      assigned_technician_name: payload.assignedTechnicianName || null,
       scheduled_at: payload.scheduledAt || null,
       notes: payload.notes?.trim() || '',
       attachments: payload.attachments ?? current.attachments ?? null,
       updated_at: new Date().toISOString(),
     };
+
+    if ('assignedTechnicianId' in payload) updatePayload['assigned_technician_id'] = (payload as any).assignedTechnicianId;
+    if ('equipmentUnitId' in payload) updatePayload['equipment_unit_id'] = (payload as any).equipmentUnitId;
 
     if (history) {
       updatePayload['history'] = history;
@@ -195,6 +199,7 @@ export class TicketSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Tickets] Error updating ticket', { payload: updatePayload, error });
       throw this.toAppError(error.message, 'No fue posible actualizar el ticket.');
     }
 
@@ -230,6 +235,7 @@ export class TicketSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Tickets] Error updating ticket status', { ticketId: id, status, error });
       throw this.toAppError(error.message, 'No fue posible actualizar el estado del ticket.');
     }
 
@@ -248,7 +254,6 @@ export class TicketSupabaseService {
 
     const nextStatus = current.status === TicketStatus.Open ? TicketStatus.Assigned : current.status;
     const updatePayload: Record<string, unknown> = {
-      assigned_technician_name: technicianName,
       status: nextStatus,
       updated_at: new Date().toISOString(),
     };
@@ -271,6 +276,7 @@ export class TicketSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Tickets] Error assigning technician', { ticketId: id, technicianName, error });
       throw this.toAppError(error.message, 'No fue posible asignar el técnico.');
     }
 
@@ -327,7 +333,7 @@ export class TicketSupabaseService {
       productId: row.product_id ?? undefined,
       productNameSnapshot: row.product_name_snapshot ?? undefined,
       equipmentSerialNumber: row.equipment_serial_number ?? undefined,
-      assignedTechnicianName: row.assigned_technician_name ?? undefined,
+      assignedTechnicianName: row.assigned_technician_name ?? row.assigned_technician?.full_name ?? undefined,
       requestedAt: row.requested_at ?? row.created_at ?? new Date().toISOString(),
       scheduledAt: row.scheduled_at ?? undefined,
       updatedAt: row.updated_at ?? row.requested_at ?? new Date().toISOString(),
@@ -407,9 +413,10 @@ export class TicketSupabaseService {
       return new Error('No tienes permisos para consultar o modificar tickets de soporte.');
     }
 
-    return new Error(message || fallback);
+    return new Error(fallback);
   }
 }
+
 
 
 

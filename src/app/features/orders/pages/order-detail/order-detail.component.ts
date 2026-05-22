@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
@@ -24,12 +24,14 @@ import { OrderSupabaseService } from '../../services/order.supabase.service';
 })
 export class OrderDetailComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly orderService = inject(OrderSupabaseService);
 
   readonly isLoading = signal(true);
   readonly order = signal<Order | null>(null);
   readonly client = signal<Client | null>(null);
   readonly actionMessage = signal('');
+  readonly isCanceling = signal(false);
 
   constructor() {
     void this.loadOrder();
@@ -81,8 +83,49 @@ export class OrderDetailComponent {
     await this.updateStatus(OrderStatus.Shipped, 'Pedido marcado como enviado.');
   }
 
+  async cancelOrder(): Promise<void> {
+    const currentOrder = this.order();
+    if (!currentOrder) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Se cancelara el pedido ${currentOrder.folio}. El pedido permanecera en el historial con estado cancelado.`);
+    if (!confirmed) {
+      return;
+    }
+
+    await this.updateStatus(OrderStatus.Canceled, 'El pedido fue cancelado correctamente.');
+  }
+
+  async cancelOrderFromAction(): Promise<void> {
+    const currentOrder = this.order();
+    if (!currentOrder || this.isCanceling() || currentOrder.status === OrderStatus.Canceled) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Se cancelara el pedido ${currentOrder.folio}. El pedido permanecera visible en el historial.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.isCanceling.set(true);
+    this.actionMessage.set('');
+
+    try {
+      const updatedOrder = await this.orderService.cancelOrder(currentOrder.id);
+      if (updatedOrder) {
+        this.order.set(updatedOrder);
+      }
+      this.actionMessage.set('El pedido fue cancelado correctamente.');
+    } catch (error) {
+      this.actionMessage.set(error instanceof Error ? error.message : 'No se pudo cancelar el pedido.');
+    } finally {
+      this.isCanceling.set(false);
+    }
+  }
+
   printOrder(): void {
-    this.actionMessage.set('La impresion real se conectara en una fase posterior del modulo documental.');
+    this.actionMessage.set('La impresión estará disponible próximamente.');
   }
 
   getStatusBadge(status: OrderStatus): { label: string; variant: BadgeVariant } {
@@ -125,7 +168,9 @@ export class OrderDetailComponent {
     }
 
     const currentClient = this.client()!;
-    return `${currentClient.shippingAddress || currentClient.address}, ${currentClient.city}, ${currentClient.state}`;
+    return currentClient.formattedShippingAddress
+      || currentClient.formattedBillingAddress
+      || `${currentClient.shippingAddress || currentClient.address}, ${currentClient.city}, ${currentClient.state}${currentClient.country ? `, ${currentClient.country}` : ''}`;
   }
 
   getUnitsCount(order: Order): number {
@@ -150,3 +195,6 @@ export class OrderDetailComponent {
     }
   }
 }
+
+
+

@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "bcenter-web": {
+    "go-medical-web": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:class": {
@@ -42,7 +42,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/bcenter-web",
+            "outputPath": "dist/go-medical-web",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -91,10 +91,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "bcenter-web:build:production"
+              "buildTarget": "go-medical-web:build:production"
             },
             "development": {
-              "buildTarget": "bcenter-web:build:development"
+              "buildTarget": "go-medical-web:build:development"
             }
           },
           "defaultConfiguration": "development"

@@ -1,6 +1,6 @@
 <bc-page-header
   title="Documentos"
-  subtitle="Repositorio tecnico para manuales, fichas, certificados y garantias asociadas a productos existentes"
+  subtitle="Repositorio técnico de manuales, fichas, certificados y garantías"
   [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Documentos' }]">
   <a routerLink="/documentos/nuevo" class="btn-primary">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -11,10 +11,6 @@
     Subir documento
   </a>
 </bc-page-header>
-
-<div class="info-banner">
-  Los documentos tecnicos se administran sobre productos ya creados en el catalogo y quedan listos para conectarse despues con Storage.
-</div>
 
 <div *ngIf="actionMessage()" class="info-banner info-banner--soft">
   {{ actionMessage() }}
@@ -143,5 +139,3 @@
     <span class="table-count">{{ filteredDocuments().length }} documento{{ filteredDocuments().length !== 1 ? 's' : '' }} tecnico{{ filteredDocuments().length !== 1 ? 's' : '' }}</span>
   </div>
 </div>
-
-

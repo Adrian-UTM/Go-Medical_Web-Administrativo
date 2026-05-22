@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
@@ -10,6 +11,7 @@ import { CustomSelectComponent } from '../../../../shared/components/custom-sele
 import { ProductCategory } from '../../../../models/product.model';
 import { InventorySupabaseService } from '../../services/inventory.supabase.service';
 import { InventoryStock, InventoryStockStatus } from '../../../../models/inventory.model';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-stock-list',
@@ -27,10 +29,14 @@ import { InventoryStock, InventoryStockStatus } from '../../../../models/invento
   templateUrl: './stock-list.component.html',
   styleUrl: './stock-list.component.css',
 })
-export class StockListComponent {
+export class StockListComponent implements OnInit {
   private readonly inventoryService = inject(InventorySupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly isLoading = signal(true);
+  private loadInFlight = false;
+
+  readonly isLoading = signal(false);
   readonly errorMessage = signal('');
   readonly stocks = signal<InventoryStock[]>([]);
   readonly searchQuery = signal('');
@@ -78,11 +84,22 @@ export class StockListComponent {
     !!this.searchQuery().trim() || !!this.selectedCategory() || !!this.selectedStockStatus()
   );
 
-  constructor() {
+  ngOnInit(): void {
     void this.loadStocks();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        void this.loadStocks();
+      });
   }
 
   async loadStocks(): Promise<void> {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.isLoading.set(true);
     this.errorMessage.set('');
 
@@ -92,6 +109,7 @@ export class StockListComponent {
       this.stocks.set([]);
       this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar el inventario.');
     } finally {
+      this.loadInFlight = false;
       this.isLoading.set(false);
     }
   }
@@ -146,4 +164,3 @@ export class StockListComponent {
     return map[status];
   }
 }
-

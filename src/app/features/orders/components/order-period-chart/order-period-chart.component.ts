@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { CommonModule, CurrencyPipe, DecimalPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 
 export interface OrderPeriodChartDatum {
   label: string;
@@ -9,7 +9,7 @@ export interface OrderPeriodChartDatum {
 @Component({
   selector: 'bc-order-period-chart',
   standalone: true,
-  imports: [CommonModule, CurrencyPipe, DecimalPipe],
+  imports: [CommonModule],
   template: `
     <section class="chart-card">
       <div class="chart-card__header">
@@ -19,7 +19,7 @@ export interface OrderPeriodChartDatum {
         </div>
       </div>
 
-      <div *ngIf="series?.length; else emptyState" class="chart-shell">
+      <div *ngIf="hasData(); else emptyState" class="chart-shell">
         <div class="chart-bars">
           <div *ngFor="let item of series" class="chart-bar-item">
             <span class="chart-bar-item__value">{{ formatValue(item.value) }}</span>
@@ -32,7 +32,10 @@ export interface OrderPeriodChartDatum {
       </div>
 
       <ng-template #emptyState>
-        <div class="chart-empty">No hay datos suficientes para este periodo.</div>
+        <div class="chart-empty">
+          <strong>No hay información suficiente para este periodo.</strong>
+          <span>Los datos aparecerán cuando existan registros dentro del rango seleccionado.</span>
+        </div>
       </ng-template>
     </section>
   `,
@@ -43,6 +46,10 @@ export class OrderPeriodChartComponent {
   @Input({ required: true }) subtitle = '';
   @Input({ required: true }) series: OrderPeriodChartDatum[] = [];
   @Input() valueType: 'count' | 'currency' = 'count';
+
+  hasData(): boolean {
+    return this.series?.some(item => item.value > 0) ?? false;
+  }
 
   getBarHeight(value: number): number {
     const maxValue = Math.max(...this.series.map(item => item.value), 0);

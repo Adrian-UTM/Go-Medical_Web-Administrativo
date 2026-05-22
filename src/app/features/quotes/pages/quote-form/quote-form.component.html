@@ -20,8 +20,6 @@
         <div class="form-section">
           <h2 class="form-section__title">Cliente</h2>
 
-          <p class="form-section__lead">Las cotizaciones se generan sobre clientes y productos ya creados en el catalogo.</p>
-
           <div class="form-field" [class.form-field--error]="hasError('clientId')">
             <label class="form-field__label" for="clientId">Cliente activo <span class="required">*</span></label>
             <bc-custom-select
@@ -49,7 +47,7 @@
             <div class="client-preview__row">
               <span class="client-preview__label">Direccion</span>
               <span class="client-preview__value">
-                {{ selectedClient()!.shippingAddress || selectedClient()!.address }}, {{ selectedClient()!.city }}, {{ selectedClient()!.state }}
+                {{ selectedClient()!.formattedShippingAddress || selectedClient()!.formattedBillingAddress || ((selectedClient()!.shippingAddress || selectedClient()!.address) + ', ' + selectedClient()!.city + ', ' + selectedClient()!.state + (selectedClient()!.country ? ', ' + selectedClient()!.country : '')) }}
               </span>
             </div>
           </div>
@@ -157,7 +155,7 @@
               formControlName="conditions"
               rows="4"
               placeholder="Condiciones de pago, vigencia, tiempos de entrega y observaciones formales para el cliente..."></textarea>
-            <span class="form-field__hint">Este bloque deja preparado el camino para la futura generacion de PDF formal.</span>
+            <span class="form-field__hint">Visible en la cotización para el cliente.</span>
           </div>
         </div>
       </div>
@@ -173,11 +171,6 @@
               [options]="statusOptions"
               placeholder="Seleccionar estado">
             </bc-custom-select>
-          </div>
-
-          <div class="summary-note">
-            IVA configurado para MVP:
-            <strong>{{ (form.get('tax_pct')?.value ?? 0) * 100 | number:'1.0-0' }}%</strong>
           </div>
         </div>
 
@@ -217,3 +210,5 @@
     </div>
   </form>
 </ng-container>
+
+

@@ -50,7 +50,8 @@ export class OrderSupabaseService {
     }
 
     const itemsByOrderId = this.groupItemsByParent(itemsResponse.data ?? [], 'order_id');
-    const orders = (orderResponse.data ?? []).map(row => this.mapOrder(row, itemsByOrderId.get(row.id) ?? []));
+    const productMap = await this.getProductMap(itemsResponse.data ?? []);
+    const orders = (orderResponse.data ?? []).map(row => this.mapOrder(row, itemsByOrderId.get(row.id) ?? [], productMap));
     return this.applyFilters(orders, filters);
   }
 
@@ -80,7 +81,8 @@ export class OrderSupabaseService {
       throw this.toAppError(itemsResponse.error.message, 'No fue posible cargar las partidas del pedido.');
     }
 
-    return this.mapOrder(orderResponse.data, itemsResponse.data ?? []);
+    const productMap = await this.getProductMap(itemsResponse.data ?? []);
+    return this.mapOrder(orderResponse.data, itemsResponse.data ?? [], productMap);
   }
 
   async getActiveClients(): Promise<Client[]> {
@@ -119,14 +121,17 @@ export class OrderSupabaseService {
       .single();
 
     if (error) {
+      console.error('[Orders] Error creating order', { payload: insertPayload, error });
       throw this.toAppError(error.message, 'No fue posible crear el pedido.');
     }
 
+    const itemPayloads = normalizedItems.map(item => this.mapOrderItemInsertPayload(data.id, item));
     const itemInsertResponse = await this.supabase.client
       .from(this.orderItemsTable)
-      .insert(normalizedItems.map(item => this.mapOrderItemInsertPayload(data.id, item)));
+      .insert(itemPayloads);
 
     if (itemInsertResponse.error) {
+      console.error('[Orders] Error creating order items', { payload: itemPayloads, error: itemInsertResponse.error });
       throw this.toAppError(itemInsertResponse.error.message, 'No fue posible guardar los conceptos del pedido.');
     }
 
@@ -162,6 +167,7 @@ export class OrderSupabaseService {
       .eq('id', id);
 
     if (error) {
+      console.error('[Orders] Error updating order', { payload: updatePayload, error });
       throw this.toAppError(error.message, 'No fue posible actualizar el pedido.');
     }
 
@@ -171,15 +177,18 @@ export class OrderSupabaseService {
       .eq('order_id', id);
 
     if (deleteResponse.error) {
+      console.error('[Orders] Error deleting old order items', { orderId: id, error: deleteResponse.error });
       throw this.toAppError(deleteResponse.error.message, 'No fue posible reemplazar las partidas del pedido.');
     }
 
     if (normalizedItems.length > 0) {
+      const itemPayloads = normalizedItems.map(item => this.mapOrderItemInsertPayload(id, item));
       const itemInsertResponse = await this.supabase.client
         .from(this.orderItemsTable)
-        .insert(normalizedItems.map(item => this.mapOrderItemInsertPayload(id, item)));
+        .insert(itemPayloads);
 
       if (itemInsertResponse.error) {
+        console.error('[Orders] Error inserting new order items', { payload: itemPayloads, error: itemInsertResponse.error });
         throw this.toAppError(itemInsertResponse.error.message, 'No fue posible guardar las partidas actualizadas del pedido.');
       }
     }
@@ -187,16 +196,12 @@ export class OrderSupabaseService {
     return this.getOrderById(id);
   }
 
+  async cancelOrder(id: string): Promise<Order | undefined> {
+    return this.updateOrderStatus(id, OrderStatus.Canceled);
+  }
+
   async deleteOrder(id: string): Promise<boolean> {
-    const { error } = await this.supabase.client
-      .from(this.orderTable)
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      throw this.toAppError(error.message, 'No fue posible eliminar el pedido.');
-    }
-
+    await this.cancelOrder(id);
     return true;
   }
 
@@ -236,14 +241,23 @@ export class OrderSupabaseService {
     }
   }
 
-  private mapOrder(row: any, itemRows: any[]): Order {
+  private async getProductMap(itemRows: any[]): Promise<Map<string, Product>> {
+    const productIds = [...new Set(itemRows.map(row => String(row.product_id ?? '')).filter(Boolean))];
+    if (productIds.length === 0) {
+      return new Map();
+    }
+
+    const products = await this.getAvailableProducts();
+    return new Map(products.filter(product => productIds.includes(product.id)).map(product => [product.id, product]));
+  }
+  private mapOrder(row: any, itemRows: any[], productMap = new Map<string, Product>()): Order {
     return {
       id: String(row.id),
       folio: row.order_number ?? row.folio ?? `PED-${this.getShortId(row.id)}`,
       clientId: String(row.client_id ?? ''),
       clientNameSnapshot: row.client_name_snapshot ?? 'Cliente no disponible',
       status: (row.status ?? OrderStatus.Draft) as OrderStatus,
-      items: itemRows.map(item => this.mapOrderItem(item)),
+      items: itemRows.map(item => this.mapOrderItem(item, productMap)),
       subtotal: Number(row.subtotal ?? 0),
       taxPct: Number(row.tax_pct ?? DEFAULT_ORDER_TAX_PCT),
       taxExempt: !!row.tax_exempt,
@@ -255,12 +269,14 @@ export class OrderSupabaseService {
     };
   }
 
-  private mapOrderItem(row: any): OrderItem {
+  private mapOrderItem(row: any, productMap = new Map<string, Product>()): OrderItem {
+    const product = productMap.get(String(row.product_id ?? ''));
+
     return {
       productId: String(row.product_id ?? ''),
-      sku: row.sku ?? '',
-      productName: row.product_name ?? '',
-      productCategory: (row.product_category ?? '') as ProductCategory,
+      sku: row.sku ?? product?.sku ?? '',
+      productName: row.product_name ?? product?.name ?? '',
+      productCategory: (row.product_category ?? product?.category ?? '') as ProductCategory,
       quantity: Number(row.quantity ?? 0),
       unitPrice: Number(row.unit_price ?? 0),
       totalLinePrice: Number(row.total_line_price ?? 0),
@@ -290,9 +306,9 @@ export class OrderSupabaseService {
     return {
       order_id: orderId,
       product_id: item.productId,
-      sku: item.sku ?? '',
-      product_name: item.productName ?? '',
-      product_category: item.productCategory ?? null,
+      sku_snapshot: item.sku ?? '',
+      product_name_snapshot: item.productName ?? '',
+      product_category_snapshot: item.productCategory ?? null,
       quantity: item.quantity,
       unit_price: item.unitPrice ?? 0,
       total_line_price: this.roundCurrency((item.quantity || 0) * (item.unitPrice || 0)),
@@ -365,3 +381,9 @@ export class OrderSupabaseService {
     return new Error(fallback);
   }
 }
+
+
+
+
+
+

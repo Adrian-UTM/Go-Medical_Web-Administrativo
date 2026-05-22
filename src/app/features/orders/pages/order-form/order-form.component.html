@@ -43,7 +43,7 @@
             <div class="client-preview__row">
               <span class="client-preview__label">Direccion</span>
               <span class="client-preview__value">
-                {{ selectedClient()!.shippingAddress || selectedClient()!.address }}, {{ selectedClient()!.city }}, {{ selectedClient()!.state }}
+                {{ selectedClient()!.formattedShippingAddress || selectedClient()!.formattedBillingAddress || ((selectedClient()!.shippingAddress || selectedClient()!.address) + ', ' + selectedClient()!.city + ', ' + selectedClient()!.state + (selectedClient()!.country ? ', ' + selectedClient()!.country : '')) }}
               </span>
             </div>
           </div>
@@ -128,7 +128,7 @@
               formControlName="notes"
               rows="4"
               placeholder="Indicaciones comerciales, entrega, facturacion o seguimiento interno..."></textarea>
-            <span class="form-field__hint">Visible para trazabilidad del pedido y futura integracion con backoffice.</span>
+            <span class="form-field__hint">Útil para seguimiento interno del pedido.</span>
           </div>
         </div>
       </div>
@@ -150,11 +150,6 @@
             <input type="checkbox" formControlName="taxExempt">
             <span>Pedido exento de IVA</span>
           </label>
-
-          <div class="summary-note">
-            IVA configurado para MVP:
-            <strong>{{ (form.get('taxPct')?.value ?? 0) * 100 | number:'1.0-0' }}%</strong>
-          </div>
         </div>
 
         <div class="form-section">
@@ -193,3 +188,5 @@
     </div>
   </form>
 </ng-container>
+
+

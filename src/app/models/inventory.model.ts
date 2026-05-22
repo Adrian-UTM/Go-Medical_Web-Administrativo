@@ -79,5 +79,5 @@ export interface InventoryAdjustmentPayload {
   movementType: MovementType;
   quantity: number;
   notes?: string;
-  createdBy: string;
+  createdBy?: string;
 }

@@ -136,19 +136,14 @@ export class InventorySupabaseService {
 
     const now = new Date().toISOString();
     const warehouseId = (currentStock as any)?.warehouseId ?? warehouseResponse.data?.[0]?.id ?? null;
-    const referenceId = `INV-${Date.now()}`;
     const insertPayload: Record<string, unknown> = {
       product_id: payload.productId,
-      sku: product.sku,
-      product_name: product.name,
-      product_category: product.category,
       warehouse_id: warehouseId,
       movement_type: payload.movementType,
       quantity: signedQuantity,
       previous_stock: previousStock,
       resulting_stock: resultingStock,
       reference_type: ReferenceType.Manual,
-      reference_id: referenceId,
       notes: payload.notes ?? '',
       created_by: payload.createdBy,
       created_at: now,
@@ -161,6 +156,14 @@ export class InventorySupabaseService {
       .single();
 
     if (error) {
+      console.error('[Inventory] Error creating movement', {
+        payload: insertPayload,
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       throw this.toAppError(error.message, 'No fue posible registrar el movimiento.');
     }
 
@@ -224,7 +227,7 @@ export class InventorySupabaseService {
       previousStock: Number(row.previous_stock ?? 0),
       resultingStock: Number(row.resulting_stock ?? 0),
       referenceType: (row.reference_type ?? ReferenceType.Inventory) as ReferenceType,
-      referenceId: String(row.reference_id ?? row.id ?? ''),
+      referenceId: String(row.reference_code ?? row.movement_number ?? row.folio ?? row.reference_id ?? row.id ?? ''),
       notes: row.notes ?? '',
       createdAt: row.created_at ?? new Date().toISOString(),
       createdBy: row.created_by ?? 'Sistema',
@@ -289,7 +292,10 @@ export class InventorySupabaseService {
       return new Error('No tienes permisos para consultar o registrar movimientos de inventario.');
     }
 
-    return new Error(message || fallback);
+    return new Error(fallback);
   }
 }
+
+
+
 

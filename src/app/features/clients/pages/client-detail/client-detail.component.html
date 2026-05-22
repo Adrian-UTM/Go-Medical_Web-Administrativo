@@ -4,17 +4,32 @@
   <bc-page-header
     [title]="client()!.businessName"
     [breadcrumbs]="breadcrumbs">
+    <button type="button" class="btn-danger" [disabled]="isDeleting()" (click)="onDeleteClient()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+        <path d="M10 11v6"></path>
+        <path d="M14 11v6"></path>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+      </svg>
+      <span *ngIf="!isDeleting()">Eliminar</span>
+      <span *ngIf="isDeleting()">Eliminando...</span>
+    </button>
     <a [routerLink]="['/clientes', client()!.id, 'editar']" class="btn-secondary">
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
       </svg>
       Editar
     </a>
-    <a routerLink="/clientes" class="btn-ghost">← Volver</a>
+    <a routerLink="/clientes" class="btn-ghost">Volver</a>
   </bc-page-header>
 
-  <div class="client-hero">
+  <div *ngIf="actionError()" class="detail-alert" role="alert">
+    {{ actionError() }}
+  </div>
+
+  <section class="client-hero">
     <div class="client-hero__main">
       <div class="client-hero__meta">
         <span class="client-hero__id">{{ client()!.id }}</span>
@@ -26,8 +41,9 @@
         <span class="client-hero__type">{{ getTypeLabel(client()!.clientType) }}</span>
       </div>
 
-      <div class="client-hero__contact" *ngIf="client()!.tradeName">
-        <h3>Nombre Comercial: {{ client()!.tradeName }}</h3>
+      <div class="client-hero__title-block">
+        <h2 *ngIf="client()!.tradeName">{{ client()!.tradeName }}</h2>
+        <p class="client-hero__subtitle">{{ client()!.businessName }}</p>
       </div>
 
       <p *ngIf="client()!.notes" class="client-hero__description">
@@ -37,18 +53,18 @@
 
     <div class="client-hero__card">
       <div class="contact-card">
-        <span class="contact-card__label">Contacto Principal</span>
-        <span class="contact-card__name">{{ client()!.contactName }}</span>
+        <span class="contact-card__label">Contacto principal</span>
+        <span class="contact-card__name">{{ client()!.contactName || 'No disponible' }}</span>
         <span class="contact-card__value" *ngIf="client()!.contactPosition">{{ client()!.contactPosition }}</span>
         <div class="contact-card__info">
-          <span>✉️ {{ client()!.email }}</span>
-          <span>📞 {{ client()!.phone }}</span>
+          <span>{{ client()!.email || 'Correo no disponible' }}</span>
+          <span>{{ client()!.phone || 'Telefono no disponible' }}</span>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="tabs-container">
+  <section class="tabs-container">
     <nav class="tabs-nav" role="tablist">
       <button
         *ngFor="let tab of tabs"
@@ -65,62 +81,86 @@
       <ng-container *ngIf="activeTab() === 'info'">
         <div class="info-grid">
           <div class="info-item">
-            <span class="info-item__label">Razón Social</span>
+            <span class="info-item__label">Razon social</span>
             <span class="info-item__value">{{ client()!.businessName }}</span>
           </div>
           <div class="info-item">
             <span class="info-item__label">RFC</span>
-            <span class="info-item__value info-item__value--mono">{{ client()!.rfc }}</span>
+            <span class="info-item__value info-item__value--mono">{{ client()!.rfc || 'No disponible' }}</span>
           </div>
-          <div class="info-item" *ngIf="client()!.billingEmail">
-            <span class="info-item__label">Email Facturación</span>
-            <span class="info-item__value">{{ client()!.billingEmail }}</span>
+          <div class="info-item">
+            <span class="info-item__label">Correo principal</span>
+            <span class="info-item__value">{{ client()!.email || 'No disponible' }}</span>
           </div>
-          <div class="info-item mt-break">
-            <span class="info-item__label">Dirección Fiscal / Principal</span>
-            <span class="info-item__value">{{ client()!.address }}, {{ client()!.city }}, {{ client()!.state }}</span>
+          <div class="info-item">
+            <span class="info-item__label">Correo de facturacion</span>
+            <span class="info-item__value">{{ client()!.billingEmail || 'No disponible' }}</span>
           </div>
-          <div class="info-item" *ngIf="client()!.shippingAddress">
-            <span class="info-item__label">Dirección de Entrega</span>
-            <span class="info-item__value">{{ client()!.shippingAddress }}</span>
+          <div class="info-item">
+            <span class="info-item__label">Telefono</span>
+            <span class="info-item__value">{{ client()!.phone || 'No disponible' }}</span>
           </div>
-          <div class="info-item mt-break">
-            <span class="info-item__label">Fecha de Alta</span>
+          <div class="info-item">
+            <span class="info-item__label">Tipo de cliente</span>
+            <span class="info-item__value">{{ getTypeLabel(client()!.clientType) }}</span>
+          </div>
+          <div class="info-item info-item--wide">
+            <span class="info-item__label">Direccion fiscal / principal</span>
+            <span class="info-item__value">{{ client()!.formattedBillingAddress || client()!.address || 'No disponible' }}</span>
+          </div>
+          <div class="info-item info-item--wide">
+            <span class="info-item__label">Direccion de entrega</span>
+            <span class="info-item__value">{{ client()!.formattedShippingAddress || client()!.shippingAddress || 'No disponible' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Ciudad</span>
+            <span class="info-item__value">{{ client()!.city || 'No disponible' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Estado</span>
+            <span class="info-item__value">{{ client()!.state || 'No disponible' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Pais</span>
+            <span class="info-item__value">{{ client()!.country || 'No disponible' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Fecha de alta</span>
             <span class="info-item__value">{{ client()!.createdAt | date:'dd/MM/yyyy' }}</span>
           </div>
           <div class="info-item">
-            <span class="info-item__label">Última Actualización</span>
+            <span class="info-item__label">Ultima actualizacion</span>
             <span class="info-item__value">{{ client()!.updatedAt | date:'dd/MM/yyyy' }}</span>
           </div>
         </div>
       </ng-container>
 
       <ng-container *ngIf="activeTab() === 'history'">
-        <div class="history-mock">
-          <div class="history-section">
+        <div class="history-sections">
+          <section class="history-section">
             <div class="history-section__header">
               <h3>Historial comercial</h3>
             </div>
             <div class="empty-placeholder">
               <p>No hay historial comercial disponible para este cliente.</p>
             </div>
-          </div>
+          </section>
 
-          <div class="history-section">
+          <section class="history-section">
             <div class="history-section__header">
-              <h3>Soporte técnico</h3>
+              <h3>Soporte tecnico</h3>
             </div>
             <div class="empty-placeholder">
               <p>No hay tickets o mantenimientos vinculados para mostrar por ahora.</p>
             </div>
-          </div>
+          </section>
         </div>
       </ng-container>
     </div>
-  </div>
+  </section>
 </ng-container>
 
 <div *ngIf="!isLoading() && !client()" class="not-found">
   <p>El cliente no fue encontrado.</p>
-  <a routerLink="/clientes" class="btn-ghost">← Volver a clientes</a>
+  <a routerLink="/clientes" class="btn-ghost">Volver a clientes</a>
 </div>

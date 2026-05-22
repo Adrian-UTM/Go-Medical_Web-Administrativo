@@ -1,15 +1,15 @@
 <div class="bc-select" [class.is-open]="isOpen" [class.is-disabled]="disabled">
-  <div class="bc-select__trigger" (click)="toggle()">
+  <button type="button" class="bc-select__trigger" [attr.id]="selectId" (click)="toggle()">
     <span class="bc-select__label" [class.is-placeholder]="!value && value !== '' && value !== 0">{{ selectedLabel }}</span>
     <svg class="bc-select__icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 9 12 15 18 9"></polyline>
     </svg>
-  </div>
-  
+  </button>
+
   <div class="bc-select__dropdown" *ngIf="isOpen">
     <ul class="bc-select__list">
-      <li class="bc-select__option" 
-          *ngFor="let option of options" 
+      <li class="bc-select__option"
+          *ngFor="let option of options"
           [class.is-selected]="option.value === value"
           (click)="selectOption(option, $event)">
         {{ option.label }}

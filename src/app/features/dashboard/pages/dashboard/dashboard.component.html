@@ -13,12 +13,27 @@
   {{ error() }}
 </div>
 
-<section class="metrics-grid" aria-label="Métricas principales">
-  <div *ngFor="let m of metrics()" class="metric-card" [id]="m.id">
-    <div class="metric-card__header">
-      <span class="metric-card__label">{{ m.label }}</span>
-      <div class="metric-card__icon" [style.color]="m.accentColor" [innerHTML]="m.icon"></div>
+<section class="dashboard-hero">
+  <div class="dashboard-hero__content">
+    <span class="dashboard-hero__eyebrow">Panel operativo</span>
+    <h2 class="dashboard-hero__title">{{ heroSummary().title }}</h2>
+    <p class="dashboard-hero__description">{{ heroSummary().description }}</p>
+  </div>
+  <div class="dashboard-hero__meta">
+    <div class="dashboard-hero__meta-card">
+      <span class="dashboard-hero__meta-label">Alertas activas</span>
+      <strong class="dashboard-hero__meta-value">{{ operationalAlerts().length }}</strong>
     </div>
+    <div class="dashboard-hero__meta-card">
+      <span class="dashboard-hero__meta-label">Pedidos recientes</span>
+      <strong class="dashboard-hero__meta-value">{{ recentOrders().length }}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="metrics-grid" aria-label="Métricas principales">
+  <article *ngFor="let m of metrics()" class="metric-card" [id]="m.id" [attr.data-tone]="m.accentTone">
+    <span class="metric-card__label">{{ m.label }}</span>
     <div class="metric-card__value">{{ m.valueLabel }}</div>
     <div *ngIf="m.delta" class="metric-card__delta"
          [class.metric-card__delta--pos]="m.deltaPositive"
@@ -26,58 +41,80 @@
       <span class="metric-card__delta-arrow">{{ m.deltaPositive ? '↑' : '↓' }}</span>
       {{ m.delta }}
     </div>
-  </div>
+  </article>
 </section>
 
-<section class="dashboard-section">
-  <div class="dashboard-section__header">
-    <h2 class="dashboard-section__title">Pedidos recientes</h2>
-    <span class="dashboard-section__subtitle">Últimos pedidos registrados</span>
-  </div>
-
-  <div *ngIf="hasRecentOrders(); else emptyOrders" class="activity-list">
-    <div *ngFor="let order of recentOrders()" class="activity-item">
-      <div class="activity-item__meta">
-        <span class="activity-item__type">{{ order.folio }}</span>
-        <span class="activity-item__time">{{ order.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
-      </div>
-      <p class="activity-item__description">{{ order.clientName }} · {{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
-      <bc-status-badge [label]="getStatusLabel(order.status)" [variant]="getStatusBadgeVariant(order.status)" size="sm"></bc-status-badge>
+<section class="dashboard-grid">
+  <article class="dashboard-section dashboard-section--alerts">
+    <div class="dashboard-section__header">
+      <h2 class="dashboard-section__title">Alertas operativas</h2>
+      <span class="dashboard-section__subtitle">Seguimiento inmediato</span>
     </div>
-  </div>
 
-  <ng-template #emptyOrders>
-    <div class="dashboard-empty">No hay pedidos recientes.</div>
-  </ng-template>
+    <div class="alert-stack">
+      <div *ngFor="let alert of operationalAlerts()" class="alert-card" [attr.data-tone]="alert.tone">
+        <div class="alert-card__dot"></div>
+        <div>
+          <strong class="alert-card__title">{{ alert.title }}</strong>
+          <p class="alert-card__description">{{ alert.description }}</p>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="dashboard-section">
+    <div class="dashboard-section__header">
+      <h2 class="dashboard-section__title">Pedidos recientes</h2>
+      <span class="dashboard-section__subtitle">Actividad comercial más reciente</span>
+    </div>
+
+    <div *ngIf="hasRecentOrders(); else emptyOrders" class="activity-list">
+      <div *ngFor="let order of recentOrders()" class="activity-item activity-item--order">
+        <div class="activity-item__meta">
+          <span class="activity-item__type">{{ order.folio }}</span>
+          <span class="activity-item__time">{{ order.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <p class="activity-item__description">{{ order.clientName }}</p>
+        <div class="activity-item__footer">
+          <strong class="activity-item__amount">{{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
+          <bc-status-badge [label]="getStatusLabel(order.status)" [variant]="getStatusBadgeVariant(order.status)" size="sm"></bc-status-badge>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #emptyOrders>
+      <div class="dashboard-empty">
+        <strong>No hay pedidos recientes.</strong>
+        <span>Los nuevos registros aparecerán aquí conforme se capture actividad comercial.</span>
+      </div>
+    </ng-template>
+  </article>
 </section>
 
-<section class="dashboard-section">
+<section class="dashboard-section dashboard-section--full">
   <div class="dashboard-section__header">
     <h2 class="dashboard-section__title">Actividad reciente</h2>
-    <span class="dashboard-section__subtitle">Movimientos recientes en la operación</span>
+    <span class="dashboard-section__subtitle">Movimientos relevantes del sistema</span>
   </div>
 
-  <div *ngIf="hasRecentActivity(); else emptyActivity" class="activity-list">
-    <div *ngFor="let item of recentActivity()" class="activity-item">
-      <div class="activity-item__meta">
-        <span class="activity-item__type">{{ item.type }}</span>
-        <span class="activity-item__time">{{ item.time }}</span>
+  <div *ngIf="hasRecentActivity(); else emptyActivity" class="timeline-list">
+    <div *ngFor="let item of recentActivity()" class="timeline-item" [attr.data-tone]="getActivityTone(item)">
+      <div class="timeline-item__marker"></div>
+      <div class="timeline-item__body">
+        <div class="timeline-item__top">
+          <span class="timeline-item__type">{{ item.type }}</span>
+          <span class="timeline-item__time">{{ item.time }}</span>
+        </div>
+        <p class="timeline-item__description">{{ item.description }}</p>
       </div>
-      <p class="activity-item__description">{{ item.description }}</p>
       <bc-status-badge [label]="item.badge" [variant]="item.badgeVariant" size="sm"></bc-status-badge>
     </div>
   </div>
 
   <ng-template #emptyActivity>
-    <div class="dashboard-empty">No hay actividad reciente disponible.</div>
+    <div class="dashboard-empty">
+      <strong>No hay actividad reciente disponible.</strong>
+      <span>Cuando existan movimientos operativos, se mostrarán en esta sección.</span>
+    </div>
   </ng-template>
 </section>
-
-<div class="dashboard-notice" role="note">
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
-    <line x1="12" y1="8" x2="12.01" y2="8"/>
-  </svg>
-  Si una sección aparece vacía, no hay registros disponibles por el momento.
-</div>

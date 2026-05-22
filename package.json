@@ -1,5 +1,5 @@
 {
-  "name": "bcenter-web",
+  "name": "go-medical-web",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",

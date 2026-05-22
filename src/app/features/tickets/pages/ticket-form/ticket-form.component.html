@@ -19,7 +19,6 @@
       <div class="form-col form-col--main">
         <div class="form-section">
           <h2 class="form-section__title">Cliente</h2>
-          <p class="form-section__lead">Los tickets se registran sobre clientes existentes y pueden asociarse opcionalmente a un producto o numero de serie.</p>
 
           <div class="form-field" [class.form-field--error]="hasError('clientId')">
             <label class="form-field__label">Cliente <span class="required">*</span></label>
@@ -53,14 +52,18 @@
 
           <div class="form-field" [class.form-field--error]="hasError('title')">
             <label class="form-field__label" for="title">Titulo <span class="required">*</span></label>
-            <input id="title" type="text" class="form-field__input" formControlName="title" placeholder="Ej. Equipo no enciende o solicita mantenimiento preventivo">
+            <input id="title" type="text" class="form-field__input" formControlName="title" maxlength="180" placeholder="Ej. Equipo no enciende o solicita mantenimiento preventivo">
             <span *ngIf="hasError('title', 'required')" class="form-field__error">Ingresa un titulo para el ticket.</span>
+            <div class="form-field__meta"><span class="form-field__counter">{{ (form.get('title')?.value?.length || 0) + '/180' }}</span></div>
+
           </div>
 
           <div class="form-field" [class.form-field--error]="hasError('description')">
             <label class="form-field__label" for="description">Descripcion <span class="required">*</span></label>
-            <textarea id="description" class="form-field__textarea" formControlName="description" rows="5" placeholder="Describe la falla, solicitud, contexto tecnico o necesidad del cliente..."></textarea>
+            <textarea id="description" class="form-field__textarea" formControlName="description" rows="5" maxlength="2000" placeholder="Describe la falla, solicitud, contexto tecnico o necesidad del cliente..."></textarea>
             <span *ngIf="hasError('description', 'required')" class="form-field__error">Describe el problema o solicitud del cliente.</span>
+            <div class="form-field__meta"><span class="form-field__counter">{{ (form.get('description')?.value?.length || 0) + '/2000' }}</span></div>
+
           </div>
 
           <div class="form-grid">
@@ -88,7 +91,9 @@
 
             <div class="form-field">
               <label class="form-field__label" for="equipmentSerialNumber">Numero de serie</label>
-              <input id="equipmentSerialNumber" type="text" class="form-field__input" formControlName="equipmentSerialNumber" placeholder="Ej. MSP500-MER-2025-011">
+              <input id="equipmentSerialNumber" type="text" class="form-field__input" formControlName="equipmentSerialNumber" maxlength="100" placeholder="Ej. MSP500-MER-2025-011">
+              <div class="form-field__meta"><span class="form-field__counter">{{ (form.get('equipmentSerialNumber')?.value?.length || 0) + '/100' }}</span></div>
+
             </div>
           </div>
 
@@ -125,7 +130,9 @@
 
           <div class="form-field">
             <label class="form-field__label" for="notes">Notas internas</label>
-            <textarea id="notes" class="form-field__textarea" formControlName="notes" rows="4" placeholder="Notas administrativas, observaciones internas o preparacion de visita tecnica..."></textarea>
+            <textarea id="notes" class="form-field__textarea" formControlName="notes" rows="4" maxlength="1000" placeholder="Notas administrativas, observaciones internas o preparación de visita técnica..."></textarea>
+            <div class="form-field__meta"><span class="form-field__counter">{{ (form.get('notes')?.value?.length || 0) + '/1000' }}</span></div>
+
           </div>
         </div>
       </div>
@@ -137,10 +144,6 @@
           <div class="form-field">
             <label class="form-field__label">Estado</label>
             <bc-custom-select formControlName="status" [options]="statusOptions" placeholder="Seleccionar estado"></bc-custom-select>
-          </div>
-
-          <div class="summary-note">
-            El historial tecnico se genera automaticamente a partir del alta y de los cambios de estado posteriores.
           </div>
         </div>
       </div>
@@ -158,3 +161,5 @@
     </div>
   </form>
 </ng-container>
+
+

@@ -162,12 +162,16 @@ export class OrderFormComponent {
     this.syncSelectedClient(order.clientId, order.clientNameSnapshot);
 
     this.itemsArray.clear();
-    order.items.forEach(item => this.addOrderLine(item));
+    if (order.items.length > 0) {
+      order.items.forEach(item => this.addOrderLine(item));
+    } else {
+      this.addOrderLine();
+    }
     this.recalculateTotals();
   }
 
   addOrderLine(item?: Partial<OrderItem>): void {
-    this.itemsArray.push(this.fb.group({
+    const lineGroup = this.fb.group({
       productId: [item?.productId ?? '', Validators.required],
       sku: [item?.sku ?? ''],
       productName: [item?.productName ?? ''],
@@ -175,8 +179,15 @@ export class OrderFormComponent {
       quantity: [item?.quantity ?? 1, [Validators.required, Validators.min(1)]],
       unitPrice: [item?.unitPrice ?? 0, [Validators.required, Validators.min(0)]],
       totalLinePrice: [item?.totalLinePrice ?? 0],
-    }));
+    });
 
+    lineGroup.get('productId')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(productId => {
+        this.syncLineProduct(lineGroup, String(productId ?? ''));
+      });
+
+    this.itemsArray.push(lineGroup);
     this.recalculateTotals();
   }
 
@@ -197,10 +208,15 @@ export class OrderFormComponent {
 
   onProductSelected(index: number, productId: string): void {
     const lineGroup = this.itemsArray.at(index) as FormGroup;
+    this.syncLineProduct(lineGroup, productId);
+  }
+
+  private syncLineProduct(lineGroup: FormGroup, productId: string): void {
     const product = this.products().find(item => item.id === productId);
 
     if (!product) {
       lineGroup.patchValue({
+        productId,
         sku: '',
         productName: '',
         productCategory: '',
@@ -223,14 +239,18 @@ export class OrderFormComponent {
   }
 
   async onSubmit(): Promise<void> {
-    if (this.form.invalid) {
+    const canSaveBaseOrder = this.isEditMode()
+      ? this.isBaseOrderDataValid()
+      : this.form.valid;
+
+    if (!canSaveBaseOrder) {
       this.form.markAllAsTouched();
       this.errorMessage.set('Completa los campos requeridos antes de guardar el pedido.');
       return;
     }
 
     const payload = this.buildPayload();
-    if (!payload.items.length) {
+    if (!this.isEditMode() && !payload.items.length) {
       this.errorMessage.set('Agrega al menos un concepto valido al pedido.');
       return;
     }
@@ -341,18 +361,16 @@ export class OrderFormComponent {
     this.totals.set(this.orderService.calculateTotals(draftItems, taxPct, taxExempt));
   }
 
+  private isBaseOrderDataValid(): boolean {
+    const requiredControls = ['clientId', 'status', 'taxPct'];
+    return requiredControls.every(controlName => this.form.get(controlName)?.valid);
+  }
+
   private buildPayload(): OrderUpsertPayload {
     const rawValue = this.form.getRawValue();
-    const items = (rawValue.items ?? [])
-      .filter((item: any) => item.productId)
-      .map((item: any) => ({
-        productId: String(item.productId),
-        sku: String(item.sku ?? ''),
-        productName: String(item.productName ?? ''),
-        productCategory: item.productCategory as ProductCategory,
-        quantity: Number(item.quantity),
-        unitPrice: Number(item.unitPrice),
-      })) as OrderItemDraft[];
+    const items = this.itemsArray.controls
+      .map(control => this.buildDraftItemFromGroup(control as FormGroup))
+      .filter((item): item is OrderItemDraft => !!item);
 
     return {
       clientId: rawValue.clientId ?? '',
@@ -365,7 +383,38 @@ export class OrderFormComponent {
     };
   }
 
+  private buildDraftItemFromGroup(group: FormGroup): OrderItemDraft | null {
+    const rawProductId = String(group.get('productId')?.value ?? '').trim();
+    const rawSku = String(group.get('sku')?.value ?? '').trim();
+    const rawProductName = String(group.get('productName')?.value ?? '').trim();
+    const product = this.products().find(candidate =>
+      candidate.id === rawProductId
+      || (!!rawSku && candidate.sku === rawSku)
+      || (!!rawProductName && candidate.name === rawProductName)
+    );
+
+    const productId = rawProductId || product?.id || '';
+    if (!productId) {
+      return null;
+    }
+
+    const quantity = Math.max(1, Number(group.get('quantity')?.value) || 1);
+    const unitPrice = Number(group.get('unitPrice')?.value ?? product?.price_mxn ?? product?.unit_price_mxn ?? 0);
+
+    return {
+      productId,
+      sku: rawSku || product?.sku || '',
+      productName: rawProductName || product?.name || '',
+      productCategory: (group.get('productCategory')?.value || product?.category || '') as ProductCategory,
+      quantity,
+      unitPrice,
+    };
+  }
+
   private roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 }
+
+
+

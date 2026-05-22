@@ -16,10 +16,7 @@ import { TopbarComponent } from './components/topbar/topbar.component';
       ></bc-sidebar>
 
       <div class="admin-shell__main">
-        <bc-topbar
-          [sidebarCollapsed]="sidebarCollapsed()"
-          (menuToggle)="toggleSidebar()"
-        ></bc-topbar>
+        <bc-topbar></bc-topbar>
 
         <main class="admin-shell__content" id="main-content">
           <router-outlet></router-outlet>
@@ -36,3 +33,4 @@ export class AdminLayoutComponent {
     this.sidebarCollapsed.update(v => !v);
   }
 }
+

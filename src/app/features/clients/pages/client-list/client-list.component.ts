@@ -1,14 +1,16 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { ClientSupabaseService } from '../../services/client.supabase.service';
 import { Client, ClientType, ClientStatus } from '../../../../core/models/client.model';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
-import { firstValueFrom } from 'rxjs';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-client-list',
@@ -27,8 +29,13 @@ import { firstValueFrom } from 'rxjs';
 })
 export class ClientListComponent implements OnInit {
   private clientService = inject(ClientSupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  isLoading = signal<boolean>(true);
+  private loadInFlight = false;
+
+  isLoading = signal<boolean>(false);
+  isDeletingId = signal<string | null>(null);
   errorMessage = signal<string>('');
   searchQuery = signal<string>('');
   selectedType = signal<string>('all');
@@ -89,9 +96,20 @@ export class ClientListComponent implements OnInit {
 
   async ngOnInit() {
     await this.loadClients();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        void this.loadClients();
+      });
   }
 
   async loadClients() {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.isLoading.set(true);
     this.errorMessage.set('');
 
@@ -102,7 +120,26 @@ export class ClientListComponent implements OnInit {
       this._clients.set([]);
       this.errorMessage.set(err instanceof Error ? err.message : 'No fue posible cargar los clientes.');
     } finally {
+      this.loadInFlight = false;
       this.isLoading.set(false);
+    }
+  }
+
+  async onDeleteClient(client: Client): Promise<void> {
+    if (this.isDeletingId() || !window.confirm(`¿Deseas eliminar a ${client.businessName}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    this.isDeletingId.set(client.id);
+    this.errorMessage.set('');
+
+    try {
+      await firstValueFrom(this.clientService.deleteClient(client.id));
+      this._clients.update(items => items.filter(item => item.id !== client.id));
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible eliminar el cliente.');
+    } finally {
+      this.isDeletingId.set(null);
     }
   }
 
@@ -112,11 +149,6 @@ export class ClientListComponent implements OnInit {
 
   onTypeChangeCustom(value: string | ClientType) {
     this.selectedType.set(value as string);
-  }
-
-  onTypeChange(event: Event) {
-    const select = event.target as HTMLSelectElement;
-    this.selectedType.set(select.value);
   }
 
   getTypeLabel(type: ClientType): string {

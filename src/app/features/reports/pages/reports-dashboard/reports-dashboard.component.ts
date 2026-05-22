@@ -1,6 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RevenueSummaryCardsComponent } from '../../components/revenue-summary-cards/revenue-summary-cards.component';
 import { TopProductsTableComponent } from '../../components/top-products-table/top-products-table.component';
 import { LowProductsTableComponent } from '../../components/low-products-table/low-products-table.component';
@@ -19,6 +20,7 @@ import {
   TicketStatusRow,
 } from '../../models/report.model';
 import { ReportsSupabaseService } from '../../services/reports.supabase.service';
+import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
   selector: 'bc-reports-dashboard',
@@ -40,10 +42,14 @@ import { ReportsSupabaseService } from '../../services/reports.supabase.service'
   templateUrl: './reports-dashboard.component.html',
   styleUrl: './reports-dashboard.component.css',
 })
-export class ReportsDashboardComponent {
+export class ReportsDashboardComponent implements OnInit {
   private readonly reportsService = inject(ReportsSupabaseService);
+  private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly loading = signal(true);
+  private loadInFlight = false;
+
+  readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly minReportDate = '2026-01-01';
   readonly maxReportDate = this.toDateInputValue(new Date());
@@ -71,14 +77,45 @@ export class ReportsDashboardComponent {
     );
   });
 
+  readonly reportHighlights = computed(() => {
+    const kpis = this.kpis();
+    if (!kpis) {
+      return [] as Array<{ label: string; value: string; tone: 'primary' | 'success' | 'warning' }>;
+    }
+
+    return [
+      {
+        label: 'Pedidos analizados',
+        value: new Intl.NumberFormat('es-MX').format(kpis.totalOrders),
+        tone: 'primary' as const,
+      },
+      {
+        label: 'Ticket promedio',
+        value: new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(kpis.avgTicket),
+        tone: 'success' as const,
+      },
+      {
+        label: 'Ingreso estimado',
+        value: new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(kpis.totalRevenue),
+        tone: 'warning' as const,
+      },
+    ];
+  });
+
   filters: ReportFilters = {};
   dateFrom = '';
   dateTo = '';
   activeTab: 'top' | 'low' | 'customers' = 'top';
   lastUpdated = new Date().toISOString();
 
-  constructor() {
+  ngOnInit(): void {
     void this.loadData();
+
+    this.pageVisibility.visible$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        void this.loadData();
+      });
   }
 
   async applyFilters(): Promise<void> {
@@ -144,6 +181,11 @@ export class ReportsDashboardComponent {
   }
 
   private async loadData(): Promise<void> {
+    if (this.loadInFlight) {
+      return;
+    }
+
+    this.loadInFlight = true;
     this.loading.set(true);
     this.error.set(null);
 
@@ -158,7 +200,7 @@ export class ReportsDashboardComponent {
       this.rebuildOrderAnalytics(snapshot.orderAnalyticsOrders, this.filters.dateFrom, this.filters.dateTo);
       this.lastUpdated = new Date().toISOString();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Ocurrio un error al cargar los reportes.');
+      this.error.set(err instanceof Error ? err.message : 'No se pudo cargar la información.');
       this.kpis.set(null);
       this.topProducts.set([]);
       this.lowProducts.set([]);
@@ -169,6 +211,7 @@ export class ReportsDashboardComponent {
       this.orderCountSeries.set([]);
       this.orderRevenueSeries.set([]);
     } finally {
+      this.loadInFlight = false;
       this.loading.set(false);
     }
   }
@@ -209,6 +252,3 @@ export class ReportsDashboardComponent {
     return `${year}-${month}-${day}`;
   }
 }
-
-
-
