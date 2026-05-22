@@ -27,6 +27,29 @@ export enum ProductStatus {
   Draft = 'draft',
 }
 
+
+export enum ProductItemType {
+  Product = 'product',
+  Service = 'service',
+}
+
+export enum ProductCondition {
+  New = 'new',
+  Preowned = 'preowned',
+}
+
+export enum PhysicalCondition {
+  Excellent = 'excellent',
+  Good = 'good',
+  Fair = 'fair',
+  Poor = 'poor',
+}
+
+export enum FunctionalCondition {
+  Operational = 'operational',
+  RequiresService = 'requires_service',
+  NotOperational = 'not_operational',
+}
 export enum ProductApplication {
   Humano = 'humano',
   Veterinario = 'veterinario',
@@ -85,6 +108,19 @@ export interface Product extends AuditFields {
   availability_status?: string;
   subcategory?: string;
   created_by?: string;
+  item_type?: ProductItemType;
+  product_condition?: ProductCondition | null;
+  service_duration_minutes?: number | null;
+  service_requires_visit?: boolean;
+  service_includes?: string | null;
+  service_notes?: string | null;
+  physical_condition?: PhysicalCondition | null;
+  functional_condition?: FunctionalCondition | null;
+  inspection_date?: string | null;
+  warranty_days?: number | null;
+  condition_notes?: string | null;
+  serial_number?: string | null;
+  included_accessories?: string | null;
 
   // Asociaciones
   specs?: ProductSpec[];
@@ -167,6 +203,19 @@ export interface CreateProductDto {
   shipping_info?: string;
   availability_status?: string;
   subcategory?: string;
+  item_type?: ProductItemType;
+  product_condition?: ProductCondition | null;
+  service_duration_minutes?: number | null;
+  service_requires_visit?: boolean;
+  service_includes?: string | null;
+  service_notes?: string | null;
+  physical_condition?: PhysicalCondition | null;
+  functional_condition?: FunctionalCondition | null;
+  inspection_date?: string | null;
+  warranty_days?: number | null;
+  condition_notes?: string | null;
+  serial_number?: string | null;
+  included_accessories?: string | null;
 }
 
 export type UpdateProductDto = Partial<CreateProductDto>;
@@ -178,4 +227,6 @@ export interface ProductFilters {
   min_price?: number;
   max_price?: number;
   status?: ProductStatus; // Legacy mock
+  item_type?: ProductItemType;
+  product_condition?: ProductCondition | '';
 }

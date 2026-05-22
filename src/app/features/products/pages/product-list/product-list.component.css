@@ -270,3 +270,74 @@
   opacity: 0.55;
   cursor: wait;
 }
+
+.product-tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  margin-bottom: var(--space-5);
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.product-tab {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.product-tab:hover {
+  color: var(--color-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.product-tab--active {
+  color: #fff;
+  background-color: var(--color-accent);
+  box-shadow: 0 6px 16px rgba(45, 106, 159, 0.18);
+}
+
+.product-tag--type {
+  background-color: rgba(45, 106, 159, 0.12);
+  color: var(--color-primary);
+}
+
+.condition-badge,
+.visit-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  background-color: rgba(39, 174, 96, 0.12);
+  color: var(--color-success);
+  white-space: nowrap;
+}
+
+.condition-badge--preowned {
+  background-color: rgba(230, 126, 34, 0.12);
+  color: var(--color-warning);
+}
+
+.visit-badge--remote {
+  background-color: rgba(45, 106, 159, 0.12);
+  color: var(--color-primary);
+}
+
+@media (max-width: 720px) {
+  .product-tabs {
+    width: 100%;
+  }
+
+  .product-tab {
+    flex: 1;
+  }
+}

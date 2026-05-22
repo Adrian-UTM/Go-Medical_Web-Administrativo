@@ -10,7 +10,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { ProductSupabaseService } from '../../services/product.supabase.service';
-import { Product, ProductCategory, ProductFilters } from '../../../../models/product.model';
+import { Product, ProductCategory, ProductFilters, ProductItemType, ProductCondition } from '../../../../models/product.model';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
@@ -38,16 +38,25 @@ export class ProductListComponent implements OnInit {
   searchTerm = '';
   selectedCategory = '';
   selectedStatus = '';
+  activeTab: ProductItemType = ProductItemType.Product;
+  selectedCondition: '' | ProductCondition = '';
 
   readonly categories: { value: string; label: string }[] = [
-    { value: '', label: 'Todas las categorias' },
-    { value: ProductCategory.UltrasoundVet, label: 'Ultrasonido Veterinario' },
-    { value: ProductCategory.UltrasoundHuman, label: 'Ultrasonido Humano' },
-    { value: ProductCategory.Consumables, label: 'Consumibles' },
-    { value: ProductCategory.SpareParts, label: 'Refacciones' },
-    { value: ProductCategory.Services, label: 'Servicios' },
+    { value: '', label: 'Todas las categorías' },
+    { value: ProductCategory.EquipoMedico, label: 'Equipo médico' },
+    { value: ProductCategory.UltrasonidoHumano, label: 'Ultrasonido humano' },
+    { value: ProductCategory.UltrasonidoVeterinario, label: 'Ultrasonido veterinario' },
+    { value: ProductCategory.Consumible, label: 'Consumibles' },
+    { value: ProductCategory.Refaccion, label: 'Refacciones' },
+    { value: ProductCategory.Accesorio, label: 'Accesorios' },
+    { value: ProductCategory.Servicio, label: 'Servicios' },
   ];
 
+  readonly conditionOptions: { value: '' | ProductCondition; label: string }[] = [
+    { value: '', label: 'Todos' },
+    { value: ProductCondition.New, label: 'Nuevos' },
+    { value: ProductCondition.Preowned, label: 'Seminuevos' },
+  ];
   readonly statuses: { value: string; label: string }[] = [
     { value: '', label: 'Todos los estados' },
     { value: 'true', label: 'Activo' },
@@ -75,6 +84,8 @@ export class ProductListComponent implements OnInit {
       search: this.searchTerm || undefined,
       category: this.selectedCategory as ProductCategory || undefined,
       is_active: this.selectedStatus === '' ? undefined : this.selectedStatus === 'true',
+      item_type: this.activeTab,
+      product_condition: this.activeTab === ProductItemType.Product ? this.selectedCondition || undefined : undefined,
     };
 
     this.productsService.getProducts(filters)
@@ -107,6 +118,18 @@ export class ProductListComponent implements OnInit {
     this.searchTerm = '';
     this.selectedCategory = '';
     this.selectedStatus = '';
+    this.selectedCondition = '';
+    this.loadProducts();
+  }
+
+  setTab(tab: ProductItemType): void {
+    if (this.activeTab === tab) {
+      return;
+    }
+
+    this.activeTab = tab;
+    this.selectedCondition = '';
+    this.selectedCategory = '';
     this.loadProducts();
   }
 
@@ -143,6 +166,34 @@ export class ProductListComponent implements OnInit {
     return labels[cat] ?? cat;
   }
 
+  getItemTypeLabel(product: Product): string {
+    return (product.item_type ?? ProductItemType.Product) === ProductItemType.Service ? 'Servicio' : 'Producto físico';
+  }
+
+  getConditionLabel(condition?: ProductCondition | null): string {
+    return condition === ProductCondition.Preowned ? 'Seminuevo' : 'Nuevo';
+  }
+
+  getVisitLabel(product: Product): string {
+    return product.service_requires_visit ? 'Requiere visita' : 'Sin visita';
+  }
+
+  getDurationLabel(minutes?: number | null): string {
+    return minutes ? `${minutes} min` : 'No definida';
+  }
+
+  get activeTabLabel(): string {
+    return this.activeTab === ProductItemType.Service ? 'servicio' : 'producto';
+  }
+
+  get isServicesTab(): boolean {
+    return this.activeTab === ProductItemType.Service;
+  }
+
+  get ProductItemType() {
+    return ProductItemType;
+  }
+
   getStatusBadge(isActive: boolean): { label: string; variant: BadgeVariant } {
     if (isActive) {
       return { label: 'Activo', variant: 'success' };
@@ -151,6 +202,6 @@ export class ProductListComponent implements OnInit {
   }
 
   get hasActiveFilters(): boolean {
-    return !!(this.searchTerm || this.selectedCategory || this.selectedStatus);
+    return !!(this.searchTerm || this.selectedCategory || this.selectedStatus || this.selectedCondition);
   }
 }

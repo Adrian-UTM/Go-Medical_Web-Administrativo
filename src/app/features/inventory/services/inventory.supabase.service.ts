@@ -13,7 +13,7 @@ import {
   MovementType,
   ReferenceType,
 } from '../../../models/inventory.model';
-import { Product, ProductCategory } from '../../../models/product.model';
+import { Product, ProductCategory, ProductItemType } from '../../../models/product.model';
 
 @Injectable({
   providedIn: 'root'
@@ -51,7 +51,9 @@ export class InventorySupabaseService {
     const productMap = new Map(products.map(product => [product.id, product]));
     const warehouseMap = new Map((warehouseResponse.data ?? []).map((warehouse: any) => [warehouse.id, warehouse]));
 
-    const stocks = (stockResponse.data ?? []).map(row => this.mapStock(row, productMap, warehouseMap));
+    const stocks = (stockResponse.data ?? [])
+      .filter(row => productMap.has(row.product_id))
+      .map(row => this.mapStock(row, productMap, warehouseMap));
     return this.applyStockFilters(stocks, filters);
   }
 
@@ -69,13 +71,15 @@ export class InventorySupabaseService {
     }
 
     const productMap = new Map(products.map(product => [product.id, product]));
-    const movements = (movementResponse.data ?? []).map(row => this.mapMovement(row, productMap));
+    const movements = (movementResponse.data ?? [])
+      .filter(row => productMap.has(row.product_id))
+      .map(row => this.mapMovement(row, productMap));
     return this.applyMovementFilters(movements, filters);
   }
 
   async getInventoryProducts(): Promise<Product[]> {
     const products = await firstValueFrom(this.productsService.getProducts());
-    return products.filter(product => product.is_active !== false);
+    return products.filter(product => product.is_active !== false && (product.item_type ?? ProductItemType.Product) === ProductItemType.Product);
   }
 
   async getStockByProductId(productId: string): Promise<InventoryStock | undefined> {
@@ -295,7 +299,5 @@ export class InventorySupabaseService {
     return new Error(fallback);
   }
 }
-
-
 
 

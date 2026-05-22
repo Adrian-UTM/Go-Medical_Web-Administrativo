@@ -7,7 +7,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { ProductSupabaseService } from '../../services/product.supabase.service';
 import { DocumentsSupabaseService } from '../../../documents/services/documents.supabase.service';
 import { DocumentStatus, DocumentType, RelatedEntityType, SystemDocument } from '../../../documents/models/document.model';
-import { Product, ProductCategory } from '../../../../models/product.model';
+import { FunctionalCondition, PhysicalCondition, Product, ProductCategory, ProductCondition, ProductItemType } from '../../../../models/product.model';
 
 @Component({
   selector: 'bc-product-detail',
@@ -153,6 +153,50 @@ export class ProductDetailComponent implements OnInit {
     return labels[cat] ?? cat;
   }
 
+
+  isService(product: Product | null): boolean {
+    return (product?.item_type ?? ProductItemType.Product) === ProductItemType.Service;
+  }
+
+  isPreowned(product: Product | null): boolean {
+    return !this.isService(product) && (product?.product_condition ?? ProductCondition.New) === ProductCondition.Preowned;
+  }
+
+  getItemTypeLabel(product: Product | null): string {
+    return this.isService(product) ? 'Servicio' : 'Producto físico';
+  }
+
+  getConditionLabel(condition?: ProductCondition | null): string {
+    return condition === ProductCondition.Preowned ? 'Seminuevo' : 'Nuevo';
+  }
+
+  getVisitLabel(product: Product | null): string {
+    return product?.service_requires_visit ? 'Requiere visita' : 'Sin visita';
+  }
+
+  getDurationLabel(minutes?: number | null): string {
+    return minutes ? `${minutes} min` : 'No definida';
+  }
+
+  getPhysicalConditionLabel(condition?: PhysicalCondition | null): string {
+    const labels: Record<PhysicalCondition, string> = {
+      [PhysicalCondition.Excellent]: 'Excelente',
+      [PhysicalCondition.Good]: 'Bueno',
+      [PhysicalCondition.Fair]: 'Regular',
+      [PhysicalCondition.Poor]: 'Deficiente',
+    };
+    return condition ? labels[condition] ?? condition : 'No registrada';
+  }
+
+  getFunctionalConditionLabel(condition?: FunctionalCondition | null): string {
+    const labels: Record<FunctionalCondition, string> = {
+      [FunctionalCondition.Operational]: 'Operativo',
+      [FunctionalCondition.RequiresService]: 'Requiere servicio',
+      [FunctionalCondition.NotOperational]: 'No operativo',
+    };
+    return condition ? labels[condition] ?? condition : 'No registrada';
+  }
+
   getStatusBadge(isActive: boolean | undefined): { label: string; variant: BadgeVariant } {
     if (isActive) {
       return { label: 'Activo', variant: 'success' };
@@ -222,4 +266,3 @@ export class ProductDetailComponent implements OnInit {
     }
   }
 }
-

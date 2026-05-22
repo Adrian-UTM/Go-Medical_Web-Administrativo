@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { from, Observable, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { Product, CreateProductDto, UpdateProductDto, ProductFilters } from '../../../models/product.model';
+import { Product, CreateProductDto, UpdateProductDto, ProductFilters, ProductItemType, ProductCondition, ProductApplication, ProductCategory, StockUnit } from '../../../models/product.model';
 
 @Injectable({
   providedIn: 'root'
@@ -26,6 +26,16 @@ export class ProductSupabaseService {
     }
     if (filters?.category) {
       query = query.eq('category', filters.category);
+    }
+    if (filters?.item_type === ProductItemType.Product) {
+      query = query.or('item_type.eq.product,item_type.is.null');
+    } else if (filters?.item_type === ProductItemType.Service) {
+      query = query.eq('item_type', ProductItemType.Service);
+    }
+    if (filters?.product_condition === ProductCondition.New) {
+      query = query.or('product_condition.eq.new,product_condition.is.null');
+    } else if (filters?.product_condition === ProductCondition.Preowned) {
+      query = query.eq('product_condition', ProductCondition.Preowned);
     }
     if (filters?.is_active !== undefined) {
       query = query.eq('is_active', filters.is_active);
@@ -129,29 +139,49 @@ export class ProductSupabaseService {
 
   private buildProductPayload(dto: CreateProductDto | UpdateProductDto, partial = false): Record<string, any> {
     const source = dto as Record<string, any>;
+    const itemType = this.cleanText(source['item_type']) === ProductItemType.Service
+      ? ProductItemType.Service
+      : ProductItemType.Product;
+    const productCondition = itemType === ProductItemType.Product
+      ? (this.cleanText(source['product_condition']) === ProductCondition.Preowned ? ProductCondition.Preowned : ProductCondition.New)
+      : null;
+
     const payload: Record<string, any> = {
       sku: this.cleanText(source['sku'])?.toUpperCase(),
       name: this.cleanText(source['name']),
       description: this.cleanText(source['description']),
-      category: this.cleanText(source['category']),
-      application: this.cleanText(source['application']),
-      brand: this.cleanText(source['brand']),
-      model: this.cleanText(source['model']),
+      category: itemType === ProductItemType.Service ? ProductCategory.Servicio : this.cleanText(source['category']),
+      application: itemType === ProductItemType.Service ? ProductApplication.General : this.cleanText(source['application']),
+      brand: itemType === ProductItemType.Service ? null : this.cleanText(source['brand']),
+      model: itemType === ProductItemType.Service ? null : this.cleanText(source['model']),
       unit_price_mxn: this.toNumber(source['unit_price_mxn']),
-      cost_price_mxn: this.toNumber(source['cost_price_mxn']),
-      reference_price_usd: this.toNumber(source['reference_price_usd'], true),
+      cost_price_mxn: itemType === ProductItemType.Service ? 0 : this.toNumber(source['cost_price_mxn']),
+      reference_price_usd: itemType === ProductItemType.Service ? null : this.toNumber(source['reference_price_usd'], true),
       currency: this.cleanText(source['currency']) || 'MXN',
-      unit: this.cleanText(source['unit']),
+      unit: itemType === ProductItemType.Service ? StockUnit.Servicio : this.cleanText(source['unit']),
       is_active: typeof source['is_active'] === 'boolean' ? source['is_active'] : true,
-      requires_serial: this.toOptionalBoolean(source['requires_serial']),
-      track_inventory: this.toOptionalBoolean(source['track_inventory']),
+      requires_serial: itemType === ProductItemType.Service ? false : this.toOptionalBoolean(source['requires_serial']),
+      track_inventory: itemType === ProductItemType.Service ? false : this.toOptionalBoolean(source['track_inventory']),
       lead_time_days: this.toNumber(source['lead_time_days'], true),
       old_price: this.toNumber(source['old_price'], true),
       warranty_text: this.cleanText(source['warranty_text']),
       shipping_info: this.cleanText(source['shipping_info']),
       availability_status: this.cleanText(source['availability_status']),
       subcategory: this.cleanText(source['subcategory']),
-      commercial_brand: this.cleanText(source['commercial_brand']),
+      commercial_brand: itemType === ProductItemType.Service ? null : this.cleanText(source['commercial_brand']),
+      item_type: itemType,
+      product_condition: productCondition,
+      service_duration_minutes: itemType === ProductItemType.Service ? this.toNumber(source['service_duration_minutes'], true) : null,
+      service_requires_visit: itemType === ProductItemType.Service ? !!source['service_requires_visit'] : false,
+      service_includes: itemType === ProductItemType.Service ? this.cleanText(source['service_includes']) : null,
+      service_notes: itemType === ProductItemType.Service ? this.cleanText(source['service_notes']) : null,
+      physical_condition: productCondition === ProductCondition.Preowned ? this.cleanText(source['physical_condition']) : null,
+      functional_condition: productCondition === ProductCondition.Preowned ? this.cleanText(source['functional_condition']) : null,
+      inspection_date: productCondition === ProductCondition.Preowned ? this.cleanText(source['inspection_date']) : null,
+      warranty_days: productCondition === ProductCondition.Preowned ? this.toNumber(source['warranty_days'], true) : null,
+      condition_notes: productCondition === ProductCondition.Preowned ? this.cleanText(source['condition_notes']) : null,
+      serial_number: productCondition === ProductCondition.Preowned ? this.cleanText(source['serial_number']) : null,
+      included_accessories: productCondition === ProductCondition.Preowned ? this.cleanText(source['included_accessories']) : null,
     };
 
     delete payload['id'];
@@ -350,5 +380,3 @@ export class ProductSupabaseService {
     );
   }
 }
-
-

@@ -12,7 +12,7 @@
       Editar
     </a>
     <button type="button" class="btn-secondary" (click)="addTechnicalDocument()">
-      Agregar documento tecnico
+      Agregar documento técnico
     </button>
     <button type="button" class="btn-secondary btn-secondary--danger" (click)="deleteProduct()" [disabled]="isDeleting()">
       {{ isDeleting() ? 'Eliminando...' : 'Eliminar' }}
@@ -43,14 +43,17 @@
           [showDot]="true">
         </bc-status-badge>
         <span class="product-hero__category">{{ getCategoryLabel(product()!.category) }}</span>
+        <span class="product-tag product-tag--type">{{ getItemTypeLabel(product()) }}</span>
       </div>
 
       <p *ngIf="product()!.description" class="product-hero__description">
         {{ product()!.description }}
       </p>
 
-      <div class="product-hero__tags" *ngIf="product()!.application">
-        <span class="product-tag">{{ product()!.application }}</span>
+      <div class="product-hero__tags">
+        <span class="product-tag" *ngIf="!isService(product()) && product()!.application">{{ product()!.application }}</span>
+        <span class="product-tag product-tag--success" *ngIf="!isService(product())">{{ getConditionLabel(product()!.product_condition) }}</span>
+        <span class="product-tag product-tag--visit" *ngIf="isService(product())">{{ getVisitLabel(product()) }}</span>
       </div>
     </div>
 
@@ -63,9 +66,13 @@
         <span *ngIf="product()!.reference_price_usd" class="product-price-card__ref">
           Ref. USD {{ product()!.reference_price_usd | currency:'USD':'symbol':'1.0-0' }}
         </span>
-        <div class="product-price-card__info" *ngIf="product()!.brand">
+        <div class="product-price-card__info" *ngIf="!isService(product()) && product()!.brand">
           <span>{{ product()!.brand }}</span>
           <span *ngIf="product()!.model"> · {{ product()!.model }}</span>
+        </div>
+        <div class="product-price-card__info" *ngIf="isService(product())">
+          <span>{{ getDurationLabel(product()!.service_duration_minutes) }}</span>
+          <span> · {{ getVisitLabel(product()) }}</span>
         </div>
       </div>
     </div>
@@ -74,24 +81,32 @@
   <div class="detail-sections">
     <section class="detail-card">
       <div class="detail-card__header">
-        <h2 class="detail-card__title">Informacion general</h2>
-        <span class="detail-card__subtitle">Datos comerciales y de catalogo del producto</span>
+        <h2 class="detail-card__title">Información general</h2>
+        <span class="detail-card__subtitle">Datos comerciales y de catálogo del registro</span>
       </div>
 
       <div class="info-grid">
         <div class="info-item">
-          <span class="info-item__label">SKU</span>
+          <span class="info-item__label">{{ isService(product()) ? 'Código' : 'SKU' }}</span>
           <span class="info-item__value info-item__value--mono">{{ product()!.sku }}</span>
         </div>
         <div class="info-item">
-          <span class="info-item__label">Categoria</span>
-          <span class="info-item__value">{{ getCategoryLabel(product()!.category) }}</span>
+          <span class="info-item__label">Tipo</span>
+          <span class="info-item__value">{{ getItemTypeLabel(product()) }}</span>
+        </div>
+        <div class="info-item" *ngIf="!isService(product())">
+          <span class="info-item__label">Condición</span>
+          <span class="info-item__value">{{ getConditionLabel(product()!.product_condition) }}</span>
         </div>
         <div class="info-item">
+          <span class="info-item__label">Categoría</span>
+          <span class="info-item__value">{{ getCategoryLabel(product()!.category) }}</span>
+        </div>
+        <div class="info-item" *ngIf="!isService(product())">
           <span class="info-item__label">Marca</span>
           <span class="info-item__value">{{ product()!.brand ?? '—' }}</span>
         </div>
-        <div class="info-item">
+        <div class="info-item" *ngIf="!isService(product())">
           <span class="info-item__label">Modelo</span>
           <span class="info-item__value">{{ product()!.model ?? '—' }}</span>
         </div>
@@ -108,29 +123,92 @@
           <span class="info-item__value">{{ product()!.created_at | date:'dd/MM/yyyy' }}</span>
         </div>
         <div class="info-item">
-          <span class="info-item__label">Ultima actualizacion</span>
+          <span class="info-item__label">Última actualización</span>
           <span class="info-item__value">{{ product()!.updated_at | date:'dd/MM/yyyy' }}</span>
         </div>
       </div>
     </section>
 
+    <section class="detail-card" *ngIf="isService(product())">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Datos del servicio</h2>
+        <span class="detail-card__subtitle">Alcance comercial y operativo del servicio</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-item__label">Duración estimada</span>
+          <span class="info-item__value">{{ getDurationLabel(product()!.service_duration_minutes) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Atención</span>
+          <span class="info-item__value">{{ getVisitLabel(product()) }}</span>
+        </div>
+        <div class="info-item info-item--wide" *ngIf="product()!.service_includes">
+          <span class="info-item__label">Incluye</span>
+          <span class="info-item__value">{{ product()!.service_includes }}</span>
+        </div>
+        <div class="info-item info-item--wide" *ngIf="product()!.service_notes">
+          <span class="info-item__label">Notas del servicio</span>
+          <span class="info-item__value">{{ product()!.service_notes }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="detail-card" *ngIf="isPreowned(product())">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Datos del producto seminuevo</h2>
+        <span class="detail-card__subtitle">Condición técnica y accesorios relacionados</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-item__label">Estado físico</span>
+          <span class="info-item__value">{{ getPhysicalConditionLabel(product()!.physical_condition) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Estado funcional</span>
+          <span class="info-item__value">{{ getFunctionalConditionLabel(product()!.functional_condition) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Revisión técnica</span>
+          <span class="info-item__value">{{ product()!.inspection_date ? (product()!.inspection_date | date:'dd/MM/yyyy') : 'No registrada' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Garantía</span>
+          <span class="info-item__value">{{ product()!.warranty_days ? product()!.warranty_days + ' días' : 'No registrada' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-item__label">Número de serie</span>
+          <span class="info-item__value info-item__value--mono">{{ product()!.serial_number ?? 'No registrado' }}</span>
+        </div>
+        <div class="info-item info-item--wide" *ngIf="product()!.included_accessories">
+          <span class="info-item__label">Accesorios incluidos</span>
+          <span class="info-item__value">{{ product()!.included_accessories }}</span>
+        </div>
+        <div class="info-item info-item--wide" *ngIf="product()!.condition_notes">
+          <span class="info-item__label">Observaciones técnicas</span>
+          <span class="info-item__value">{{ product()!.condition_notes }}</span>
+        </div>
+      </div>
+    </section>
     <section class="detail-card">
       <div class="detail-card__header detail-card__header--split">
         <div>
-          <h2 class="detail-card__title">Documentos tecnicos</h2>
-          <span class="detail-card__subtitle">Manuales, fichas tecnicas, certificados, garantias y guias de mantenimiento asociadas al producto</span>
+          <h2 class="detail-card__title">Documentos técnicos</h2>
+          <span class="detail-card__subtitle">Manuales, fichas técnicas, certificados, garantías y guías de mantenimiento asociadas al producto</span>
         </div>
         <button type="button" class="btn-secondary" (click)="addTechnicalDocument()">
-          Agregar documento tecnico
+          Agregar documento técnico
         </button>
       </div>
 
       <div *ngIf="areDocumentsLoading()" class="tab-empty">
-        Cargando documentos tecnicos del producto...
+        Cargando documentos técnicos del producto...
       </div>
 
       <div *ngIf="!areDocumentsLoading() && technicalDocuments().length === 0" class="tab-empty">
-        Sin documentos tecnicos relacionados con este producto todavia.
+        Sin documentos técnicos relacionados con este producto todavía.
       </div>
 
       <div class="documents-grid" *ngIf="!areDocumentsLoading() && technicalDocuments().length">
@@ -173,8 +251,8 @@
 
     <section class="detail-card">
       <div class="detail-card__header">
-        <h2 class="detail-card__title">Especificaciones tecnicas</h2>
-        <span class="detail-card__subtitle">Caracteristicas agrupadas del producto o equipo</span>
+        <h2 class="detail-card__title">Especificaciones técnicas</h2>
+        <span class="detail-card__subtitle">Características agrupadas del producto o equipo</span>
       </div>
 
       <div *ngIf="!product()!.specs || product()!.specs!.length === 0" class="tab-empty">
@@ -199,5 +277,3 @@
   <p>El producto no fue encontrado.</p>
   <a routerLink="/productos" class="btn-ghost">← Volver a productos</a>
 </div>
-
-

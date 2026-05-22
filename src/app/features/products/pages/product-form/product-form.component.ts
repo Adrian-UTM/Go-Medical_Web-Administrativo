@@ -8,7 +8,7 @@ import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/componen
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { ProductSupabaseService } from '../../services/product.supabase.service';
-import { ProductCategory, ProductApplication, StockUnit } from '../../../../models/product.model';
+import { ProductCategory, ProductApplication, StockUnit, ProductItemType, ProductCondition, PhysicalCondition, FunctionalCondition } from '../../../../models/product.model';
 
 @Component({
   selector: 'bc-product-form',
@@ -35,10 +35,12 @@ export class ProductFormComponent implements OnInit {
   selectedFile: File | null = null;
 
   form: FormGroup = this.fb.group({
+    item_type: [ProductItemType.Product, Validators.required],
     sku: ['', [Validators.required, Validators.maxLength(50)]],
     name: ['', [Validators.required, Validators.maxLength(150)]],
     description: ['', Validators.maxLength(500)],
     category: ['', Validators.required],
+    product_condition: [ProductCondition.New],
     application: [ProductApplication.General, Validators.required],
     is_active: [true, Validators.required],
     brand: ['', Validators.maxLength(80)],
@@ -49,8 +51,41 @@ export class ProductFormComponent implements OnInit {
     currency: ['MXN', Validators.required],
     unit: [StockUnit.Pieza, Validators.required],
     image_url: [''],
+    service_duration_minutes: [null, Validators.min(0)],
+    service_requires_visit: [false],
+    service_includes: ['', Validators.maxLength(500)],
+    service_notes: ['', Validators.maxLength(500)],
+    physical_condition: [null],
+    functional_condition: [null],
+    inspection_date: [null],
+    warranty_days: [null, Validators.min(0)],
+    condition_notes: ['', Validators.maxLength(500)],
+    serial_number: ['', Validators.maxLength(80)],
+    included_accessories: ['', Validators.maxLength(500)],
   });
 
+  readonly itemTypes = [
+    { value: ProductItemType.Product, label: 'Producto físico' },
+    { value: ProductItemType.Service, label: 'Servicio' },
+  ];
+
+  readonly productConditions = [
+    { value: ProductCondition.New, label: 'Nuevo' },
+    { value: ProductCondition.Preowned, label: 'Seminuevo' },
+  ];
+
+  readonly physicalConditions = [
+    { value: PhysicalCondition.Excellent, label: 'Excelente' },
+    { value: PhysicalCondition.Good, label: 'Bueno' },
+    { value: PhysicalCondition.Fair, label: 'Regular' },
+    { value: PhysicalCondition.Poor, label: 'Deficiente' },
+  ];
+
+  readonly functionalConditions = [
+    { value: FunctionalCondition.Operational, label: 'Operativo' },
+    { value: FunctionalCondition.RequiresService, label: 'Requiere servicio' },
+    { value: FunctionalCondition.NotOperational, label: 'No operativo' },
+  ];
   readonly categories = [
     { value: ProductCategory.EquipoMedico, label: 'Equipo Médico' },
     { value: ProductCategory.UltrasonidoHumano, label: 'Ultrasonido Humano' },
@@ -83,6 +118,30 @@ export class ProductFormComponent implements OnInit {
     { value: 'false', label: 'Inactivo' },
   ];
 
+  get isService(): boolean {
+    return this.form.get('item_type')?.value === ProductItemType.Service;
+  }
+
+  get isPhysicalProduct(): boolean {
+    return !this.isService;
+  }
+
+  get isPreowned(): boolean {
+    return this.isPhysicalProduct && this.form.get('product_condition')?.value === ProductCondition.Preowned;
+  }
+
+  get nameLabel(): string {
+    return this.isService ? 'Nombre del servicio' : 'Nombre del producto';
+  }
+
+  get skuLabel(): string {
+    return this.isService ? 'Código del servicio' : 'SKU';
+  }
+
+  get priceLabel(): string {
+    return this.isService ? 'Precio base MXN' : 'Precio venta MXN';
+  }
+
   get pageTitle(): string {
     return this.isEditMode ? 'Editar producto' : 'Nuevo producto';
   }
@@ -96,6 +155,8 @@ export class ProductFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.form.get('item_type')?.valueChanges.subscribe(value => this.applyItemTypeRules(value));
+    this.form.get('product_condition')?.valueChanges.subscribe(value => this.applyConditionRules(value));
     this.productId = this.route.snapshot.paramMap.get('id');
     this.isEditMode = !!this.productId && this.route.snapshot.url.some(s => s.path === 'editar');
 
@@ -106,8 +167,12 @@ export class ProductFormComponent implements OnInit {
           if (product) {
             this.form.patchValue({
               ...product,
+              item_type: product.item_type ?? ProductItemType.Product,
+              product_condition: product.product_condition ?? ProductCondition.New,
               is_active: product.is_active ? 'true' : 'false'
             });
+            this.applyItemTypeRules(this.form.get('item_type')?.value, false);
+            this.applyConditionRules(this.form.get('product_condition')?.value, false);
 
             // Cargar imagen si existe
             const primaryMedia = product.media?.find(m => m.is_primary) || product.media?.[0];
@@ -120,6 +185,9 @@ export class ProductFormComponent implements OnInit {
         },
         error: () => this.isLoadingData.set(false)
       });
+    } else {
+      this.applyItemTypeRules(this.form.get('item_type')?.value, false);
+      this.applyConditionRules(this.form.get('product_condition')?.value, false);
     }
   }
 
@@ -164,7 +232,7 @@ export class ProductFormComponent implements OnInit {
     this.errorMessage.set('');
 
     const dto = {
-      ...this.form.value,
+      ...this.form.getRawValue(),
       is_active: this.form.value.is_active === true || this.form.value.is_active === 'true',
       unit_price_mxn: Number(this.form.value.unit_price_mxn),
       cost_price_mxn: Number(this.form.value.cost_price_mxn),
@@ -174,6 +242,7 @@ export class ProductFormComponent implements OnInit {
     };
 
     delete dto.image_url;
+    this.normalizeDtoByType(dto);
 
     try {
       const result = this.isEditMode && this.productId
@@ -196,6 +265,91 @@ export class ProductFormComponent implements OnInit {
     }
   }
 
+  private applyItemTypeRules(itemType: unknown, emitEvent = true): void {
+    if (itemType === ProductItemType.Service) {
+      this.form.patchValue({
+        product_condition: null,
+        category: ProductCategory.Servicio,
+        application: ProductApplication.General,
+        unit: StockUnit.Servicio,
+        cost_price_mxn: 0,
+        reference_price_usd: null,
+        brand: '',
+        model: '',
+        physical_condition: null,
+        functional_condition: null,
+        inspection_date: null,
+        warranty_days: null,
+        condition_notes: '',
+        serial_number: '',
+        included_accessories: '',
+      }, { emitEvent });
+      return;
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (!this.form.get('product_condition')?.value) {
+      updates['product_condition'] = ProductCondition.New;
+    }
+    if (this.form.get('category')?.value === ProductCategory.Servicio) {
+      updates['category'] = '';
+    }
+    if (this.form.get('unit')?.value === StockUnit.Servicio) {
+      updates['unit'] = StockUnit.Pieza;
+    }
+    if (Object.keys(updates).length > 0) {
+      this.form.patchValue(updates, { emitEvent });
+    }
+  }
+
+  private applyConditionRules(condition: unknown, emitEvent = true): void {
+    if (condition !== ProductCondition.Preowned) {
+      this.form.patchValue({
+        physical_condition: null,
+        functional_condition: null,
+        inspection_date: null,
+        warranty_days: null,
+        condition_notes: '',
+        serial_number: '',
+        included_accessories: '',
+      }, { emitEvent });
+    }
+  }
+
+  private normalizeDtoByType(dto: any): void {
+    if (dto.item_type === ProductItemType.Service) {
+      dto.product_condition = null;
+      dto.service_requires_visit = !!dto.service_requires_visit;
+      dto.service_duration_minutes = dto.service_duration_minutes === null || dto.service_duration_minutes === '' ? null : Number(dto.service_duration_minutes);
+      dto.physical_condition = null;
+      dto.functional_condition = null;
+      dto.inspection_date = null;
+      dto.warranty_days = null;
+      dto.condition_notes = null;
+      dto.serial_number = null;
+      dto.included_accessories = null;
+      return;
+    }
+
+    dto.item_type = ProductItemType.Product;
+    dto.product_condition = dto.product_condition || ProductCondition.New;
+    dto.service_duration_minutes = null;
+    dto.service_requires_visit = false;
+    dto.service_includes = null;
+    dto.service_notes = null;
+
+    if (dto.product_condition !== ProductCondition.Preowned) {
+      dto.physical_condition = null;
+      dto.functional_condition = null;
+      dto.inspection_date = null;
+      dto.warranty_days = null;
+      dto.condition_notes = null;
+      dto.serial_number = null;
+      dto.included_accessories = null;
+    } else {
+      dto.warranty_days = dto.warranty_days === null || dto.warranty_days === '' ? null : Number(dto.warranty_days);
+    }
+  }
   hasError(ctrl: string, error?: string): boolean {
     const control = this.form.get(ctrl);
     if (!control?.touched) return false;

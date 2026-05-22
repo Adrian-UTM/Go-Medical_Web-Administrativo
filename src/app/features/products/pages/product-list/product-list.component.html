@@ -1,6 +1,6 @@
 <bc-page-header
   title="Productos"
-  subtitle="Catalogo de equipos, consumibles y servicios"
+  subtitle="Catálogo de productos físicos y servicios comerciales"
   [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Productos' }]">
   <a id="btn-nuevo-producto" routerLink="/productos/nuevo" class="btn-primary">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -10,6 +10,15 @@
     Nuevo producto
   </a>
 </bc-page-header>
+
+<div class="product-tabs" role="tablist" aria-label="Tipo de registro de productos">
+  <button type="button" class="product-tab" [class.product-tab--active]="activeTab === ProductItemType.Product" (click)="setTab(ProductItemType.Product)">
+    Productos físicos
+  </button>
+  <button type="button" class="product-tab" [class.product-tab--active]="activeTab === ProductItemType.Service" (click)="setTab(ProductItemType.Service)">
+    Servicios
+  </button>
+</div>
 
 <div *ngIf="actionMessage()" class="info-banner">
   {{ actionMessage() }}
@@ -38,7 +47,7 @@
       [options]="categories" 
       [(ngModel)]="selectedCategory" 
       (selectionChange)="onFilterChange()"
-      placeholder="Todas las categorias">
+      placeholder="Todas las categorías">
     </bc-custom-select>
   </div>
 
@@ -51,6 +60,14 @@
     </bc-custom-select>
   </div>
 
+  <div *ngIf="!isServicesTab" style="min-width: 180px;">
+    <bc-custom-select
+      [options]="conditionOptions"
+      [(ngModel)]="selectedCondition"
+      (selectionChange)="onFilterChange()"
+      placeholder="Todos">
+    </bc-custom-select>
+  </div>
   <button *ngIf="hasActiveFilters" class="btn-ghost btn-sm" (click)="clearFilters()">
     Limpiar filtros
   </button>
@@ -60,8 +77,8 @@
 
 <bc-empty-state
   *ngIf="!isLoading() && products().length === 0"
-  title="Sin productos"
-  description="No se encontraron productos con los filtros aplicados."
+  [title]="isServicesTab ? 'Sin servicios' : 'Sin productos físicos'"
+  [description]="'No se encontraron ' + activeTabLabel + 's con los filtros aplicados.'"
   [hasAction]="hasActiveFilters">
   <button *ngIf="hasActiveFilters" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>
@@ -72,8 +89,11 @@
       <tr>
         <th scope="col">SKU</th>
         <th scope="col">Nombre</th>
-        <th scope="col">Categoria</th>
-        <th scope="col">Marca / Modelo</th>
+        <th scope="col" *ngIf="!isServicesTab">Condición</th>
+        <th scope="col">Categoría</th>
+        <th scope="col" *ngIf="!isServicesTab">Marca / Modelo</th>
+        <th scope="col" *ngIf="isServicesTab">Duración estimada</th>
+        <th scope="col" *ngIf="isServicesTab">Visita</th>
         <th scope="col" class="text-right">Precio MXN</th>
         <th scope="col">Estado</th>
         <th scope="col" class="text-center">Acciones</th>
@@ -93,17 +113,27 @@
             <div>
               <span class="product-name">{{ product.name }}</span>
               <span class="product-tags">
-                <span class="product-tag">{{ product.application }}</span>
+                <span class="product-tag product-tag--type">{{ getItemTypeLabel(product) }}</span>
+                <span class="product-tag" *ngIf="!isServicesTab">{{ product.application }}</span>
               </span>
             </div>
           </div>
         </td>
+        <td *ngIf="!isServicesTab">
+          <span class="condition-badge" [class.condition-badge--preowned]="product.product_condition === 'preowned'">
+            {{ getConditionLabel(product.product_condition) }}
+          </span>
+        </td>
         <td>
           <span class="category-label">{{ getCategoryLabel(product.category) }}</span>
         </td>
-        <td class="data-table__secondary">
+        <td class="data-table__secondary" *ngIf="!isServicesTab">
           {{ product.brand ?? '—' }}
           <span *ngIf="product.model"> / {{ product.model }}</span>
+        </td>
+        <td class="data-table__secondary" *ngIf="isServicesTab">{{ getDurationLabel(product.service_duration_minutes) }}</td>
+        <td *ngIf="isServicesTab">
+          <span class="visit-badge" [class.visit-badge--remote]="!product.service_requires_visit">{{ getVisitLabel(product) }}</span>
         </td>
         <td class="text-right data-table__price">
           {{ product.unit_price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
@@ -144,6 +174,6 @@
   </table>
 
   <div class="table-footer">
-    <span class="table-count">{{ products().length }} producto{{ products().length !== 1 ? 's' : '' }}</span>
+    <span class="table-count">{{ products().length }} {{ isServicesTab ? 'servicio' : 'producto' }}{{ products().length !== 1 ? 's' : '' }}</span>
   </div>
 </div>
