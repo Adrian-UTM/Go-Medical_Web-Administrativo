@@ -93,12 +93,12 @@
   color: #ffffff;
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(45, 139, 235, 0.30);
+  box-shadow: 0 2px 8px rgba(44, 105, 117, 0.30);
 }
 
 .btn-refresh:hover {
   background: var(--color-accent-hover);
-  box-shadow: 0 4px 12px rgba(45, 139, 235, 0.40);
+  box-shadow: 0 4px 12px rgba(44, 105, 117, 0.40);
   transform: translateY(-1px);
 }
 
@@ -311,8 +311,8 @@
 .tab-btn:hover { color: var(--color-text-primary); }
 
 .tab-btn--active {
-  color: #2D8BEB;
-  border-bottom-color: #2D8BEB;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -379,13 +379,13 @@
 }
 
 .order-analytics__controls .tab-btn:hover {
-  background-color: rgba(45, 139, 235, 0.10);
-  color: #2D8BEB;
+  background-color: rgba(44, 105, 117, 0.10);
+  color: var(--color-primary);
 }
 
 .order-analytics__controls .tab-btn--active {
   background-color: #ffffff;
-  color: #2D8BEB;
+  color: var(--color-primary);
   font-weight: var(--font-weight-semibold);
   border-bottom-color: transparent;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);

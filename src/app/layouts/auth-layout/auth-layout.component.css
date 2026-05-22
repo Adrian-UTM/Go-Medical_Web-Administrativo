@@ -4,7 +4,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(150deg, #1148A0 0%, #1565C0 55%, #2D8BEB 100%);
+  background: radial-gradient(circle at 22% 18%, rgba(205, 224, 201, 0.34), transparent 20rem), linear-gradient(150deg, #1D4C55 0%, #2C6975 55%, #68B2A0 100%);
   padding: var(--space-8);
   gap: var(--space-8);
 }
@@ -20,7 +20,7 @@
   height: 44px;
   background-color: rgba(255,255,255,0.15);
   border: 2px solid rgba(255,255,255,0.3);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;

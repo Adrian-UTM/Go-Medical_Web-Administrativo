@@ -114,3 +114,20 @@
 .bc-select__check {
   margin-left: var(--space-2);
 }
+
+
+.bc-select__dropdown {
+  background-color: rgba(255, 255, 255, 0.98);
+  border-color: rgba(44, 105, 117, 0.14);
+  box-shadow: 0 18px 38px rgba(29, 76, 85, 0.14);
+}
+
+.bc-select__option:hover,
+.bc-select__option.is-selected:hover {
+  background-color: var(--color-primary);
+}
+
+.bc-select__option.is-selected {
+  background-color: rgba(203, 230, 226, 0.42);
+  color: var(--color-primary-dark);
+}

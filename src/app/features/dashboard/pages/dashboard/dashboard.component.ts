@@ -1,7 +1,7 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { CurrencyPipe, DatePipe, NgFor, NgIf } from '@angular/common';
+import { CurrencyPipe, DatePipe, NgFor, NgIf, SlicePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import {
   DashboardMetricCardData,
@@ -28,7 +28,7 @@ interface OperationalAlert {
 @Component({
   selector: 'bc-dashboard',
   standalone: true,
-  imports: [NgFor, NgIf, PageHeaderComponent, StatusBadgeComponent, CurrencyPipe, DatePipe],
+  imports: [NgFor, NgIf, SlicePipe, RouterLink, StatusBadgeComponent, CurrencyPipe, DatePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })

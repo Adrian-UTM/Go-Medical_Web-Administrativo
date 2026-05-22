@@ -1,7 +1,12 @@
+/* ============================================================
+   ADMIN LAYOUT SHELL — Go Medical
+   ============================================================ */
+
 .admin-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   min-height: 100vh;
+  background: #E8F4F1;
   transition: grid-template-columns var(--transition-slow);
 }
 
@@ -9,26 +14,60 @@
   grid-template-columns: 64px 1fr;
 }
 
+/* Main area (topbar + content) */
 .admin-shell__main {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   overflow: hidden;
+  /* Mint background for the whole right area */
+  background: #EDF7F5;
 }
 
+/* Content area — white card with padding and rounded edges on left */
 .admin-shell__content {
   flex: 1;
-  padding: var(--space-8);
+  padding: 28px 32px 40px;
   overflow-y: auto;
-  background-color: var(--color-bg-app);
+  background: #ffffff;
+  margin: 12px 12px 12px 8px;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(29, 76, 85, 0.07);
+  animation: shell-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes shell-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.admin-shell__content > * {
+  animation: view-enter 260ms ease both;
+}
+
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .admin-shell__content {
+    padding: 20px 20px 32px;
+    margin: 8px 8px 8px 6px;
+  }
 }
 
 @media (max-width: 768px) {
   .admin-shell {
     grid-template-columns: 0 1fr;
   }
-
   .admin-shell--collapsed {
     grid-template-columns: 0 1fr;
+  }
+  .admin-shell__content {
+    margin: 6px;
+    border-radius: 14px;
+    padding: 16px;
   }
 }

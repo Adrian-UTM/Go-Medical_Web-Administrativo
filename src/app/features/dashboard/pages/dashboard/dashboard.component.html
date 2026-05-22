@@ -1,11 +1,10 @@
-<bc-page-header
-  title="Dashboard"
-  subtitle="Resumen operativo de Go Medical"
-  [breadcrumbs]="[{ label: 'Inicio' }, { label: 'Dashboard' }]">
-</bc-page-header>
+<!-- ============================================================
+     DASHBOARD — Go Medical (Maqueta Biomedica PAX)
+     ============================================================ -->
 
-<div *ngIf="error()" class="dashboard-notice dashboard-notice--error" role="alert">
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+<!-- Error notice -->
+<div *ngIf="error()" class="db-notice db-notice--error" role="alert">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
     <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -13,108 +12,185 @@
   {{ error() }}
 </div>
 
-<section class="dashboard-hero">
-  <div class="dashboard-hero__content">
-    <span class="dashboard-hero__eyebrow">Panel operativo</span>
-    <h2 class="dashboard-hero__title">{{ heroSummary().title }}</h2>
-    <p class="dashboard-hero__description">{{ heroSummary().description }}</p>
+<!-- Page header -->
+<div class="db-page-header">
+  <div>
+    <h1 class="db-page-title">Dashboard</h1>
+    <p class="db-page-subtitle">Monitoreo operativo y comercial de Go Medical</p>
   </div>
-  <div class="dashboard-hero__meta">
-    <div class="dashboard-hero__meta-card">
-      <span class="dashboard-hero__meta-label">Alertas activas</span>
-      <strong class="dashboard-hero__meta-value">{{ operationalAlerts().length }}</strong>
+  <span class="db-pill-badge">Reporte General</span>
+</div>
+
+<!-- ============================================================
+     HERO SECTION: Teal card + SLA cards
+     ============================================================ -->
+<section class="db-hero">
+
+  <!-- Left: Big teal hero card -->
+  <div class="db-hero__main">
+    <div class="db-hero__kpi-label">TIEMPO OPERATIVO SEMANAL</div>
+
+    <!-- Wave trend label top right -->
+    <div class="db-hero__trend">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Tendencia Operativa
     </div>
-    <div class="dashboard-hero__meta-card">
-      <span class="dashboard-hero__meta-label">Pedidos recientes</span>
-      <strong class="dashboard-hero__meta-value">{{ recentOrders().length }}</strong>
+
+    <!-- Big value / title -->
+    <h2 class="db-hero__title">{{ heroSummary().title }}</h2>
+    <p class="db-hero__desc">{{ heroSummary().description }}</p>
+
+    <!-- Decorative wave SVG -->
+    <div class="db-hero__wave" aria-hidden="true">
+      <svg viewBox="0 0 400 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,50 C60,20 120,70 180,45 C240,20 300,65 360,38 C390,25 400,30 400,30 L400,80 L0,80 Z"
+              fill="rgba(255,255,255,0.08)"/>
+        <path d="M0,60 C80,30 160,75 240,50 C300,30 360,58 400,42 L400,80 L0,80 Z"
+              fill="rgba(255,255,255,0.06)"/>
+        <polyline points="0,55 60,30 120,65 180,42 240,55 300,32 360,50 400,38"
+                  fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     </div>
+  </div>
+
+  <!-- Right: two SLA / counter cards -->
+  <div class="db-hero__side">
+
+    <div class="db-hero__sla-card">
+      <div class="db-hero__sla-label">ALERTAS ACTIVAS</div>
+      <div class="db-hero__sla-ring">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" width="90" height="90">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#E8F4F1" stroke-width="6"/>
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#2C6975" stroke-width="6"
+                  stroke-dasharray="201" stroke-dashoffset="40"
+                  stroke-linecap="round"
+                  transform="rotate(-90 40 40)"/>
+          <text x="40" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="#1D4C55" font-family="inherit">
+            {{ operationalAlerts().length }}
+          </text>
+        </svg>
+      </div>
+      <p class="db-hero__sla-sub">Seguimiento inmediato</p>
+    </div>
+
+    <div class="db-hero__sla-card">
+      <div class="db-hero__sla-label">PEDIDOS RECIENTES</div>
+      <div class="db-hero__sla-ring">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" width="90" height="90">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#E8F4F1" stroke-width="6"/>
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#68B2A0" stroke-width="6"
+                  stroke-dasharray="201" stroke-dashoffset="60"
+                  stroke-linecap="round"
+                  transform="rotate(-90 40 40)"/>
+          <text x="40" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="#1D4C55" font-family="inherit">
+            {{ recentOrders().length }}
+          </text>
+        </svg>
+      </div>
+      <p class="db-hero__sla-sub">Actividad comercial</p>
+    </div>
+
   </div>
 </section>
 
-<section class="metrics-grid" aria-label="Métricas principales">
-  <article *ngFor="let m of metrics()" class="metric-card" [id]="m.id" [attr.data-tone]="m.accentTone">
-    <span class="metric-card__label">{{ m.label }}</span>
-    <div class="metric-card__value">{{ m.valueLabel }}</div>
-    <div *ngIf="m.delta" class="metric-card__delta"
-         [class.metric-card__delta--pos]="m.deltaPositive"
-         [class.metric-card__delta--neg]="!m.deltaPositive">
-      <span class="metric-card__delta-arrow">{{ m.deltaPositive ? '↑' : '↓' }}</span>
-      {{ m.delta }}
+<!-- ============================================================
+     KPI METRICS SECTION
+     ============================================================ -->
+<div class="db-section-header">
+  <h2 class="db-section-title">Estadísticas por periodo</h2>
+</div>
+
+<section class="db-metrics" aria-label="Métricas principales">
+  <article *ngFor="let m of metrics(); let i = index"
+           class="db-metric-card"
+           [id]="m.id"
+           [attr.data-tone]="m.accentTone"
+           [style.animation-delay]="(i * 60) + 'ms'">
+    <div class="db-metric-card__top">
+      <span class="db-metric-card__label">{{ m.label }}</span>
+      <div class="db-metric-card__icon" [innerHTML]="m.icon"></div>
     </div>
+    <div class="db-metric-card__value">{{ m.valueLabel }}</div>
+    <div class="db-metric-card__delta">{{ m.delta }}</div>
   </article>
 </section>
 
-<section class="dashboard-grid">
-  <article class="dashboard-section dashboard-section--alerts">
-    <div class="dashboard-section__header">
-      <h2 class="dashboard-section__title">Alertas operativas</h2>
-      <span class="dashboard-section__subtitle">Seguimiento inmediato</span>
-    </div>
+<!-- ============================================================
+     BOTTOM GRID: Activity + Quick Actions
+     ============================================================ -->
+<section class="db-bottom">
 
-    <div class="alert-stack">
-      <div *ngFor="let alert of operationalAlerts()" class="alert-card" [attr.data-tone]="alert.tone">
-        <div class="alert-card__dot"></div>
-        <div>
-          <strong class="alert-card__title">{{ alert.title }}</strong>
-          <p class="alert-card__description">{{ alert.description }}</p>
+  <!-- Actividad Operativa Reciente -->
+  <article class="db-panel">
+    <h2 class="db-panel__title">Actividad Operativa Reciente</h2>
+
+    <div *ngIf="operationalAlerts().length || hasRecentActivity(); else emptyActivity" class="db-activity">
+
+      <!-- Alerts -->
+      <div *ngFor="let alert of operationalAlerts()"
+           class="db-activity__item"
+           [attr.data-tone]="alert.tone">
+        <div class="db-activity__icon">
+          <svg *ngIf="alert.tone === 'warning'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <svg *ngIf="alert.tone === 'info'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <svg *ngIf="alert.tone === 'success'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
         </div>
+        <div class="db-activity__content">
+          <p>{{ alert.title }}</p>
+          <span>{{ alert.description }}</span>
+        </div>
+        <div class="db-activity__time">Alerta</div>
+      </div>
+
+      <!-- Recent activity items -->
+      <div *ngFor="let item of recentActivity() | slice:0:4"
+           class="db-activity__item"
+           [attr.data-tone]="getActivityTone(item)">
+        <div class="db-activity__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="db-activity__content">
+          <p>{{ item.description }}</p>
+          <span>{{ item.type }}</span>
+        </div>
+        <div class="db-activity__time">{{ item.time }}</div>
       </div>
     </div>
-  </article>
 
-  <article class="dashboard-section">
-    <div class="dashboard-section__header">
-      <h2 class="dashboard-section__title">Pedidos recientes</h2>
-      <span class="dashboard-section__subtitle">Actividad comercial más reciente</span>
-    </div>
-
-    <div *ngIf="hasRecentOrders(); else emptyOrders" class="activity-list">
-      <div *ngFor="let order of recentOrders()" class="activity-item activity-item--order">
-        <div class="activity-item__meta">
-          <span class="activity-item__type">{{ order.folio }}</span>
-          <span class="activity-item__time">{{ order.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
-        </div>
-        <p class="activity-item__description">{{ order.clientName }}</p>
-        <div class="activity-item__footer">
-          <strong class="activity-item__amount">{{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
-          <bc-status-badge [label]="getStatusLabel(order.status)" [variant]="getStatusBadgeVariant(order.status)" size="sm"></bc-status-badge>
-        </div>
-      </div>
-    </div>
-
-    <ng-template #emptyOrders>
-      <div class="dashboard-empty">
-        <strong>No hay pedidos recientes.</strong>
-        <span>Los nuevos registros aparecerán aquí conforme se capture actividad comercial.</span>
-      </div>
+    <ng-template #emptyActivity>
+      <div class="db-empty">Sin actividad operativa reciente.</div>
     </ng-template>
   </article>
-</section>
 
-<section class="dashboard-section dashboard-section--full">
-  <div class="dashboard-section__header">
-    <h2 class="dashboard-section__title">Actividad reciente</h2>
-    <span class="dashboard-section__subtitle">Movimientos relevantes del sistema</span>
-  </div>
-
-  <div *ngIf="hasRecentActivity(); else emptyActivity" class="timeline-list">
-    <div *ngFor="let item of recentActivity()" class="timeline-item" [attr.data-tone]="getActivityTone(item)">
-      <div class="timeline-item__marker"></div>
-      <div class="timeline-item__body">
-        <div class="timeline-item__top">
-          <span class="timeline-item__type">{{ item.type }}</span>
-          <span class="timeline-item__time">{{ item.time }}</span>
-        </div>
-        <p class="timeline-item__description">{{ item.description }}</p>
-      </div>
-      <bc-status-badge [label]="item.badge" [variant]="item.badgeVariant" size="sm"></bc-status-badge>
+  <!-- Acciones Rápidas -->
+  <article class="db-panel">
+    <h2 class="db-panel__title">Acciones Rápidas</h2>
+    <div class="db-quick-actions">
+      <a routerLink="/pedidos/nuevo" class="db-action db-action--teal">Nuevo Pedido</a>
+      <a routerLink="/clientes/nuevo" class="db-action db-action--yellow">Registrar Cliente</a>
+      <a routerLink="/tickets/nuevo" class="db-action db-action--outline">Agendar Mantenimiento</a>
+      <a routerLink="/reportes" class="db-action db-action--outline">Ver Reportes</a>
     </div>
-  </div>
+  </article>
 
-  <ng-template #emptyActivity>
-    <div class="dashboard-empty">
-      <strong>No hay actividad reciente disponible.</strong>
-      <span>Cuando existan movimientos operativos, se mostrarán en esta sección.</span>
-    </div>
-  </ng-template>
 </section>

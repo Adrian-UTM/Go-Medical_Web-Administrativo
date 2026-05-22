@@ -33,3 +33,13 @@
 .empty-state__action {
   margin-top: var(--space-4);
 }
+
+.empty-state {
+  border: 1px dashed rgba(44, 105, 117, 0.18);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(203,230,226,0.20));
+}
+
+.empty-state__icon {
+  color: var(--color-secondary);
+}

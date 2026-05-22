@@ -1,71 +1,147 @@
+/* ============================================================
+   TOPBAR — Go Medical (Maqueta Biomedica PAX)
+   ============================================================ */
+
 .topbar {
-  height: var(--topbar-height);
-  background-color: var(--color-bg-surface);
-  border-bottom: 1px solid var(--color-border);
+  height: 60px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(44, 105, 117, 0.1);
   display: flex;
   align-items: center;
-  padding: 0 var(--space-6);
-  gap: var(--space-4);
+  padding: 0 20px;
+  gap: 16px;
   position: sticky;
   top: 0;
   z-index: 50;
   flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(29, 76, 85, 0.06);
 }
 
-.topbar__spacer {
+/* Left */
+.topbar__left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Search — center, takes available space */
+.topbar__search-wrap {
   flex: 1;
+  display: flex;
+  justify-content: flex-start;
+  max-width: 400px;
 }
 
+.topbar__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.topbar__search-icon {
+  position: absolute;
+  left: 14px;
+  color: #8DA4A7;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.topbar__search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 16px 0 38px;
+  border: 1px solid rgba(44, 105, 117, 0.15);
+  border-radius: 9999px;
+  background: #F6FAFA;
+  color: #1D2A2C;
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.topbar__search-input::placeholder {
+  color: #8DA4A7;
+}
+
+.topbar__search-input:focus {
+  border-color: #68B2A0;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(104, 178, 160, 0.14);
+}
+
+/* Right actions */
 .topbar__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
+/* Icon button (bell, menu, logout) */
 .topbar__icon-btn {
-  background: none;
-  border: none;
-  color: var(--color-gray-500);
+  background: transparent;
+  border: 1px solid transparent;
+  color: #627F83;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: all 150ms ease;
+  flex-shrink: 0;
 }
 
 .topbar__icon-btn:hover {
-  background-color: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: rgba(44, 105, 117, 0.07);
+  color: #2C6975;
 }
 
+.topbar__menu-btn {
+  border-radius: 10px;
+}
+
+/* Divider */
 .topbar__divider {
   width: 1px;
-  height: 24px;
-  background-color: var(--color-border);
-  margin: 0 var(--space-2);
+  height: 26px;
+  background: rgba(44, 105, 117, 0.12);
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 
+/* User section */
 .topbar__user {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 9999px;
+  background: transparent;
+  transition: background 150ms ease;
+}
+
+.topbar__user:hover {
+  background: rgba(44, 105, 117, 0.05);
 }
 
 .topbar__user-avatar {
-  width: 34px;
-  height: 34px;
-  background-color: var(--color-primary);
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #2C6975, #68B2A0);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-size: 0.75rem;
+  font-weight: 700;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(44, 105, 117, 0.22);
 }
 
 .topbar__user-info {
@@ -75,24 +151,22 @@
 }
 
 .topbar__user-name {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1D2A2C;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .topbar__user-role {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  color: #627F83;
   line-height: 1;
+  white-space: nowrap;
 }
 
-.topbar__logout {
-  color: var(--color-gray-400);
-}
-
+/* Logout specific hover */
 .topbar__logout:hover {
-  color: var(--color-danger);
-  background-color: var(--color-danger-bg);
+  color: #BC4B51;
+  background: rgba(188, 75, 81, 0.08);
 }
-

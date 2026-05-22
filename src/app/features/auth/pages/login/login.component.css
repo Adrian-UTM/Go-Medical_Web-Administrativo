@@ -1,7 +1,7 @@
 /* Login card */
 .login-card {
   background-color: var(--color-bg-surface);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-2xl);
   padding: var(--space-10);
   width: 100%;
   max-width: 440px;
@@ -76,8 +76,8 @@
 }
 
 .form-field__input:focus {
-  border-color: #2D8BEB;
-  box-shadow: 0 0 0 3px rgba(45, 139, 235, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(44, 105, 117, 0.15);
 }
 
 .form-field--error .form-field__input {
@@ -170,7 +170,7 @@
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-6);
-  background-color: #2D8BEB;
+  background-color: var(--color-primary);
   color: #fff;
   border: none;
   border-radius: var(--radius-md);
@@ -179,12 +179,12 @@
   cursor: pointer;
   transition: background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
   outline: none;
-  box-shadow: 0 4px 12px rgba(45, 139, 235, 0.35);
+  box-shadow: 0 4px 12px rgba(44, 105, 117, 0.35);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #1A72CE;
-  box-shadow: 0 6px 16px rgba(45, 139, 235, 0.45);
+  background-color: var(--color-primary-dark);
+  box-shadow: 0 6px 16px rgba(44, 105, 117, 0.45);
   transform: translateY(-1px);
 }
 
@@ -241,4 +241,3 @@
   text-decoration: underline;
   color: var(--color-accent);
 }
-

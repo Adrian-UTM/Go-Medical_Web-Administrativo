@@ -57,14 +57,34 @@
 }
 
 .breadcrumb__link {
-  color: var(--color-accent);
+  color: var(--color-primary);
   transition: color var(--transition-fast);
 }
 
 .breadcrumb__link:hover {
-  color: var(--color-accent-hover);
+  color: var(--color-primary-hover);
 }
 
 .breadcrumb__sep {
   color: var(--color-gray-300);
+}
+
+.page-header {
+  border-bottom-color: rgba(44, 105, 117, 0.14);
+}
+
+.page-header__title {
+  letter-spacing: -0.02em;
+}
+
+.page-header__subtitle {
+  color: var(--color-text-secondary);
+}
+
+.breadcrumb__link {
+  font-weight: var(--font-weight-medium);
+}
+
+.breadcrumb__link:hover {
+  color: var(--color-secondary-hover);
 }
