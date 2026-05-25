@@ -39,13 +39,28 @@
           <span class="info-item__label">Cliente</span>
           <span class="info-item__value">{{ ticket()!.clientNameSnapshot }}</span>
         </div>
-        <div class="info-item">
+        <div class="info-item" *ngIf="client()">
           <span class="info-item__label">Contacto</span>
-          <span class="info-item__value">{{ getClientContact() }}</span>
+          <div class="info-item__value" style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-weight: var(--font-weight-medium); color: var(--color-text-primary);">{{ client()!.contactName || 'Sin contacto' }}</div>
+            <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary);">{{ client()!.email || 'Sin correo' }}</div>
+            <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary);">{{ client()!.phone || 'Sin teléfono' }}</div>
+          </div>
+        </div>
+        <div class="info-item" *ngIf="!client()">
+          <span class="info-item__label">Contacto</span>
+          <span class="info-item__value">Contacto no disponible</span>
         </div>
         <div class="info-item">
-          <span class="info-item__label">Producto / equipo</span>
-          <span class="info-item__value">{{ getRelatedAsset() }}</span>
+          <span class="info-item__label">{{ isProductService() ? 'Servicio relacionado' : 'Producto / Equipo' }}</span>
+          <div class="info-item__value" style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-weight: var(--font-weight-medium); color: var(--color-text-primary);">
+              {{ product() ? product()!.name : (ticket()!.productNameSnapshot || 'Sin asociar') }}
+            </div>
+            <div *ngIf="product()" style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: 2px;">
+              SKU: {{ product()!.sku }} · {{ isProductService() ? 'Servicio' : 'Producto físico' }}
+            </div>
+          </div>
         </div>
         <div class="info-item" *ngIf="productCategoryLabel()">
           <span class="info-item__label">Categoria</span>
@@ -79,7 +94,7 @@
       <button type="button" class="btn-secondary" (click)="markWaitingParts()" [disabled]="isProcessing() || ticket()!.status === 'waiting_parts'">Esperando refaccion</button>
       <button type="button" class="btn-secondary" (click)="markResolved()" [disabled]="isProcessing() || ticket()!.status === 'resolved'">Marcar resuelto</button>
       <button type="button" class="btn-secondary" (click)="closeTicket()" [disabled]="isProcessing() || ticket()!.status === 'closed'">Cerrar ticket</button>
-      <button type="button" class="btn-ghost" (click)="cancelTicket()" [disabled]="isProcessing() || ticket()!.status === 'canceled'">Cancelar ticket</button>
+      <button type="button" class="btn-ghost" (click)="cancelTicket()" [disabled]="isProcessing() || ticket()!.status === 'cancelled'">Cancelar ticket</button>
     </aside>
   </div>
 
@@ -95,9 +110,9 @@
           <span class="detail-row__label">Titulo</span>
           <span class="detail-row__value">{{ ticket()!.title }}</span>
         </div>
-        <div class="detail-row">
+        <div class="detail-row" *ngIf="!isProductService() && ticket()!.equipmentSerialNumber">
           <span class="detail-row__label">Numero de serie</span>
-          <span class="detail-row__value detail-row__value--mono">{{ ticket()!.equipmentSerialNumber || 'No registrado' }}</span>
+          <span class="detail-row__value detail-row__value--mono">{{ ticket()!.equipmentSerialNumber }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row__label">Ultima actualizacion</span>

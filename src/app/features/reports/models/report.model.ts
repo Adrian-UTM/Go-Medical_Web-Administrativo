@@ -5,6 +5,9 @@ export interface ReportKpis {
   avgTicket: number;
   pendingOpportunities: number;
   pendingOpportunitiesValue: number;
+  activeClients: number;
+  openTickets: number;
+  lowStockProducts: number;
 }
 
 export interface ProductSalesRow {
@@ -42,7 +45,16 @@ export interface TicketStatusRow {
   count: number;
 }
 
+export interface ReportDistributionRow {
+  key: string;
+  label: string;
+  value: number;
+}
+
+export type ReportPeriodMode = 'day' | 'week' | 'month';
+
 export interface ReportFilters {
+  periodMode?: ReportPeriodMode;
   dateFrom?: string;
   dateTo?: string;
   category?: string;
@@ -56,6 +68,8 @@ export interface ReportsSnapshot {
   topCustomers: CustomerSalesRow[];
   orderAnalyticsOrders: import('../../../models/order.model').Order[];
   ticketStatusRows: TicketStatusRow[];
+  revenueByCategoryRows: ReportDistributionRow[];
+  catalogDistributionRows: ReportDistributionRow[];
 }
 
 export const ESTIMATED_COST_RATIO = 0.60;

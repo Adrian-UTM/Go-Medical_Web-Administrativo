@@ -10,9 +10,11 @@
   /* Marca — Teal biomédico Go Medical */
   --color-primary:        #2C6975;
   --color-primary-hover:  #1D4C55;
+  --color-primary-dark:   #163E45;
   --color-secondary:      #68B2A0;
   --color-secondary-hover:#519888;
   --color-accent:         #CDE0C9;
+  --color-accent-hover:   #B7D2B1;
   --color-bg-mint:        #CBE6E2;
   --color-background:     #FFFFFF;
 
@@ -498,3 +500,79 @@ body {
 .ticket-status-card:hover {
   box-shadow: 0 18px 38px rgba(29, 76, 85, 0.14) !important;
 }
+/* ----------------------------------------------------------
+   BOTONES — contraste consistente en hover
+   ---------------------------------------------------------- */
+.btn-primary.btn-primary,
+a.btn-primary.btn-primary,
+button.btn-primary.btn-primary,
+.btn-refresh.btn-refresh {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 10px 24px rgba(44, 105, 117, 0.22) !important;
+}
+
+.btn-primary.btn-primary:hover:not(:disabled),
+a.btn-primary.btn-primary:hover:not(:disabled),
+button.btn-primary.btn-primary:hover:not(:disabled),
+.btn-refresh.btn-refresh:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary-hover)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 30px rgba(29, 76, 85, 0.28) !important;
+}
+
+.btn-secondary.btn-secondary,
+a.btn-secondary.btn-secondary,
+button.btn-secondary.btn-secondary {
+  background-color: rgba(203, 230, 226, 0.72) !important;
+  color: var(--color-primary-dark) !important;
+  border-color: rgba(44, 105, 117, 0.18) !important;
+}
+
+.btn-secondary.btn-secondary:hover:not(:disabled),
+a.btn-secondary.btn-secondary:hover:not(:disabled),
+button.btn-secondary.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary) !important;
+}
+
+.btn-ghost.btn-ghost,
+a.btn-ghost.btn-ghost,
+button.btn-ghost.btn-ghost {
+  color: var(--color-text-secondary) !important;
+}
+
+.btn-ghost.btn-ghost:hover:not(:disabled),
+a.btn-ghost.btn-ghost:hover:not(:disabled),
+button.btn-ghost.btn-ghost:hover:not(:disabled) {
+  background-color: var(--color-bg-hover) !important;
+  color: var(--color-primary-dark) !important;
+  border-color: rgba(44, 105, 117, 0.18) !important;
+}
+
+.btn-icon.btn-icon:hover:not(:disabled),
+a.btn-icon.btn-icon:hover:not(:disabled),
+button.btn-icon.btn-icon:hover:not(:disabled) {
+  background-color: var(--color-bg-hover) !important;
+  color: var(--color-primary-dark) !important;
+  border-color: rgba(44, 105, 117, 0.18) !important;
+}
+
+.btn-danger.btn-danger:hover:not(:disabled),
+.btn-icon--danger.btn-icon--danger:hover:not(:disabled) {
+  background-color: var(--color-danger) !important;
+  color: #ffffff !important;
+  border-color: var(--color-danger) !important;
+}
+
+/* Restablecer textareas a formas rectangulares profesionales redondeadas */
+textarea.form-control,
+textarea.form-field__textarea,
+textarea {
+  border-radius: var(--radius-xl) !important;
+  resize: vertical !important;
+  min-height: 110px !important;
+}
+

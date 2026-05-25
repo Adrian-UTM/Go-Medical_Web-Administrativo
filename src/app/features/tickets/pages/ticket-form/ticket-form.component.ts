@@ -8,8 +8,8 @@ import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/componen
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Client } from '../../../../core/models/client.model';
-import { Product, ProductCategory } from '../../../../models/product.model';
-import { ServiceTicket, TicketPriority, TicketStatus, TicketType, TicketUpsertPayload } from '../../models/ticket.model';
+import { Product, ProductCategory, ProductItemType } from '../../../../models/product.model';
+import { ServiceTicket, TicketPriority, TicketStatus, TicketTechnician, TicketType, TicketUpsertPayload } from '../../models/ticket.model';
 import { TicketSupabaseService } from '../../services/ticket.supabase.service';
 
 @Component({
@@ -32,6 +32,7 @@ export class TicketFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ticketsService = inject(TicketSupabaseService);
+  private readonly externalTechnicianValue = '__other__';
 
   readonly isEditMode = signal(false);
   readonly isLoadingData = signal(true);
@@ -39,7 +40,7 @@ export class TicketFormComponent {
   readonly errorMessage = signal('');
   readonly clients = signal<Client[]>([]);
   readonly products = signal<Product[]>([]);
-  readonly technicians = signal<string[]>([]);
+  readonly technicians = signal<TicketTechnician[]>([]);
   readonly selectedClient = signal<Client | null>(null);
   readonly selectedProduct = signal<Product | null>(null);
 
@@ -59,7 +60,8 @@ export class TicketFormComponent {
 
   readonly technicianOptions = computed(() => [
     { value: '', label: 'Sin asignar' },
-    ...this.technicians().map(name => ({ value: name, label: name })),
+    ...this.technicians().map(technician => ({ value: technician.id, label: technician.fullName })),
+    { value: this.externalTechnicianValue, label: 'Otro' },
   ]);
 
   readonly typeOptions = [
@@ -99,7 +101,8 @@ export class TicketFormComponent {
     productId: [''],
     productNameSnapshot: [''],
     equipmentSerialNumber: ['', Validators.maxLength(100)],
-    assignedTechnicianName: [''],
+    assignedTechnicianSelection: [''],
+    assignedTechnicianCustomName: ['', Validators.maxLength(120)],
     scheduledAt: [''],
     notes: ['', Validators.maxLength(1000)],
   });
@@ -112,11 +115,35 @@ export class TicketFormComponent {
       )
       .subscribe(value => this.syncSelectedProduct(String(value ?? '')));
 
+    this.form.get('assignedTechnicianSelection')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(value => {
+        if (value !== this.externalTechnicianValue) {
+          this.form.patchValue({ assignedTechnicianCustomName: '' }, { emitEvent: false });
+        }
+      });
+
     void this.initialize();
   }
 
   get pageTitle(): string {
     return this.isEditMode() ? 'Editar ticket' : 'Nuevo ticket';
+  }
+
+  get isExternalTechnicianSelected(): boolean {
+    return this.form.get('assignedTechnicianSelection')?.value === this.externalTechnicianValue;
+  }
+
+  get isSelectedProductService(): boolean {
+    return (this.selectedProduct()?.item_type ?? ProductItemType.Product) === ProductItemType.Service;
+  }
+
+  get relatedProductLabel(): string {
+    return this.isSelectedProductService ? 'Servicio relacionado' : 'Producto relacionado';
+  }
+
+  get selectedProductTypeLabel(): string {
+    return this.isSelectedProductService ? 'Servicio' : 'Producto';
   }
 
   get breadcrumbs(): BreadcrumbItem[] {
@@ -129,7 +156,7 @@ export class TicketFormComponent {
 
   async initialize(): Promise<void> {
     this.ticketId = this.route.snapshot.paramMap.get('id');
-    const isEditing = !!this.ticketId && this.route.snapshot.url.some(segment => segment.path === 'editar');
+    const isEditing = !!this.ticketId;
     this.isEditMode.set(isEditing);
     this.isLoadingData.set(true);
 
@@ -137,7 +164,7 @@ export class TicketFormComponent {
       const [clients, products, technicians] = await Promise.all([
         this.ticketsService.getActiveClients(),
         this.ticketsService.getAvailableProducts(),
-        this.ticketsService.getTechnicians(),
+        this.ticketsService.getTechnicianProfiles(),
       ]);
 
       this.clients.set(clients);
@@ -173,7 +200,8 @@ export class TicketFormComponent {
       productId: ticket.productId ?? '',
       productNameSnapshot: ticket.productNameSnapshot ?? '',
       equipmentSerialNumber: ticket.equipmentSerialNumber ?? '',
-      assignedTechnicianName: ticket.assignedTechnicianName ?? '',
+      assignedTechnicianSelection: ticket.assignedTechnicianCustomName ? this.externalTechnicianValue : ticket.assignedTechnicianId ?? '',
+      assignedTechnicianCustomName: ticket.assignedTechnicianCustomName ?? '',
       scheduledAt: this.toDateTimeInputValue(ticket.scheduledAt),
       notes: ticket.notes,
     }, { emitEvent: false });
@@ -197,6 +225,14 @@ export class TicketFormComponent {
       return;
     }
 
+    if (this.isExternalTechnicianSelected) {
+      const customName = this.form.get('assignedTechnicianCustomName')?.value?.trim();
+      if (!customName) {
+        this.errorMessage.set('Ingresa el nombre del tecnico externo.');
+        return;
+      }
+    }
+
     this.isSaving.set(true);
     this.errorMessage.set('');
 
@@ -213,6 +249,7 @@ export class TicketFormComponent {
 
       await this.router.navigate(['/tickets', savedTicket.id]);
     } catch (error) {
+      console.error('[Tickets] save failed', error);
       this.errorMessage.set(error instanceof Error ? error.message : 'Ocurrio un error al guardar el ticket. Intenta nuevamente.');
     } finally {
       this.isSaving.set(false);
@@ -262,6 +299,9 @@ export class TicketFormComponent {
 
     this.form.patchValue({
       productNameSnapshot: ticket?.productNameSnapshot ?? product?.name ?? '',
+      equipmentSerialNumber: product && (product.item_type ?? ProductItemType.Product) === ProductItemType.Service
+        ? ''
+        : this.form.get('equipmentSerialNumber')?.value ?? '',
     }, { emitEvent: false });
   }
 
@@ -278,8 +318,13 @@ export class TicketFormComponent {
       status: raw.status ?? TicketStatus.Open,
       productId: raw.productId || undefined,
       productNameSnapshot: raw.productNameSnapshot || undefined,
-      equipmentSerialNumber: raw.equipmentSerialNumber || undefined,
-      assignedTechnicianName: raw.assignedTechnicianName || undefined,
+      equipmentSerialNumber: this.isSelectedProductService ? undefined : raw.equipmentSerialNumber || undefined,
+      assignedTechnicianId: raw.assignedTechnicianSelection && raw.assignedTechnicianSelection !== this.externalTechnicianValue
+        ? raw.assignedTechnicianSelection
+        : null,
+      assignedTechnicianCustomName: raw.assignedTechnicianSelection === this.externalTechnicianValue
+        ? raw.assignedTechnicianCustomName?.trim() || null
+        : null,
       scheduledAt: this.toIsoFromDateTimeInput(raw.scheduledAt || ''),
       notes: raw.notes ?? '',
     };

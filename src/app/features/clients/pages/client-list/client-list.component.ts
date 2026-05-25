@@ -154,9 +154,13 @@ export class ClientListComponent implements OnInit {
   getTypeLabel(type: ClientType): string {
     switch (type) {
       case ClientType.Clinica: return 'Clínica';
+      case ClientType.Hospital: return 'Hospital';
       case ClientType.Medico: return 'Médico';
-      case ClientType.Veterinario: return 'Veterinario';
+      case ClientType.Veterinario: return 'Veterinaria';
       case ClientType.Institucion: return 'Institución';
+      case ClientType.Distribuidor: return 'Distribuidor';
+      case ClientType.Empresa: return 'Empresa';
+      case ClientType.Otro: return 'Otro';
       default: return type;
     }
   }

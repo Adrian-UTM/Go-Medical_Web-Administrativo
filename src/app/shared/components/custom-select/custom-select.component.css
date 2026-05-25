@@ -96,19 +96,19 @@
 }
 
 .bc-select__option:hover {
-  background-color: var(--color-accent);
-  color: white;
+  background-color: var(--color-primary);
+  color: #ffffff;
 }
 
 .bc-select__option.is-selected {
-  background-color: rgba(45, 106, 159, 0.08); /* accent very light */
-  color: var(--color-accent);
+  background-color: rgba(203, 230, 226, 0.42);
+  color: var(--color-primary-dark);
   font-weight: var(--font-weight-semibold);
 }
 
 .bc-select__option.is-selected:hover {
-  background-color: var(--color-accent);
-  color: white;
+  background-color: var(--color-primary);
+  color: #ffffff;
 }
 
 .bc-select__check {
@@ -125,6 +125,7 @@
 .bc-select__option:hover,
 .bc-select__option.is-selected:hover {
   background-color: var(--color-primary);
+  color: #ffffff;
 }
 
 .bc-select__option.is-selected {

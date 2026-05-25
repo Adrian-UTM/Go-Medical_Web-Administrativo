@@ -119,7 +119,7 @@ export class QuoteFormComponent {
 
   private async initialize(): Promise<void> {
     this.quoteId = this.route.snapshot.paramMap.get('id');
-    const isEditing = !!this.quoteId && this.route.snapshot.url.some(segment => segment.path === 'editar');
+    const isEditing = !!this.quoteId;
     this.isEditMode.set(isEditing);
 
     try {

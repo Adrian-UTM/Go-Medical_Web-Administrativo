@@ -118,7 +118,7 @@ export class OrderFormComponent {
 
   private async initialize(): Promise<void> {
     this.orderId = this.route.snapshot.paramMap.get('id');
-    const isEditing = !!this.orderId && this.route.snapshot.url.some(segment => segment.path === 'editar');
+    const isEditing = !!this.orderId;
     this.isEditMode.set(isEditing);
 
     try {

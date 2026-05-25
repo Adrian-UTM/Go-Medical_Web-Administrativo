@@ -5,7 +5,7 @@ export enum TicketStatus {
   WaitingParts = 'waiting_parts',
   Resolved = 'resolved',
   Closed = 'closed',
-  Canceled = 'canceled',
+  Canceled = 'cancelled',
 }
 
 export enum TicketPriority {
@@ -16,12 +16,12 @@ export enum TicketPriority {
 }
 
 export enum TicketType {
-  Preventive = 'preventive',
-  Corrective = 'corrective',
-  Warranty = 'warranty',
-  Installation = 'installation',
-  Review = 'review',
-  Other = 'other',
+  Preventive = 'preventivo',
+  Corrective = 'correctivo',
+  Warranty = 'garantia',
+  Installation = 'instalacion',
+  Review = 'revision',
+  Other = 'otro',
 }
 
 export interface TicketHistoryItem {
@@ -45,6 +45,8 @@ export interface ServiceTicket {
   productId?: string;
   productNameSnapshot?: string;
   equipmentSerialNumber?: string;
+  assignedTechnicianId?: string;
+  assignedTechnicianCustomName?: string;
   assignedTechnicianName?: string;
   requestedAt: string;
   scheduledAt?: string;
@@ -52,6 +54,12 @@ export interface ServiceTicket {
   notes: string;
   attachments?: string[];
   history: TicketHistoryItem[];
+}
+
+export interface TicketTechnician {
+  id: string;
+  fullName: string;
+  role?: string;
 }
 
 export interface TicketFilters {
@@ -72,8 +80,13 @@ export interface TicketUpsertPayload {
   productId?: string;
   productNameSnapshot?: string;
   equipmentSerialNumber?: string;
+  assignedTechnicianId?: string | null;
+  assignedTechnicianCustomName?: string | null;
   assignedTechnicianName?: string;
+  equipmentUnitId?: string | null;
   scheduledAt?: string;
   notes?: string;
   attachments?: string[];
 }
+
+

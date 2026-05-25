@@ -12,6 +12,7 @@ import { OrderSupabaseService } from '../../services/order.supabase.service';
 import { Order, OrderStatsPeriodPreset, OrderStatus } from '../../../../models/order.model';
 import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
+import { SupabaseService } from '../../../../core/services/supabase.service';
 
 @Component({
   selector: 'bc-order-list',
@@ -34,6 +35,7 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
 export class OrderListComponent implements OnInit {
   private readonly orderService = inject(OrderSupabaseService);
   private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly supabase = inject(SupabaseService);
   private readonly destroyRef = inject(DestroyRef);
 
   private loadInFlight = false;
@@ -89,8 +91,25 @@ export class OrderListComponent implements OnInit {
       .subscribe(() => {
         void this.loadOrders();
       });
+
+    this.setupRealtimeRefresh();
   }
 
+  private setupRealtimeRefresh(): void {
+    const channel = this.supabase.client
+      .channel('orders-list-refresh')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        void this.loadOrders();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        void this.loadOrders();
+      })
+      .subscribe();
+
+    this.destroyRef.onDestroy(() => {
+      void this.supabase.client.removeChannel(channel);
+    });
+  }
   async loadOrders(): Promise<void> {
     if (this.loadInFlight) {
       return;
@@ -167,12 +186,13 @@ export class OrderListComponent implements OnInit {
       [OrderStatus.Canceled]: { label: 'Cancelado', variant: 'danger' },
     };
 
-    return statusMap[status];
+    return statusMap[status] ?? { label: 'Borrador', variant: 'neutral' };
   }
 
   getItemsCount(order: Order): number {
     return order.items.reduce((sum, item) => sum + item.quantity, 0);
   }
 }
+
 
 

@@ -10,6 +10,7 @@ import {
   DashboardSupabaseService,
 } from '../../services/dashboard.supabase.service';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
+import { SupabaseService } from '../../../../core/services/supabase.service';
 
 interface MetricCardView extends DashboardMetricCardData {
   valueLabel: string;
@@ -35,6 +36,7 @@ interface OperationalAlert {
 export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardSupabaseService);
   private readonly pageVisibility = inject(PageVisibilityService);
+  private readonly supabase = inject(SupabaseService);
   private readonly destroyRef = inject(DestroyRef);
 
   private loadInFlight = false;
@@ -197,8 +199,28 @@ export class DashboardComponent implements OnInit {
       .subscribe(() => {
         void this.loadDashboard();
       });
+
+    this.setupRealtimeRefresh();
   }
 
+  private setupRealtimeRefresh(): void {
+    const channel = this.supabase.client
+      .channel('dashboard-refresh')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        void this.loadDashboard();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        void this.loadDashboard();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_tickets' }, () => {
+        void this.loadDashboard();
+      })
+      .subscribe();
+
+    this.destroyRef.onDestroy(() => {
+      void this.supabase.client.removeChannel(channel);
+    });
+  }
   async loadDashboard(): Promise<void> {
     if (this.loadInFlight) {
       return;
@@ -257,3 +279,4 @@ export class DashboardComponent implements OnInit {
     return new Intl.NumberFormat('es-MX').format(value);
   }
 }
+

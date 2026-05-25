@@ -46,8 +46,8 @@
 }
 
 .status-badge--primary {
-  background-color: rgba(45, 106, 159, 0.12);
-  color: var(--color-accent);
+  background-color: rgba(44, 105, 117, 0.14);
+  color: var(--color-primary-dark);
 }
 
 .status-badge--neutral {

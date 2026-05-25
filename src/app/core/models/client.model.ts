@@ -1,8 +1,11 @@
 export enum ClientType {
   Clinica = 'clinica',
+  Hospital = 'hospital',
   Medico = 'medico',
   Veterinario = 'veterinario',
   Institucion = 'institucion',
+  Distribuidor = 'distribuidor',
+  Empresa = 'empresa',
   Otro = 'otro'
 }
 

@@ -46,11 +46,12 @@ export class OrderSupabaseService {
     }
 
     if (itemsResponse.error) {
-      throw this.toAppError(itemsResponse.error.message, 'No fue posible cargar las partidas de los pedidos.');
+      console.warn('[Orders] No fue posible cargar partidas; se mostraran pedidos sin conceptos.', itemsResponse.error);
     }
 
-    const itemsByOrderId = this.groupItemsByParent(itemsResponse.data ?? [], 'order_id');
-    const productMap = await this.getProductMap(itemsResponse.data ?? []);
+    const itemRows = itemsResponse.error ? [] : (itemsResponse.data ?? []);
+    const itemsByOrderId = this.groupItemsByParent(itemRows, 'order_id');
+    const productMap = await this.getProductMap(itemRows);
     const orders = (orderResponse.data ?? []).map(row => this.mapOrder(row, itemsByOrderId.get(row.id) ?? [], productMap));
     return this.applyFilters(orders, filters);
   }
@@ -247,8 +248,13 @@ export class OrderSupabaseService {
       return new Map();
     }
 
-    const products = await this.getAvailableProducts();
-    return new Map(products.filter(product => productIds.includes(product.id)).map(product => [product.id, product]));
+    try {
+      const products = await this.getAvailableProducts();
+      return new Map(products.filter(product => productIds.includes(product.id)).map(product => [product.id, product]));
+    } catch (error) {
+      console.warn('[Orders] No fue posible enriquecer partidas con productos.', error);
+      return new Map();
+    }
   }
   private mapOrder(row: any, itemRows: any[], productMap = new Map<string, Product>()): Order {
     return {
@@ -256,7 +262,7 @@ export class OrderSupabaseService {
       folio: row.order_number ?? row.folio ?? `PED-${this.getShortId(row.id)}`,
       clientId: String(row.client_id ?? ''),
       clientNameSnapshot: row.client_name_snapshot ?? 'Cliente no disponible',
-      status: (row.status ?? OrderStatus.Draft) as OrderStatus,
+      status: this.normalizeStatus(row.status),
       items: itemRows.map(item => this.mapOrderItem(item, productMap)),
       subtotal: Number(row.subtotal ?? 0),
       taxPct: Number(row.tax_pct ?? DEFAULT_ORDER_TAX_PCT),
@@ -274,9 +280,9 @@ export class OrderSupabaseService {
 
     return {
       productId: String(row.product_id ?? ''),
-      sku: row.sku ?? product?.sku ?? '',
-      productName: row.product_name ?? product?.name ?? '',
-      productCategory: (row.product_category ?? product?.category ?? '') as ProductCategory,
+      sku: row.sku_snapshot ?? row.sku ?? product?.sku ?? '',
+      productName: row.product_name_snapshot ?? row.product_name ?? product?.name ?? '',
+      productCategory: (row.product_category_snapshot ?? row.product_category ?? product?.category ?? '') as ProductCategory,
       quantity: Number(row.quantity ?? 0),
       unitPrice: Number(row.unit_price ?? 0),
       totalLinePrice: Number(row.total_line_price ?? 0),
@@ -339,7 +345,7 @@ export class OrderSupabaseService {
         order.folio,
         order.clientNameSnapshot,
         ...order.items.map(item => item.productName),
-      ].some(value => value.toLowerCase().includes(query));
+      ].some(value => String(value ?? '').toLowerCase().includes(query));
       const matchesStatus = !filters.status || order.status === filters.status;
       return matchesQuery && matchesStatus;
     });
@@ -368,6 +374,25 @@ export class OrderSupabaseService {
     return String(value ?? '').replace(/-/g, '').slice(0, 8).toUpperCase() || '0000';
   }
 
+  private normalizeStatus(value: unknown): OrderStatus {
+    const status = String(value ?? '').trim().toLowerCase();
+    const aliases: Record<string, OrderStatus> = {
+      draft: OrderStatus.Draft,
+      pending: OrderStatus.PendingPayment,
+      pending_review: OrderStatus.PendingReview,
+      pending_payment: OrderStatus.PendingPayment,
+      paid: OrderStatus.Paid,
+      processing: OrderStatus.Processing,
+      in_progress: OrderStatus.Processing,
+      shipped: OrderStatus.Shipped,
+      delivered: OrderStatus.Delivered,
+      completed: OrderStatus.Delivered,
+      canceled: OrderStatus.Canceled,
+      cancelled: OrderStatus.Canceled,
+    };
+
+    return aliases[status] ?? OrderStatus.Draft;
+  }
   private roundCurrency(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
@@ -381,6 +406,7 @@ export class OrderSupabaseService {
     return new Error(fallback);
   }
 }
+
 
 
 

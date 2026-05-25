@@ -7,7 +7,7 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Client } from '../../../../core/models/client.model';
-import { ProductCategory } from '../../../../models/product.model';
+import { Product, ProductCategory, ProductItemType } from '../../../../models/product.model';
 import { ServiceTicket, TicketHistoryItem, TicketPriority, TicketStatus, TicketType } from '../../models/ticket.model';
 import { TicketSupabaseService } from '../../services/ticket.supabase.service';
 
@@ -35,10 +35,12 @@ export class TicketDetailComponent {
   readonly isProcessing = signal(false);
   readonly ticket = signal<ServiceTicket | null>(null);
   readonly client = signal<Client | null>(null);
+  readonly product = signal<Product | null>(null);
+  readonly isProductService = computed(() => this.product()?.item_type === 'service');
   readonly productCategoryLabel = signal('');
   readonly actionMessage = signal('');
   readonly selectedTechnician = signal('');
-  readonly technicianOptions = computed(() => this.ticketsService.technicians().map(name => ({ value: name, label: name })));
+  readonly technicianOptions = computed(() => this.ticketsService.technicians().map(technician => ({ value: technician.id, label: technician.fullName })));
 
   readonly sortedHistory = computed(() => {
     const currentTicket = this.ticket();
@@ -82,11 +84,18 @@ export class TicketDetailComponent {
 
       this.ticket.set(currentTicket);
       this.client.set(await this.ticketsService.getClientById(currentTicket.clientId) ?? null);
-      this.selectedTechnician.set(currentTicket.assignedTechnicianName || this.technicianOptions()[0]?.value || '');
+      this.selectedTechnician.set(currentTicket.assignedTechnicianId ?? '');
 
       if (currentTicket.productId) {
-        const product = await this.ticketsService.getAvailableProducts().then(products => products.find(item => item.id === currentTicket.productId));
+        let product = await this.ticketsService.getAvailableProducts().then(products => products.find(item => item.id === currentTicket.productId));
+        if (!product) {
+          product = await this.ticketsService.getProductById(currentTicket.productId);
+        }
+        this.product.set(product ?? null);
         this.productCategoryLabel.set(product ? this.getCategoryLabel(product.category) : '');
+      } else {
+        this.product.set(null);
+        this.productCategoryLabel.set('');
       }
     } catch (error) {
       this.ticket.set(null);
@@ -99,16 +108,16 @@ export class TicketDetailComponent {
 
   async assignTechnician(): Promise<void> {
     const currentTicket = this.ticket();
-    const technicianName = this.selectedTechnician();
+    const technicianId = this.selectedTechnician();
 
-    if (!currentTicket || !technicianName) {
+    if (!currentTicket || !technicianId) {
       this.actionMessage.set('Selecciona un tecnico para asignar el ticket.');
       return;
     }
 
     await this.applyUpdate(
-      () => this.ticketsService.assignTechnician(currentTicket.id, technicianName),
-      `Ticket asignado a ${technicianName}.`
+      () => this.ticketsService.assignTechnician(currentTicket.id, technicianId),
+      `Ticket asignado correctamente.`
     );
   }
 
@@ -219,8 +228,8 @@ export class TicketDetailComponent {
 
       this.ticket.set(updated);
       this.actionMessage.set(successMessage);
-      if (updated.assignedTechnicianName) {
-        this.selectedTechnician.set(updated.assignedTechnicianName);
+      if (updated.assignedTechnicianId) {
+        this.selectedTechnician.set(updated.assignedTechnicianId ?? '');
       }
     } catch (error) {
       this.actionMessage.set(error instanceof Error ? error.message : 'No fue posible actualizar el ticket.');

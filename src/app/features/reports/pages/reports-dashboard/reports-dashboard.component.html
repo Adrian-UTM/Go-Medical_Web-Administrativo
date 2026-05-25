@@ -7,7 +7,7 @@
         <span class="breadcrumb__item breadcrumb__item--active">Estadísticas</span>
       </nav>
       <h1 class="page-title">Estadísticas Comerciales</h1>
-      <p class="page-subtitle">Visión ejecutiva del comportamiento comercial y operativo de Go Medical.</p>
+      <p class="page-subtitle">Dashboard ejecutivo de ingresos, pedidos, catálogo y soporte técnico de Go Medical.</p>
     </div>
 
     <div class="reports-hero__meta">
@@ -31,55 +31,67 @@
 
   <section class="filters-panel">
     <div class="filters-panel__row">
-      <div class="filter-group">
-        <label class="filter-label">Desde</label>
-        <div class="date-picker-shell">
-          <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(fromDateInput)">
-            <span>{{ formatFilterDate(dateFrom) }}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </button>
-          <input
-            #fromDateInput
-            class="date-picker-shell__native"
-            type="date"
-            [ngModel]="dateFrom"
-            (ngModelChange)="onDateInputChange('from', $event)"
-            [min]="minReportDate"
-            [max]="maxReportDate"
-            inputmode="none"
-            (keydown)="$event.preventDefault()"
-            (click)="openDatePicker(fromDateInput)">
-        </div>
+      <div class="filters-panel__copy">
+        <span class="eyebrow">Periodo de análisis</span>
+        <strong>Periodo activo: {{ periodLabel }}</strong>
       </div>
 
-      <div class="filter-group">
-        <label class="filter-label">Hasta</label>
-        <div class="date-picker-shell">
-          <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(toDateInput)">
-            <span>{{ formatFilterDate(dateTo) }}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </button>
-          <input
-            #toDateInput
-            class="date-picker-shell__native"
-            type="date"
-            [ngModel]="dateTo"
-            (ngModelChange)="onDateInputChange('to', $event)"
-            [min]="minReportDate"
-            [max]="maxReportDate"
-            inputmode="none"
-            (keydown)="$event.preventDefault()"
-            (click)="openDatePicker(toDateInput)">
+      <div class="filters-panel__controls">
+        <div class="period-toggle" aria-label="Periodo de estadísticas">
+          <button type="button" class="period-toggle__btn" [class.period-toggle__btn--active]="periodMode === 'day'" (click)="applyPeriodMode('day')">Día</button>
+          <button type="button" class="period-toggle__btn" [class.period-toggle__btn--active]="periodMode === 'week'" (click)="applyPeriodMode('week')">Semana</button>
+          <button type="button" class="period-toggle__btn" [class.period-toggle__btn--active]="periodMode === 'month'" (click)="applyPeriodMode('month')">Mes</button>
         </div>
-      </div>
+        <div class="filter-group">
+          <label class="filter-label">Desde</label>
+          <div class="date-picker-shell">
+            <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(fromDateInput)">
+              <span>{{ formatFilterDate(dateFrom) }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </button>
+            <input
+              #fromDateInput
+              class="date-picker-shell__native"
+              type="date"
+              [ngModel]="dateFrom"
+              (ngModelChange)="onDateInputChange('from', $event)"
+              [min]="minReportDate"
+              [max]="maxReportDate"
+              inputmode="none"
+              (keydown)="$event.preventDefault()"
+              (click)="openDatePicker(fromDateInput)">
+          </div>
+        </div>
 
-      <div class="filter-actions">
-        <button class="btn-primary" (click)="applyFilters()">Aplicar filtros</button>
-        <button class="btn-ghost" (click)="clearFilters()">Limpiar</button>
+        <div class="filter-group">
+          <label class="filter-label">Hasta</label>
+          <div class="date-picker-shell">
+            <button type="button" class="date-picker-shell__trigger" (click)="openDatePicker(toDateInput)">
+              <span>{{ formatFilterDate(dateTo) }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </button>
+            <input
+              #toDateInput
+              class="date-picker-shell__native"
+              type="date"
+              [ngModel]="dateTo"
+              (ngModelChange)="onDateInputChange('to', $event)"
+              [min]="minReportDate"
+              [max]="maxReportDate"
+              inputmode="none"
+              (keydown)="$event.preventDefault()"
+              (click)="openDatePicker(toDateInput)">
+          </div>
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn-primary" (click)="applyFilters()">Aplicar filtros</button>
+          <button class="btn-ghost" (click)="clearFilters()">Limpiar</button>
+        </div>
       </div>
     </div>
   </section>
@@ -93,28 +105,95 @@
     {{ error() }}
   </div>
 
-  <section class="highlights-grid" *ngIf="!loading() && reportHighlights().length">
-    <article *ngFor="let highlight of reportHighlights()" class="highlight-card" [attr.data-tone]="highlight.tone">
-      <span class="highlight-card__label">{{ highlight.label }}</span>
-      <strong class="highlight-card__value">{{ highlight.value }}</strong>
+  <section class="kpi-grid" *ngIf="loading()">
+    <article class="kpi-card kpi-card--loading" *ngFor="let item of [1,2,3,4,5,6]"></article>
+  </section>
+
+  <section class="kpi-grid" *ngIf="!loading() && kpiCards().length">
+    <article *ngFor="let card of kpiCards(); trackBy: trackByKpi" class="kpi-card" [attr.data-tone]="card.tone">
+      <span class="kpi-card__icon">{{ card.icon }}</span>
+      <span class="kpi-card__label">{{ card.label }}</span>
+      <strong class="kpi-card__value">{{ card.value }}</strong>
+      <span class="kpi-card__description">{{ card.description }}</span>
     </article>
   </section>
 
-  <section class="section-block" *ngIf="loading()">
-    <bc-revenue-summary-cards [kpis]="null" />
-  </section>
-
-  <section class="section-block" *ngIf="!loading()">
-    <bc-revenue-summary-cards [kpis]="kpis()" />
-  </section>
-
   <div class="empty-report-note" *ngIf="!loading() && !hasAnyData()">
-    <strong>No hay información suficiente para generar estas estadísticas.</strong>
-    <span>Prueba con otro rango o espera a que exista más actividad operativa.</span>
+    <strong>No hay información registrada para este periodo.</strong>
+    <span>Cuando exista actividad comercial u operativa, las distribuciones aparecerán aquí.</span>
   </div>
 
+  <section class="charts-grid charts-grid--main" *ngIf="!loading()">
+    <article class="chart-card" *ngFor="let chart of mainCharts()">
+      <div class="chart-card__header">
+        <span class="eyebrow">Distribución</span>
+        <h2>{{ chart.title }}</h2>
+        <p>{{ chart.subtitle }}</p>
+      </div>
+
+      <div class="chart-card__body" *ngIf="chart.segments.length; else emptyChart">
+        <div class="donut-chart" [style.background]="donutBackground(chart.segments)" [attr.aria-label]="chart.title">
+          <div class="donut-chart__center">
+            <span>{{ chart.centerLabel }}</span>
+            <strong>{{ chart.centerValue }}</strong>
+          </div>
+        </div>
+
+        <div class="chart-legend">
+          <div class="chart-legend__item" *ngFor="let segment of chart.segments; trackBy: trackBySegment" [title]="segment.label + ': ' + segment.formattedValue">
+            <span class="chart-legend__dot" [style.background-color]="segment.color"></span>
+            <span class="chart-legend__label">{{ segment.label }}</span>
+            <strong>{{ segment.percent }}%</strong>
+            <small>{{ segment.formattedValue }}</small>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #emptyChart>
+        <div class="chart-empty">
+          <span class="chart-empty__icon">○</span>
+          <p>{{ chart.emptyText }}</p>
+        </div>
+      </ng-template>
+    </article>
+  </section>
+
+  <section class="charts-grid charts-grid--secondary" *ngIf="!loading()">
+    <article class="chart-card chart-card--compact" *ngFor="let chart of secondaryCharts()">
+      <div class="chart-card__header">
+        <span class="eyebrow">Operación</span>
+        <h2>{{ chart.title }}</h2>
+        <p>{{ chart.subtitle }}</p>
+      </div>
+
+      <div class="chart-card__body" *ngIf="chart.segments.length; else emptySecondaryChart">
+        <div class="donut-chart donut-chart--sm" [style.background]="donutBackground(chart.segments)" [attr.aria-label]="chart.title">
+          <div class="donut-chart__center">
+            <span>{{ chart.centerLabel }}</span>
+            <strong>{{ chart.centerValue }}</strong>
+          </div>
+        </div>
+
+        <div class="chart-legend chart-legend--compact">
+          <div class="chart-legend__item" *ngFor="let segment of chart.segments; trackBy: trackBySegment" [title]="segment.label + ': ' + segment.formattedValue">
+            <span class="chart-legend__dot" [style.background-color]="segment.color"></span>
+            <span class="chart-legend__label">{{ segment.label }}</span>
+            <strong>{{ segment.percent }}%</strong>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #emptySecondaryChart>
+        <div class="chart-empty chart-empty--compact">
+          <span class="chart-empty__icon">○</span>
+          <p>{{ chart.emptyText }}</p>
+        </div>
+      </ng-template>
+    </article>
+  </section>
+
   <div class="section-divider" *ngIf="!loading()">
-    <span class="section-divider__label">Análisis detallado</span>
+    <span class="section-divider__label">Resumen complementario</span>
   </div>
 
   <div class="tables-block" *ngIf="!loading()">
@@ -135,7 +214,7 @@
         <div class="table-header">
           <div>
             <h2 class="table-title">Productos más vendidos</h2>
-            <p class="table-subtitle">Concentrado por unidades vendidas dentro del periodo seleccionado.</p>
+            <p class="table-subtitle">Concentrado compacto por unidades vendidas dentro del periodo.</p>
           </div>
         </div>
         <bc-top-products-table [rows]="topProducts()" />
@@ -144,8 +223,8 @@
       <div *ngIf="activeTab === 'low'">
         <div class="table-header">
           <div>
-            <h2 class="table-title">Productos de menor rotación</h2>
-            <p class="table-subtitle">Cruce entre ventas e inventario para identificar bajo movimiento.</p>
+            <h2 class="table-title">Productos de menor salida</h2>
+            <p class="table-subtitle">Lectura rápida de productos con bajo movimiento y stock disponible.</p>
           </div>
         </div>
         <bc-low-products-table [rows]="lowProducts()" />
@@ -154,65 +233,12 @@
       <div *ngIf="activeTab === 'customers'">
         <div class="table-header">
           <div>
-            <h2 class="table-title">Clientes principales</h2>
-            <p class="table-subtitle">Clientes con mayor volumen de compra dentro del rango analizado.</p>
+            <h2 class="table-title">Clientes con más pedidos</h2>
+            <p class="table-subtitle">Cuentas comerciales con mayor volumen dentro del rango analizado.</p>
           </div>
         </div>
         <bc-top-customers-table [rows]="topCustomers()" />
       </div>
     </div>
   </div>
-
-  <section class="order-analytics" *ngIf="!loading() && orderAnalytics()">
-    <div class="order-analytics__header">
-      <div>
-        <h2 class="table-title">Analítica de pedidos</h2>
-        <p class="table-subtitle">Comparativa de volumen e ingresos según la agrupación seleccionada.</p>
-      </div>
-      <div class="order-analytics__controls">
-        <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'day'" (click)="setOrderAnalyticsGrouping('day')">Día</button>
-        <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'week'" (click)="setOrderAnalyticsGrouping('week')">Semana</button>
-        <button type="button" class="tab-btn" [class.tab-btn--active]="orderAnalyticsGrouping() === 'month'" (click)="setOrderAnalyticsGrouping('month')">Mes</button>
-      </div>
-    </div>
-
-    <div class="order-analytics__label">{{ orderAnalytics()!.periodLabel }}</div>
-
-    <div class="order-analytics__charts">
-      <bc-order-period-chart
-        title="Pedidos por periodo"
-        subtitle="Volumen registrado según el rango seleccionado"
-        [series]="orderCountSeries()"
-        valueType="count">
-      </bc-order-period-chart>
-
-      <bc-order-period-chart
-        title="Ingresos por periodo"
-        subtitle="Importe total registrado por periodo"
-        [series]="orderRevenueSeries()"
-        valueType="currency">
-      </bc-order-period-chart>
-    </div>
-
-    <div class="order-analytics__tables">
-      <bc-order-status-summary [rows]="orderAnalytics()!.statusSummary"></bc-order-status-summary>
-      <bc-top-ordered-products [rows]="orderAnalytics()!.topOrderedProducts"></bc-top-ordered-products>
-    </div>
-  </section>
-
-  <section class="ticket-status-panel" *ngIf="!loading()">
-    <div class="table-header">
-      <div>
-        <h2 class="table-title">Tickets por estado</h2>
-        <p class="table-subtitle">Distribución actual del soporte técnico.</p>
-      </div>
-    </div>
-
-    <div class="ticket-status-grid">
-      <article *ngFor="let row of ticketStatusRows()" class="ticket-status-card">
-        <span class="ticket-status-card__label">{{ row.label }}</span>
-        <strong class="ticket-status-card__value">{{ row.count }}</strong>
-      </article>
-    </div>
-  </section>
 </div>

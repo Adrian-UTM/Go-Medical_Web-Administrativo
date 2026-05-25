@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { from, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { SupabaseService } from '../../../core/services/supabase.service';
 import {
   Client,
@@ -33,22 +33,46 @@ export class ClientSupabaseService {
     }
 
     if (filters?.clientType) {
-      query = query.eq('client_type', filters.clientType);
+      let mappedType: string = filters.clientType;
+      if (filters.clientType === ClientType.Hospital) {
+        mappedType = 'clinica';
+      } else if (filters.clientType === ClientType.Empresa) {
+        mappedType = 'otro';
+      }
+      query = query.eq('client_type', mappedType);
     }
 
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
 
-    return from(query).pipe(
-      map(({ data, error }) => {
-        if (error) {
-          throw this.toAppError(error.message, 'No fue posible cargar los clientes.');
-        }
+    return from(
+      this.supabase.client
+        .from('profiles')
+        .select('email')
+        .neq('role', 'client')
+    ).pipe(
+      switchMap(({ data: internalProfiles }) => {
+        const internalEmails = new Set(
+          (internalProfiles ?? [])
+            .map(p => String(p.email ?? '').trim().toLowerCase())
+            .filter(Boolean)
+        );
 
-        return (data ?? [])
-          .filter(item => this.isCommercialClientRecord(item))
-          .map(item => this.mapToLegacyClient(item));
+        return from(query).pipe(
+          map(({ data, error }) => {
+            if (error) {
+              throw this.toAppError(error.message, 'No fue posible cargar los clientes.');
+            }
+
+            return (data ?? [])
+              .filter(item => {
+                const email = String(item.email ?? '').trim().toLowerCase();
+                return !internalEmails.has(email) && this.isCommercialClientRecord(item);
+              })
+              .map(item => this.mapToLegacyClient(item));
+          })
+        );
       })
     );
   }
@@ -289,8 +313,15 @@ export class ClientSupabaseService {
       ? billingDetails
       : this.resolveShippingAddressDetails(clientData, billingDetails);
 
+    let mappedClientType = clientData.clientType ?? clientData.client_type ?? ClientType.Otro;
+    if (mappedClientType === ClientType.Hospital) {
+      mappedClientType = ClientType.Clinica;
+    } else if (mappedClientType === ClientType.Empresa) {
+      mappedClientType = ClientType.Otro;
+    }
+
     const payload: Record<string, any> = {
-      client_type: clientData.clientType ?? clientData.client_type ?? ClientType.Otro,
+      client_type: mappedClientType,
       status: clientData.status ?? ClientStatus.Active,
       business_name: this.toNullable(clientData.businessName ?? clientData.business_name),
       trade_name: this.toNullable(clientData.tradeName ?? clientData.trade_name),

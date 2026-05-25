@@ -1,26 +1,51 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
+import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RevenueSummaryCardsComponent } from '../../components/revenue-summary-cards/revenue-summary-cards.component';
 import { TopProductsTableComponent } from '../../components/top-products-table/top-products-table.component';
 import { LowProductsTableComponent } from '../../components/low-products-table/low-products-table.component';
 import { TopCustomersTableComponent } from '../../components/top-customers-table/top-customers-table.component';
-import { OrderPeriodChartComponent, OrderPeriodChartDatum } from '../../../orders/components/order-period-chart/order-period-chart.component';
-import { OrderStatusSummaryComponent } from '../../../orders/components/order-status-summary/order-status-summary.component';
-import { TopOrderedProductsComponent } from '../../../orders/components/top-ordered-products/top-ordered-products.component';
-import { buildOrderStatsSnapshot } from '../../../orders/utils/order-stats.helper';
-import { Order, OrderStatsGrouping, OrderStatsSnapshot } from '../../../../models/order.model';
+import { OrderStatus } from '../../../../models/order.model';
 import {
   CustomerSalesRow,
   ProductLowSalesRow,
   ProductSalesRow,
+  ReportDistributionRow,
   ReportFilters,
   ReportKpis,
+  ReportPeriodMode,
   TicketStatusRow,
 } from '../../models/report.model';
 import { ReportsSupabaseService } from '../../services/reports.supabase.service';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
+
+type ChartTone = 'teal' | 'aqua' | 'mint' | 'amber' | 'rose' | 'slate';
+
+interface KpiCard {
+  label: string;
+  value: string;
+  description: string;
+  tone: ChartTone;
+  icon: string;
+}
+
+interface ChartSegment {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+  formattedValue: string;
+  percent: number;
+}
+
+interface DonutChart {
+  title: string;
+  subtitle: string;
+  centerLabel: string;
+  centerValue: string;
+  emptyText: string;
+  segments: ChartSegment[];
+}
 
 @Component({
   selector: 'bc-reports-dashboard',
@@ -28,16 +53,11 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
   imports: [
     NgIf,
     NgFor,
-    NgClass,
     DatePipe,
     FormsModule,
-    RevenueSummaryCardsComponent,
     TopProductsTableComponent,
     LowProductsTableComponent,
     TopCustomersTableComponent,
-    OrderPeriodChartComponent,
-    OrderStatusSummaryComponent,
-    TopOrderedProductsComponent,
   ],
   templateUrl: './reports-dashboard.component.html',
   styleUrl: './reports-dashboard.component.css',
@@ -47,6 +67,7 @@ export class ReportsDashboardComponent implements OnInit {
   private readonly pageVisibility = inject(PageVisibilityService);
   private readonly destroyRef = inject(DestroyRef);
 
+  private readonly palette = ['#2C6975', '#68B2A0', '#8CC7BA', '#CDE0C9', '#F5C453', '#BC4B51', '#627F83'];
   private loadInFlight = false;
 
   readonly loading = signal(false);
@@ -58,18 +79,18 @@ export class ReportsDashboardComponent implements OnInit {
   readonly topProducts = signal<ProductSalesRow[]>([]);
   readonly lowProducts = signal<ProductLowSalesRow[]>([]);
   readonly topCustomers = signal<CustomerSalesRow[]>([]);
-  readonly orderAnalyticsOrders = signal<Order[]>([]);
-  readonly orderAnalytics = signal<OrderStatsSnapshot | null>(null);
   readonly ticketStatusRows = signal<TicketStatusRow[]>([]);
-  readonly orderAnalyticsGrouping = signal<OrderStatsGrouping>('day');
-  readonly orderCountSeries = signal<OrderPeriodChartDatum[]>([]);
-  readonly orderRevenueSeries = signal<OrderPeriodChartDatum[]>([]);
+  readonly revenueByCategoryRows = signal<ReportDistributionRow[]>([]);
+  readonly catalogDistributionRows = signal<ReportDistributionRow[]>([]);
+  readonly orderStatusRows = signal<ReportDistributionRow[]>([]);
 
   readonly hasAnyData = computed(() => {
     const kpis = this.kpis();
     return !!kpis && (
       kpis.totalRevenue > 0 ||
       kpis.totalOrders > 0 ||
+      kpis.activeClients > 0 ||
+      kpis.openTickets > 0 ||
       this.topProducts().length > 0 ||
       this.lowProducts().length > 0 ||
       this.topCustomers().length > 0 ||
@@ -77,34 +98,119 @@ export class ReportsDashboardComponent implements OnInit {
     );
   });
 
-  readonly reportHighlights = computed(() => {
+  readonly kpiCards = computed<KpiCard[]>(() => {
     const kpis = this.kpis();
     if (!kpis) {
-      return [] as Array<{ label: string; value: string; tone: 'primary' | 'success' | 'warning' }>;
+      return [];
     }
 
     return [
       {
-        label: 'Pedidos analizados',
-        value: new Intl.NumberFormat('es-MX').format(kpis.totalOrders),
-        tone: 'primary' as const,
+        label: 'Total de pedidos',
+        value: this.formatNumber(kpis.totalOrders),
+        description: 'Pedidos completados en el periodo',
+        tone: 'teal',
+        icon: '□',
+      },
+      {
+        label: 'Ingresos totales',
+        value: this.formatCurrency(kpis.totalRevenue),
+        description: 'Venta confirmada por pedidos pagados o entregados',
+        tone: 'aqua',
+        icon: '$',
       },
       {
         label: 'Ticket promedio',
-        value: new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(kpis.avgTicket),
-        tone: 'success' as const,
+        value: this.formatCurrency(kpis.avgTicket),
+        description: 'Valor promedio por pedido completado',
+        tone: 'mint',
+        icon: '↗',
       },
       {
-        label: 'Ingreso estimado',
-        value: new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(kpis.totalRevenue),
-        tone: 'warning' as const,
+        label: 'Clientes activos',
+        value: this.formatNumber(kpis.activeClients),
+        description: 'Cuentas comerciales disponibles',
+        tone: 'slate',
+        icon: '◎',
+      },
+      {
+        label: 'Tickets abiertos',
+        value: this.formatNumber(kpis.openTickets),
+        description: 'Solicitudes técnicas en seguimiento',
+        tone: 'amber',
+        icon: '!',
+      },
+      {
+        label: 'Stock bajo',
+        value: this.formatNumber(kpis.lowStockProducts),
+        description: 'Productos físicos bajo mínimo definido',
+        tone: 'rose',
+        icon: '↓',
       },
     ];
   });
 
-  filters: ReportFilters = {};
-  dateFrom = '';
-  dateTo = '';
+  readonly orderStatusChart = computed<DonutChart>(() => {
+    const rows = this.orderStatusRows().filter(row => row.value > 0);
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    return {
+      title: 'Pedidos por estado',
+      subtitle: 'Distribución operativa de pedidos en el rango seleccionado',
+      centerLabel: 'Pedidos',
+      centerValue: this.formatNumber(total),
+      emptyText: 'Aún no hay suficientes datos para mostrar esta distribución.',
+      segments: this.toChartSegments(rows, 'number'),
+    };
+  });
+
+  readonly revenueCategoryChart = computed<DonutChart>(() => {
+    const rows = this.revenueByCategoryRows().filter(row => row.value > 0);
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    return {
+      title: 'Ingresos por categoría',
+      subtitle: 'Participación comercial por tipo de producto o servicio',
+      centerLabel: 'Ingresos',
+      centerValue: this.formatCurrency(total),
+      emptyText: 'Aún no hay suficientes datos para mostrar esta distribución.',
+      segments: this.toChartSegments(rows, 'currency'),
+    };
+  });
+
+  readonly ticketStatusChart = computed<DonutChart>(() => {
+    const rows = this.ticketStatusRows()
+      .filter(row => row.count > 0)
+      .map(row => ({ key: row.status, label: row.label, value: row.count }));
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    return {
+      title: 'Tickets por estado',
+      subtitle: 'Carga actual de soporte técnico y seguimiento',
+      centerLabel: 'Tickets',
+      centerValue: this.formatNumber(total),
+      emptyText: 'Aún no hay suficientes datos para mostrar esta distribución.',
+      segments: this.toChartSegments(rows, 'number'),
+    };
+  });
+
+  readonly mainCharts = computed(() => [this.orderStatusChart(), this.revenueCategoryChart()]);
+  readonly secondaryCharts = computed(() => [this.ticketStatusChart(), this.catalogChart()]);
+
+  readonly catalogChart = computed<DonutChart>(() => {
+    const rows = this.catalogDistributionRows().filter(row => row.value > 0);
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    return {
+      title: 'Catálogo por tipo',
+      subtitle: 'Composición entre productos nuevos, seminuevos y servicios',
+      centerLabel: 'Registros',
+      centerValue: this.formatNumber(total),
+      emptyText: 'Aún no hay suficientes datos para mostrar esta distribución.',
+      segments: this.toChartSegments(rows, 'number'),
+    };
+  });
+
+  filters: ReportFilters = this.createPeriodFilters('day');
+  periodMode: ReportPeriodMode = 'day';
+  dateFrom = this.filters.dateFrom ?? '';
+  dateTo = this.filters.dateTo ?? '';
   activeTab: 'top' | 'low' | 'customers' = 'top';
   lastUpdated = new Date().toISOString();
 
@@ -122,8 +228,16 @@ export class ReportsDashboardComponent implements OnInit {
     this.dateFrom = this.normalizeReportDate(this.dateFrom);
     this.dateTo = this.normalizeReportDate(this.dateTo);
 
+    if (this.dateFrom && !this.dateTo) {
+      this.dateTo = this.dateFrom;
+    }
+
+    if (this.dateTo && !this.dateFrom) {
+      this.dateFrom = this.dateTo;
+    }
+
     this.filters = {
-      ...this.filters,
+      periodMode: this.periodMode,
       dateFrom: this.dateFrom || undefined,
       dateTo: this.dateTo || undefined,
     };
@@ -131,19 +245,24 @@ export class ReportsDashboardComponent implements OnInit {
   }
 
   async clearFilters(): Promise<void> {
-    this.filters = {};
-    this.dateFrom = '';
-    this.dateTo = '';
+    this.setPeriodMode('day');
+    await this.loadData();
+  }
+
+  setPeriodMode(mode: ReportPeriodMode): void {
+    this.periodMode = mode;
+    this.filters = this.createPeriodFilters(mode);
+    this.dateFrom = this.filters.dateFrom ?? '';
+    this.dateTo = this.filters.dateTo ?? '';
+  }
+
+  async applyPeriodMode(mode: ReportPeriodMode): Promise<void> {
+    this.setPeriodMode(mode);
     await this.loadData();
   }
 
   setTab(tab: 'top' | 'low' | 'customers'): void {
     this.activeTab = tab;
-  }
-
-  setOrderAnalyticsGrouping(grouping: OrderStatsGrouping): void {
-    this.orderAnalyticsGrouping.set(grouping);
-    this.rebuildOrderAnalytics();
   }
 
   openDatePicker(input: HTMLInputElement): void {
@@ -166,6 +285,15 @@ export class ReportsDashboardComponent implements OnInit {
     this.dateTo = normalized;
   }
 
+  get periodLabel(): string {
+    const labels: Record<ReportPeriodMode, string> = {
+      day: 'Día',
+      week: 'Semana',
+      month: 'Mes',
+    };
+
+    return labels[this.periodMode];
+  }
   formatFilterDate(value: string): string {
     if (!value) {
       return 'Seleccionar fecha';
@@ -178,6 +306,30 @@ export class ReportsDashboardComponent implements OnInit {
       month: 'short',
       year: 'numeric',
     }).format(date);
+  }
+
+  donutBackground(segments: ChartSegment[]): string {
+    if (!segments.length) {
+      return 'conic-gradient(#E8F5F2 0deg 360deg)';
+    }
+
+    let cursor = 0;
+    const stops = segments.map(segment => {
+      const start = cursor;
+      const end = cursor + (segment.percent * 3.6);
+      cursor = end;
+      return `${segment.color} ${start}deg ${end}deg`;
+    });
+
+    return `conic-gradient(${stops.join(', ')})`;
+  }
+
+  trackBySegment(_: number, segment: ChartSegment): string {
+    return segment.key;
+  }
+
+  trackByKpi(_: number, card: KpiCard): string {
+    return card.label;
   }
 
   private async loadData(): Promise<void> {
@@ -196,8 +348,9 @@ export class ReportsDashboardComponent implements OnInit {
       this.lowProducts.set(snapshot.lowProducts);
       this.topCustomers.set(snapshot.topCustomers);
       this.ticketStatusRows.set(snapshot.ticketStatusRows);
-      this.orderAnalyticsOrders.set(snapshot.orderAnalyticsOrders);
-      this.rebuildOrderAnalytics(snapshot.orderAnalyticsOrders, this.filters.dateFrom, this.filters.dateTo);
+      this.revenueByCategoryRows.set(snapshot.revenueByCategoryRows);
+      this.catalogDistributionRows.set(snapshot.catalogDistributionRows);
+      this.orderStatusRows.set(this.buildOrderStatusRows(snapshot.orderAnalyticsOrders));
       this.lastUpdated = new Date().toISOString();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'No se pudo cargar la información.');
@@ -206,29 +359,101 @@ export class ReportsDashboardComponent implements OnInit {
       this.lowProducts.set([]);
       this.topCustomers.set([]);
       this.ticketStatusRows.set([]);
-      this.orderAnalyticsOrders.set([]);
-      this.orderAnalytics.set(null);
-      this.orderCountSeries.set([]);
-      this.orderRevenueSeries.set([]);
+      this.revenueByCategoryRows.set([]);
+      this.catalogDistributionRows.set([]);
+      this.orderStatusRows.set([]);
     } finally {
       this.loadInFlight = false;
       this.loading.set(false);
     }
   }
 
-  private rebuildOrderAnalytics(orders: Order[] = this.orderAnalyticsOrders(), dateFrom?: string, dateTo?: string): void {
-    const snapshot = buildOrderStatsSnapshot(orders, {
-      periodPreset: this.dateFrom || this.dateTo ? 'custom' : 'last_30_days',
-      grouping: this.orderAnalyticsGrouping(),
-      dateFrom: dateFrom || this.dateFrom || undefined,
-      dateTo: dateTo || this.dateTo || undefined,
-    });
+  private buildOrderStatusRows(orders: Array<{ status: OrderStatus }>): ReportDistributionRow[] {
+    const labels: Record<OrderStatus, string> = {
+      [OrderStatus.Draft]: 'Borrador',
+      [OrderStatus.PendingReview]: 'Pendiente',
+      [OrderStatus.PendingPayment]: 'Pendiente de pago',
+      [OrderStatus.Paid]: 'Pagado',
+      [OrderStatus.Processing]: 'En proceso',
+      [OrderStatus.Shipped]: 'Enviado',
+      [OrderStatus.Delivered]: 'Entregado',
+      [OrderStatus.Canceled]: 'Cancelado',
+    };
 
-    this.orderAnalytics.set(snapshot);
-    this.orderCountSeries.set(snapshot.periodPoints.map(point => ({ label: point.label, value: point.ordersCount })));
-    this.orderRevenueSeries.set(snapshot.periodPoints.map(point => ({ label: point.label, value: point.revenue })));
+    const sequence = [
+      OrderStatus.PendingReview,
+      OrderStatus.PendingPayment,
+      OrderStatus.Paid,
+      OrderStatus.Processing,
+      OrderStatus.Shipped,
+      OrderStatus.Delivered,
+      OrderStatus.Canceled,
+      OrderStatus.Draft,
+    ];
+
+    return sequence.map(status => ({
+      key: status,
+      label: labels[status],
+      value: orders.filter(order => order.status === status).length,
+    }));
   }
 
+  private toChartSegments(rows: ReportDistributionRow[], valueType: 'number' | 'currency'): ChartSegment[] {
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    if (total <= 0) {
+      return [];
+    }
+
+    return rows.map((row, index) => ({
+      key: row.key,
+      label: row.label,
+      value: row.value,
+      color: this.palette[index % this.palette.length],
+      formattedValue: valueType === 'currency' ? this.formatCurrency(row.value) : this.formatNumber(row.value),
+      percent: Math.round((row.value / total) * 1000) / 10,
+    }));
+  }
+
+  private formatCurrency(value: number): string {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      maximumFractionDigits: 0,
+    }).format(value || 0);
+  }
+
+  private formatNumber(value: number): string {
+    return new Intl.NumberFormat('es-MX').format(value || 0);
+  }
+
+  private createPeriodFilters(mode: ReportPeriodMode): ReportFilters {
+    const today = new Date();
+    const range = this.getPeriodRange(mode, today);
+    return {
+      periodMode: mode,
+      dateFrom: this.toDateInputValue(range.from),
+      dateTo: this.toDateInputValue(range.to),
+    };
+  }
+
+  private getPeriodRange(mode: ReportPeriodMode, baseDate: Date): { from: Date; to: Date } {
+    if (mode === 'week') {
+      const day = baseDate.getDay();
+      const mondayOffset = day === 0 ? -6 : 1 - day;
+      const from = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + mondayOffset);
+      const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6);
+      return { from, to };
+    }
+
+    if (mode === 'month') {
+      return {
+        from: new Date(baseDate.getFullYear(), baseDate.getMonth(), 1),
+        to: new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0),
+      };
+    }
+
+    return { from: baseDate, to: baseDate };
+  }
   private normalizeReportDate(value: string): string {
     if (!value) {
       return '';

@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { ClientSupabaseService } from '../../clients/services/client.supabase.service';
 import { ProductSupabaseService } from '../../products/services/product.supabase.service';
 import { Client, ClientStatus } from '../../../core/models/client.model';
-import { Product } from '../../../models/product.model';
+import { Product, ProductItemType } from '../../../models/product.model';
 import {
   ServiceTicket,
   TicketFilters,
@@ -11,16 +11,18 @@ import {
   TicketPriority,
   TicketStatus,
   TicketType,
+  TicketTechnician,
   TicketUpsertPayload,
 } from '../models/ticket.model';
 import { SupabaseService } from '../../../core/services/supabase.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class TicketSupabaseService {
   private readonly tableName = 'service_tickets';
   private readonly profilesTable = 'profiles';
 
-  private readonly _technicians = signal<string[]>([]);
+  private readonly _technicians = signal<TicketTechnician[]>([]);
   readonly technicians = computed(() => this._technicians());
   private techniciansLoaded = false;
   private techniciansLoadingPromise: Promise<void> | null = null;
@@ -29,15 +31,35 @@ export class TicketSupabaseService {
     private readonly supabase: SupabaseService,
     private readonly clientsService: ClientSupabaseService,
     private readonly productsService: ProductSupabaseService,
+    private readonly authService: AuthService,
   ) {
     void this.loadTechnicians();
   }
 
   async getTickets(filters?: TicketFilters): Promise<ServiceTicket[]> {
+    await this.loadTechnicians();
+
     const response = await this.supabase.client
       .from(this.tableName)
-      .select('*')
-      .order('requested_at', { ascending: false });
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
+      .order('created_at', { ascending: false });
 
     if (response.error) {
       throw this.toAppError(response.error.message, 'No fue posible cargar los tickets de soporte.');
@@ -74,9 +96,28 @@ export class TicketSupabaseService {
   }
 
   async getTicketById(id: string): Promise<ServiceTicket | undefined> {
+    await this.loadTechnicians();
+
     const response = await this.supabase.client
       .from(this.tableName)
-      .select('*')
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
       .eq('id', id)
       .single();
 
@@ -102,11 +143,20 @@ export class TicketSupabaseService {
   }
 
   async getTechnicians(): Promise<string[]> {
+    const technicians = await this.getTechnicianProfiles();
+    return technicians.map(technician => technician.fullName);
+  }
+
+  async getTechnicianProfiles(): Promise<TicketTechnician[]> {
     if (!this.techniciansLoaded) {
       await this.loadTechnicians();
     }
 
     return this._technicians();
+  }
+
+  supportsExternalTechnicianName(): boolean {
+    return true;
   }
 
   async getClientById(id: string): Promise<Client | undefined> {
@@ -117,95 +167,101 @@ export class TicketSupabaseService {
     }
   }
 
+  async getProductById(id: string): Promise<Product | undefined> {
+    try {
+      return await firstValueFrom(this.productsService.getProductById(id));
+    } catch {
+      return undefined;
+    }
+  }
+
   async createTicket(payload: TicketUpsertPayload): Promise<ServiceTicket | undefined> {
-    const client = await this.getClientById(payload.clientId);
-    const product = payload.productId ? (await this.getAvailableProducts()).find(item => item.id === payload.productId) : undefined;
-
-    const insertPayload: Record<string, unknown> = {
-      ticket_number: await this.generateNextTicketNumber(),
-      client_id: payload.clientId,
-      client_name_snapshot: payload.clientNameSnapshot?.trim() || client?.businessName || '',
-      title: payload.title.trim(),
-      description: payload.description.trim(),
-      status: payload.status ?? TicketStatus.Open,
-      priority: payload.priority,
-      type: payload.type,
-      product_id: payload.productId || null,
-      product_name_snapshot: payload.productNameSnapshot?.trim() || product?.name || null,
-      requested_at: new Date().toISOString(),
-      scheduled_at: payload.scheduledAt || null,
-      notes: payload.notes?.trim() || '',
-      attachments: payload.attachments ?? null,
-    };
-
-    // Use actual DB columns if present in payload
-    if ('assignedTechnicianId' in payload) insertPayload['assigned_technician_id'] = (payload as any).assignedTechnicianId;
-    if ('equipmentUnitId' in payload) insertPayload['equipment_unit_id'] = (payload as any).equipmentUnitId;
+    const insertPayload = await this.buildDbPayload(payload);
 
     const { data, error } = await this.supabase.client
       .from(this.tableName)
       .insert(insertPayload)
-      .select('*')
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
       .single();
 
     if (error) {
-      console.error('[Tickets] Error creating ticket', { payload: insertPayload, error });
+      console.error('[Tickets] Error creating ticket', {
+        payload: insertPayload,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
       throw this.toAppError(error.message, 'No fue posible crear el ticket.');
     }
 
     return this.mapTicket(data);
   }
-
   async updateTicket(id: string, payload: TicketUpsertPayload): Promise<ServiceTicket | undefined> {
     const current = await this.getRawTicket(id);
     if (!current) {
       return undefined;
     }
 
-    const history = this.appendHistoryIfSupported(current, {
-      status: payload.status ?? (current.status as TicketStatus) ?? TicketStatus.Open,
-      comment: 'Se actualizaron datos administrativos del ticket.',
-      authorName: 'Mesa de soporte',
-    });
-
-    const updatePayload: Record<string, unknown> = {
-      client_id: payload.clientId,
-      client_name_snapshot: payload.clientNameSnapshot ?? current.client_name_snapshot ?? '',
-      title: payload.title.trim(),
-      description: payload.description.trim(),
-      status: payload.status ?? current.status,
-      priority: payload.priority,
-      type: payload.type,
-      product_id: payload.productId || null,
-      product_name_snapshot: payload.productNameSnapshot || null,
-      scheduled_at: payload.scheduledAt || null,
-      notes: payload.notes?.trim() || '',
-      attachments: payload.attachments ?? current.attachments ?? null,
-      updated_at: new Date().toISOString(),
-    };
-
-    if ('assignedTechnicianId' in payload) updatePayload['assigned_technician_id'] = (payload as any).assignedTechnicianId;
-    if ('equipmentUnitId' in payload) updatePayload['equipment_unit_id'] = (payload as any).equipmentUnitId;
-
-    if (history) {
-      updatePayload['history'] = history;
-    }
+    const updatePayload = await this.buildDbPayload(payload, true);
+    updatePayload['updated_at'] = new Date().toISOString();
 
     const { data, error } = await this.supabase.client
       .from(this.tableName)
       .update(updatePayload)
       .eq('id', id)
-      .select('*')
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
       .single();
 
     if (error) {
-      console.error('[Tickets] Error updating ticket', { payload: updatePayload, error });
+      console.error('[Tickets] Error updating ticket', {
+        payload: updatePayload,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
       throw this.toAppError(error.message, 'No fue posible actualizar el ticket.');
     }
 
     return this.mapTicket(data);
   }
-
   async updateTicketStatus(
     id: string,
     status: TicketStatus,
@@ -231,7 +287,24 @@ export class TicketSupabaseService {
       .from(this.tableName)
       .update(updatePayload)
       .eq('id', id)
-      .select('*')
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
       .single();
 
     if (error) {
@@ -244,7 +317,7 @@ export class TicketSupabaseService {
 
   async assignTechnician(
     id: string,
-    technicianName: string,
+    technicianId: string,
     authorName = 'Coordinacion tecnica'
   ): Promise<ServiceTicket | undefined> {
     const current = await this.getRawTicket(id);
@@ -256,11 +329,13 @@ export class TicketSupabaseService {
     const updatePayload: Record<string, unknown> = {
       status: nextStatus,
       updated_at: new Date().toISOString(),
+      assigned_technician_id: this.normalizeUuid(technicianId),
+      assigned_technician_custom_name: null,
     };
 
     const history = this.appendHistoryIfSupported(current, {
       status: nextStatus,
-      comment: `Ticket asignado a ${technicianName}.`,
+      comment: `Ticket asignado a ${this._technicians().find(technician => technician.id === technicianId)?.fullName ?? 'tecnico'}.`,
       authorName,
     });
 
@@ -272,17 +347,108 @@ export class TicketSupabaseService {
       .from(this.tableName)
       .update(updatePayload)
       .eq('id', id)
-      .select('*')
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
       .single();
 
     if (error) {
-      console.error('[Tickets] Error assigning technician', { ticketId: id, technicianName, error });
+      console.error('[Tickets] Error assigning technician', { ticketId: id, technicianId, error });
       throw this.toAppError(error.message, 'No fue posible asignar el técnico.');
     }
 
     return this.mapTicket(data);
   }
 
+  private async buildDbPayload(payload: TicketUpsertPayload, isUpdate = false): Promise<Record<string, unknown>> {
+    const product = payload.productId ? (await this.getAvailableProducts()).find(item => item.id === payload.productId) : undefined;
+    const equipmentUnitId = await this.resolveEquipmentUnitId(payload, product);
+    const assignedTechnicianId = this.normalizeUuid(payload.assignedTechnicianId);
+    const assignedTechnicianCustomName = assignedTechnicianId
+      ? null
+      : payload.assignedTechnicianCustomName?.trim() || null;
+
+    const dbPayload: Record<string, unknown> = {
+      client_id: payload.clientId,
+      product_id: this.normalizeUuid(payload.productId),
+      title: payload.title?.trim(),
+      description: payload.description?.trim() || null,
+      status: payload.status ?? TicketStatus.Open,
+      priority: payload.priority,
+      type: payload.type,
+      equipment_unit_id: equipmentUnitId,
+      assigned_technician_id: assignedTechnicianId,
+      assigned_technician_custom_name: assignedTechnicianCustomName,
+    };
+
+    if (!isUpdate) {
+      const currentUserId = this.normalizeUuid(this.authService.currentUserId());
+      if (currentUserId) {
+        dbPayload['requested_by'] = currentUserId;
+      }
+    }
+
+    return dbPayload;
+  }
+
+  private async resolveEquipmentUnitId(payload: TicketUpsertPayload, product?: Product): Promise<string | null> {
+    const explicitEquipmentId = this.normalizeUuid(payload.equipmentUnitId);
+    if (explicitEquipmentId) {
+      return explicitEquipmentId;
+    }
+
+    if (!product || (product.item_type ?? ProductItemType.Product) === ProductItemType.Service) {
+      return null;
+    }
+
+    const serialNumber = payload.equipmentSerialNumber?.trim();
+    if (!serialNumber) {
+      return null;
+    }
+
+    const { data, error } = await this.supabase.client
+      .from('equipment_units')
+      .select('id')
+      .eq('product_id', product.id)
+      .eq('serial_number', serialNumber)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[Tickets] No fue posible resolver equipment_unit_id', {
+        productId: product.id,
+        serialNumber,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      return null;
+    }
+
+    return this.normalizeUuid(data?.id);
+  }
+
+  private normalizeUuid(value?: string | null): string | null {
+    const normalized = String(value ?? '').trim();
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidPattern.test(normalized) ? normalized : null;
+  }
   private async loadTechnicians(): Promise<void> {
     if (this.techniciansLoadingPromise) {
       await this.techniciansLoadingPromise;
@@ -297,7 +463,7 @@ export class TicketSupabaseService {
   private async fetchTechnicians(): Promise<void> {
     const { data, error } = await this.supabase.client
       .from(this.profilesTable)
-      .select('full_name, role, is_active');
+      .select('id, full_name, email, role, is_active');
 
     if (error) {
       this._technicians.set([]);
@@ -305,13 +471,17 @@ export class TicketSupabaseService {
       return;
     }
 
-    const names = (data ?? [])
+    const technicians = (data ?? [])
       .filter((profile: any) => profile.is_active !== false)
-      .filter((profile: any) => ['tech', 'technician', 'manager', 'admin'].includes(String(profile.role ?? '').toLowerCase()))
-      .map((profile: any) => String(profile.full_name ?? '').trim())
-      .filter(Boolean);
+      .filter((profile: any) => ['technician', 'staff', 'admin'].includes(String(profile.role ?? '').toLowerCase()))
+      .map((profile: any) => ({
+        id: String(profile.id ?? ''),
+        fullName: String(profile.full_name ?? profile.email ?? '').trim(),
+        role: profile.role ? String(profile.role) : undefined,
+      }))
+      .filter((technician: TicketTechnician) => this.normalizeUuid(technician.id) && technician.fullName);
 
-    this._technicians.set([...new Set(names)].sort((a, b) => a.localeCompare(b, 'es-MX')));
+    this._technicians.set(technicians.sort((a, b) => a.fullName.localeCompare(b.fullName, 'es-MX')));
     this.techniciansLoaded = true;
   }
 
@@ -320,20 +490,52 @@ export class TicketSupabaseService {
       ? row.history.map((item: any, index: number) => this.mapHistoryItem(item, row.status, index))
       : [];
 
+    const assignedTechnicianId = this.normalizeUuid(row.assigned_technician_id);
+    const assignedTechnicianCustomName = String(row.assigned_technician_custom_name ?? '').trim() || undefined;
+    const assignedTechnician = assignedTechnicianId
+      ? this._technicians().find(technician => technician.id === assignedTechnicianId)
+      : undefined;
+
+    // Resolver detalles del cliente vía join relacional
+    const clientObj = row.clients;
+    let clientName = 'Cliente no asociado';
+    if (clientObj) {
+      clientName = clientObj.trade_name 
+        ? `${clientObj.business_name} (${clientObj.trade_name})` 
+        : clientObj.business_name;
+    } else if (row.client_name_snapshot) {
+      clientName = row.client_name_snapshot;
+    }
+
+    // Resolver detalles del producto vía join relacional
+    const productObj = row.products;
+    let productName = 'Sin asociar';
+    if (productObj) {
+      productName = productObj.name;
+    } else if (row.product_name_snapshot) {
+      productName = row.product_name_snapshot;
+    }
+
+    // Resolver número de serie del equipo vía join relacional
+    const eqObj = row.equipment_units;
+    const serialNumber = eqObj ? eqObj.serial_number : (row.equipment_serial_number ?? undefined);
+
     return {
       id: String(row.id),
       ticketNumber: row.ticket_number ?? row.ticketNumber ?? 'Sin folio',
       clientId: String(row.client_id ?? ''),
-      clientNameSnapshot: row.client_name_snapshot ?? 'Cliente no disponible',
+      clientNameSnapshot: clientName,
       title: row.title ?? '',
       description: row.description ?? '',
       status: (row.status ?? TicketStatus.Open) as TicketStatus,
       priority: (row.priority ?? TicketPriority.Medium) as TicketPriority,
       type: (row.type ?? TicketType.Other) as TicketType,
       productId: row.product_id ?? undefined,
-      productNameSnapshot: row.product_name_snapshot ?? undefined,
-      equipmentSerialNumber: row.equipment_serial_number ?? undefined,
-      assignedTechnicianName: row.assigned_technician_name ?? row.assigned_technician?.full_name ?? undefined,
+      productNameSnapshot: productName,
+      equipmentSerialNumber: serialNumber,
+      assignedTechnicianId: assignedTechnicianId ?? undefined,
+      assignedTechnicianCustomName,
+      assignedTechnicianName: assignedTechnicianCustomName ?? assignedTechnician?.fullName ?? row.assigned_technician?.full_name ?? undefined,
       requestedAt: row.requested_at ?? row.created_at ?? new Date().toISOString(),
       scheduledAt: row.scheduled_at ?? undefined,
       updatedAt: row.updated_at ?? row.requested_at ?? new Date().toISOString(),
@@ -416,8 +618,3 @@ export class TicketSupabaseService {
     return new Error(fallback);
   }
 }
-
-
-
-
-

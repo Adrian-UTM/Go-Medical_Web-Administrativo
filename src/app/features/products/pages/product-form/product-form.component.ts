@@ -158,7 +158,7 @@ export class ProductFormComponent implements OnInit {
     this.form.get('item_type')?.valueChanges.subscribe(value => this.applyItemTypeRules(value));
     this.form.get('product_condition')?.valueChanges.subscribe(value => this.applyConditionRules(value));
     this.productId = this.route.snapshot.paramMap.get('id');
-    this.isEditMode = !!this.productId && this.route.snapshot.url.some(s => s.path === 'editar');
+    this.isEditMode = !!this.productId;
 
     if (this.isEditMode && this.productId) {
       this.isLoadingData.set(true);
