@@ -263,7 +263,7 @@ export class OrderSupabaseService {
       clientId: String(row.client_id ?? ''),
       clientNameSnapshot: row.client_name_snapshot ?? 'Cliente no disponible',
       status: this.normalizeStatus(row.status),
-      items: itemRows.map(item => this.mapOrderItem(item, productMap)),
+      items: this.dedupeExactOrderItems(itemRows.map(item => this.mapOrderItem(item, productMap))),
       subtotal: Number(row.subtotal ?? 0),
       taxPct: Number(row.tax_pct ?? DEFAULT_ORDER_TAX_PCT),
       taxExempt: !!row.tax_exempt,
@@ -279,6 +279,8 @@ export class OrderSupabaseService {
     const product = productMap.get(String(row.product_id ?? ''));
 
     return {
+      id: String(row.id ?? ''),
+      orderItemId: String(row.id ?? ''),
       productId: String(row.product_id ?? ''),
       sku: row.sku_snapshot ?? row.sku ?? product?.sku ?? '',
       productName: row.product_name_snapshot ?? row.product_name ?? product?.name ?? '',
@@ -290,7 +292,7 @@ export class OrderSupabaseService {
   }
 
   private normalizeDraftItems(items: OrderItemDraft[], products: Product[]): OrderItemDraft[] {
-    return items
+    const normalized = items
       .filter(item => item.productId)
       .map(item => {
         const product = products.find(candidate => candidate.id === item.productId);
@@ -306,6 +308,46 @@ export class OrderSupabaseService {
           unitPrice,
         };
       });
+
+    const registry = new Map<string, OrderItemDraft>();
+    normalized.forEach(item => {
+      const key = [
+        item.productId,
+        item.sku ?? '',
+        item.productName ?? '',
+        item.productCategory ?? '',
+        item.quantity,
+        item.unitPrice ?? 0,
+      ].join('|');
+
+      if (!registry.has(key)) {
+        registry.set(key, item);
+      }
+    });
+
+    return Array.from(registry.values());
+  }
+
+  private dedupeExactOrderItems(items: OrderItem[]): OrderItem[] {
+    const registry = new Map<string, OrderItem>();
+
+    items.forEach(item => {
+      const key = [
+        item.productId,
+        item.sku,
+        item.productName,
+        item.productCategory,
+        item.quantity,
+        item.unitPrice,
+        item.totalLinePrice,
+      ].join('|');
+
+      if (!registry.has(key)) {
+        registry.set(key, item);
+      }
+    });
+
+    return Array.from(registry.values());
   }
 
   private mapOrderItemInsertPayload(orderId: string, item: OrderItemDraft): Record<string, unknown> {

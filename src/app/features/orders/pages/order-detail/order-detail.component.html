@@ -53,10 +53,10 @@
     <div class="order-hero__side">
       <div class="action-card">
         <span class="action-card__label">Acciones del pedido</span>
-        <button type="button" class="btn-primary" (click)="markAsPaid()">Marcar como pagado</button>
-        <button type="button" class="btn-secondary btn-secondary--block" (click)="markAsShipped()">Marcar como enviado</button>
-        <button type="button" class="btn-warning btn-warning--block" (click)="cancelOrder()" [disabled]="order()!.status === 'canceled'">Cancelar pedido</button>
-        <button type="button" class="btn-danger btn-danger--block" (click)="cancelOrderFromAction()" [disabled]="isCanceling() || order()!.status === 'canceled'">
+        <a *ngIf="canRegisterReturn()" [routerLink]="['/pedidos', order()!.id, 'devolucion', 'nueva']" class="btn-secondary btn-secondary--block">Registrar devolucion</a>
+        <button *ngIf="canMarkAsPaid()" type="button" class="btn-primary btn-primary--block" (click)="markAsPaid()">Marcar como pagado</button>
+        <button *ngIf="canMarkAsShipped()" type="button" class="btn-secondary btn-secondary--block" (click)="markAsShipped()">Marcar como enviado</button>
+        <button *ngIf="canCancelOrder()" type="button" class="btn-danger btn-danger--block" (click)="cancelOrderFromAction()" [disabled]="isCanceling()">
           <span *ngIf="!isCanceling()">Cancelar pedido</span>
           <span *ngIf="isCanceling()">Cancelando...</span>
         </button>
@@ -130,6 +130,7 @@
   <p>El pedido no fue encontrado.</p>
   <a routerLink="/pedidos" class="btn-ghost">← Volver a pedidos</a>
 </div>
+
 
 
 

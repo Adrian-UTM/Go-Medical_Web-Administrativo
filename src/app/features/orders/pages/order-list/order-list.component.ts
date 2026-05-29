@@ -13,6 +13,15 @@ import { Order, OrderStatsPeriodPreset, OrderStatus } from '../../../../models/o
 import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 import { SupabaseService } from '../../../../core/services/supabase.service';
+import { ReturnRequestsSupabaseService } from '../../services/return-requests.supabase.service';
+import {
+  RETURN_REASON_LABELS,
+  RETURN_REQUEST_STATUS_LABELS,
+  RETURN_REQUEST_STATUS_VARIANTS,
+  ReturnReasonType,
+  ReturnRequest,
+  ReturnRequestStatus,
+} from '../../../../models/return-request.model';
 
 @Component({
   selector: 'bc-order-list',
@@ -34,17 +43,26 @@ import { SupabaseService } from '../../../../core/services/supabase.service';
 })
 export class OrderListComponent implements OnInit {
   private readonly orderService = inject(OrderSupabaseService);
+  private readonly returnRequestsService = inject(ReturnRequestsSupabaseService);
   private readonly pageVisibility = inject(PageVisibilityService);
   private readonly supabase = inject(SupabaseService);
   private readonly destroyRef = inject(DestroyRef);
 
   private loadInFlight = false;
+  private returnsLoadInFlight = false;
 
   readonly isLoading = signal(false);
+  readonly isLoadingReturns = signal(false);
   readonly errorMessage = signal('');
+  readonly returnErrorMessage = signal('');
+  readonly activeTab = signal<'orders' | 'returns'>('orders');
   readonly orders = signal<Order[]>([]);
+  readonly returnRequests = signal<ReturnRequest[]>([]);
   readonly searchQuery = signal('');
   readonly selectedStatus = signal<OrderStatus | ''>('');
+  readonly returnSearchQuery = signal('');
+  readonly selectedReturnStatus = signal<ReturnRequestStatus | ''>('');
+  readonly selectedReturnReason = signal<ReturnReasonType | ''>('');
   readonly quickPreset = signal<OrderStatsPeriodPreset>('today');
   readonly cancelingOrderId = signal<string | null>(null);
 
@@ -58,6 +76,16 @@ export class OrderListComponent implements OnInit {
     { value: OrderStatus.Shipped, label: 'Enviado' },
     { value: OrderStatus.Delivered, label: 'Entregado' },
     { value: OrderStatus.Canceled, label: 'Cancelado' },
+  ];
+
+  readonly returnStatusOptions: { value: ReturnRequestStatus | ''; label: string }[] = [
+    { value: '', label: 'Todos los estados' },
+    ...Object.values(ReturnRequestStatus).map(status => ({ value: status, label: RETURN_REQUEST_STATUS_LABELS[status] })),
+  ];
+
+  readonly returnReasonOptions: { value: ReturnReasonType | ''; label: string }[] = [
+    { value: '', label: 'Todos los motivos' },
+    ...Object.values(ReturnReasonType).map(reason => ({ value: reason, label: RETURN_REASON_LABELS[reason] })),
   ];
 
   readonly filteredOrders = computed(() => {
@@ -82,6 +110,25 @@ export class OrderListComponent implements OnInit {
   }));
 
   readonly hasActiveFilters = computed(() => !!this.searchQuery().trim() || !!this.selectedStatus());
+  readonly filteredReturnRequests = computed(() => {
+    const query = this.returnSearchQuery().trim().toLowerCase();
+    const status = this.selectedReturnStatus();
+    const reason = this.selectedReturnReason();
+
+    return this.returnRequests().filter(request => {
+      const matchesQuery = !query || [
+        request.returnNumber,
+        request.order?.folio ?? '',
+        request.client?.businessName ?? request.order?.clientNameSnapshot ?? '',
+      ].some(value => String(value ?? '').toLowerCase().includes(query));
+      const matchesStatus = !status || request.status === status;
+      const matchesReason = !reason || request.reason === reason;
+      return matchesQuery && matchesStatus && matchesReason;
+    });
+  });
+  readonly hasActiveReturnFilters = computed(() =>
+    !!this.returnSearchQuery().trim() || !!this.selectedReturnStatus() || !!this.selectedReturnReason()
+  );
 
   ngOnInit(): void {
     void this.loadOrders();
@@ -89,7 +136,7 @@ export class OrderListComponent implements OnInit {
     this.pageVisibility.visible$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        void this.loadOrders();
+        void this.reloadActiveTab();
       });
 
     this.setupRealtimeRefresh();
@@ -103,6 +150,12 @@ export class OrderListComponent implements OnInit {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
         void this.loadOrders();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'return_requests' }, () => {
+        void this.loadReturnRequests();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'return_request_items' }, () => {
+        void this.loadReturnRequests();
       })
       .subscribe();
 
@@ -130,9 +183,55 @@ export class OrderListComponent implements OnInit {
     }
   }
 
+  async loadReturnRequests(): Promise<void> {
+    if (this.returnsLoadInFlight) {
+      return;
+    }
+
+    this.returnsLoadInFlight = true;
+    this.isLoadingReturns.set(true);
+    this.returnErrorMessage.set('');
+
+    try {
+      this.returnRequests.set(await this.returnRequestsService.getReturnRequests());
+    } catch (error: any) {
+      console.error('[Returns] Error loading return requests', {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      this.returnRequests.set([]);
+      this.returnErrorMessage.set('No fue posible cargar las devoluciones.');
+    } finally {
+      this.returnsLoadInFlight = false;
+      this.isLoadingReturns.set(false);
+    }
+  }
+
+  setActiveTab(tab: 'orders' | 'returns'): void {
+    this.activeTab.set(tab);
+    if (tab === 'returns' && !this.returnRequests().length) {
+      void this.loadReturnRequests();
+    }
+  }
+
+  reloadActiveTab(): Promise<void> {
+    return this.activeTab() === 'returns'
+      ? this.loadReturnRequests()
+      : this.loadOrders();
+  }
+
   clearFilters(): void {
     this.searchQuery.set('');
     this.selectedStatus.set('');
+  }
+
+  clearReturnFilters(): void {
+    this.returnSearchQuery.set('');
+    this.selectedReturnStatus.set('');
+    this.selectedReturnReason.set('');
   }
 
   setQuickPreset(preset: OrderStatsPeriodPreset): void {
@@ -191,6 +290,29 @@ export class OrderListComponent implements OnInit {
 
   getItemsCount(order: Order): number {
     return order.items.reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  getReturnStatusBadge(status: ReturnRequestStatus): { label: string; variant: BadgeVariant } {
+    return {
+      label: RETURN_REQUEST_STATUS_LABELS[status],
+      variant: RETURN_REQUEST_STATUS_VARIANTS[status],
+    };
+  }
+
+  getReturnReasonLabel(reason: ReturnReasonType): string {
+    return RETURN_REASON_LABELS[reason];
+  }
+
+  getReturnItemsCount(request: ReturnRequest): number {
+    return request.items.reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  getReturnOrderFolio(request: ReturnRequest): string {
+    return request.order?.folio ?? 'Pedido no disponible';
+  }
+
+  getReturnClientName(request: ReturnRequest): string {
+    return request.client?.businessName ?? request.order?.clientNameSnapshot ?? 'Cliente no disponible';
   }
 }
 

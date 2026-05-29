@@ -38,13 +38,8 @@ export class ClientFormComponent implements OnInit {
   readonly saveErrorMessage = signal('');
 
   readonly clientTypes = Object.values(ClientType);
-  readonly clientStatuses = Object.values(ClientStatus);
 
   readonly typeOptions = this.clientTypes.map(type => ({ value: type, label: this.getTypeLabel(type) }));
-  readonly statusOptions = [
-    { value: ClientStatus.Active, label: 'Activo - Puede facturar' },
-    { value: ClientStatus.Inactive, label: 'Inactivo - Bloqueado' },
-  ];
 
   readonly clientForm: FormGroup = this.fb.group({
     clientType: [ClientType.Clinica, Validators.required],
@@ -56,7 +51,7 @@ export class ClientFormComponent implements OnInit {
     contactPosition: ['', Validators.maxLength(100)],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(100)]],
     billingEmail: ['', [Validators.email, Validators.maxLength(100)]],
-    phone: ['', [Validators.required, Validators.maxLength(20)]],
+    phone: ['', [Validators.required, Validators.maxLength(10), Validators.pattern(/^\d{10}$/)]],
     billingAddress: this.createAddressGroup(),
     useSameShippingAddress: [true],
     shippingAddress: this.createAddressGroup(),
@@ -87,6 +82,7 @@ export class ClientFormComponent implements OnInit {
 
   constructor() {
     this.setupShippingAddressBehavior();
+    this.setupPhoneNormalization();
   }
 
   async ngOnInit(): Promise<void> {
@@ -126,7 +122,7 @@ export class ClientFormComponent implements OnInit {
         contactPosition: client.contactPosition || client.contact_position,
         email: client.email,
         billingEmail: client.billingEmail || client.billing_email,
-        phone: client.phone,
+        phone: this.normalizePhone(client.phone),
         billingAddress,
         useSameShippingAddress,
         shippingAddress,
@@ -236,6 +232,21 @@ export class ClientFormComponent implements OnInit {
       });
   }
 
+  private setupPhoneNormalization(): void {
+    this.clientForm.get('phone')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(value => {
+        const normalized = this.normalizePhone(value);
+        if (value !== normalized) {
+          this.clientForm.get('phone')?.setValue(normalized, { emitEvent: false });
+        }
+      });
+  }
+
+  private normalizePhone(value: unknown): string {
+    return String(value ?? '').replace(/\D/g, '').slice(0, 10);
+  }
+
   private applyShippingAddressState(useSame: boolean): void {
     if (useSame) {
       this.shippingAddressGroup.disable({ emitEvent: false });
@@ -267,7 +278,7 @@ export class ClientFormComponent implements OnInit {
       contactPosition: raw.contactPosition,
       email: raw.email,
       billingEmail: raw.billingEmail,
-      phone: raw.phone,
+      phone: this.normalizePhone(raw.phone),
       address: this.formatAddressLine(billingAddressDetails),
       shippingAddress: useSameShippingAddress ? this.formatAddressLine(billingAddressDetails) : this.formatAddressLine(shippingAddressDetails),
       city: billingAddressDetails.city,

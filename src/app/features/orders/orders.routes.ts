@@ -19,6 +19,18 @@ export const ORDERS_ROUTES: Routes = [
     title: 'Nuevo Pedido | Go Medical',
   },
   {
+    path: 'devoluciones/:returnId',
+    loadComponent: () =>
+      import('./pages/return-detail/return-detail.component').then(m => m.ReturnDetailComponent),
+    title: 'Detalle de Devolucion | Go Medical',
+  },
+  {
+    path: ':id/devolucion/nueva',
+    loadComponent: () =>
+      import('./pages/return-form/return-form.component').then(m => m.ReturnFormComponent),
+    title: 'Registrar Devolucion | Go Medical',
+  },
+  {
     path: ':id',
     loadComponent: () =>
       import('./pages/order-detail/order-detail.component').then(m => m.OrderDetailComponent),

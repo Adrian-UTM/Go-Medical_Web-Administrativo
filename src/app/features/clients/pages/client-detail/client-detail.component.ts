@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink, Router } from '@angular/router';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
-import { ClientSupabaseService } from '../../services/client.supabase.service';
+import { ClientHistorySnapshot, ClientSupabaseService } from '../../services/client.supabase.service';
 import { Client, ClientStatus, ClientType } from '../../../../core/models/client.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -23,7 +23,14 @@ export class ClientDetailComponent implements OnInit {
   isLoading = signal<boolean>(true);
   isDeleting = signal<boolean>(false);
   actionError = signal<string>('');
+  historyError = signal<string>('');
   client = signal<Client | null>(null);
+  history = signal<ClientHistorySnapshot>({
+    orders: [],
+    quotes: [],
+    tickets: [],
+    returnRequests: [],
+  });
 
   activeTab = signal<'info' | 'history'>('info');
   tabs = [
@@ -56,6 +63,7 @@ export class ClientDetailComponent implements OnInit {
       const data = await firstValueFrom(this.clientService.getClientById(id));
       if (data) {
         this.client.set(data);
+        await this.loadClientHistory(id);
       } else {
         await this.router.navigate(['/clientes']);
       }
@@ -63,6 +71,25 @@ export class ClientDetailComponent implements OnInit {
       await this.router.navigate(['/clientes']);
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  async loadClientHistory(clientId: string) {
+    this.historyError.set('');
+
+    try {
+      this.history.set(await firstValueFrom(this.clientService.getClientHistory(clientId)));
+    } catch (error: any) {
+      console.error('[Clients] Error loading client history', {
+        clientId,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code
+      });
+      this.history.set({ orders: [], quotes: [], tickets: [], returnRequests: [] });
+      this.historyError.set('No fue posible cargar el historial del cliente.');
     }
   }
 
@@ -93,6 +120,98 @@ export class ClientDetailComponent implements OnInit {
     } finally {
       this.isDeleting.set(false);
     }
+  }
+
+  hasOrders(): boolean {
+    return this.history().orders.length > 0;
+  }
+
+  hasQuotes(): boolean {
+    return this.history().quotes.length > 0;
+  }
+
+  hasReturns(): boolean {
+    return this.history().returnRequests.length > 0;
+  }
+
+  hasTickets(): boolean {
+    return this.history().tickets.length > 0;
+  }
+
+  isHistoryEmpty(): boolean {
+    const current = this.history();
+    return current.orders.length === 0 &&
+           current.quotes.length === 0 &&
+           current.tickets.length === 0 &&
+           (current.returnRequests.length === 0 || !!current.returnRequestsUnavailable);
+  }
+
+  getOrderStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      draft: 'Borrador',
+      pending_review: 'Pendiente de revision',
+      pending_payment: 'Pendiente de pago',
+      paid: 'Pagado',
+      processing: 'En proceso',
+      shipped: 'Enviado',
+      delivered: 'Entregado',
+      completed: 'Entregado',
+      canceled: 'Cancelado',
+      cancelled: 'Cancelado',
+    };
+    return map[String(status ?? '').toLowerCase()] ?? 'Pedido';
+  }
+
+  getQuoteStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      draft: 'Borrador',
+      sent: 'Enviada',
+      approved: 'Aprobada',
+      rejected: 'Rechazada',
+      expired: 'Vencida',
+      converted: 'Convertida',
+    };
+    return map[String(status ?? '').toLowerCase()] ?? 'Cotizacion';
+  }
+
+  getTicketStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      open: 'Abierto',
+      assigned: 'Asignado',
+      in_progress: 'En proceso',
+      waiting_parts: 'Esperando refaccion',
+      resolved: 'Resuelto',
+      closed: 'Cerrado',
+      canceled: 'Cancelado',
+      cancelled: 'Cancelado',
+    };
+    return map[String(status ?? '').toLowerCase()] ?? 'Ticket';
+  }
+
+  getReturnStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+      pending_review: 'Pendiente de revision',
+      approved: 'Aprobada',
+      rejected: 'Rechazada',
+      product_received: 'Producto recibido',
+      refund_processed: 'Reembolso procesado',
+      replacement_sent: 'Cambio enviado',
+      closed: 'Cerrada',
+      cancelled: 'Cancelada',
+    };
+    return map[String(status ?? '').toLowerCase()] ?? 'Devolucion';
+  }
+
+  getReturnReasonLabel(reason: string): string {
+    const map: Record<string, string> = {
+      defective_product: 'Producto defectuoso',
+      wrong_product: 'Producto equivocado',
+      damaged_shipping: 'Dano en envio',
+      customer_error: 'Error del cliente',
+      warranty: 'Garantia',
+      other: 'Otro',
+    };
+    return map[String(reason ?? '').toLowerCase()] ?? 'Otro';
   }
 
   getTypeLabel(type: ClientType | string): string {

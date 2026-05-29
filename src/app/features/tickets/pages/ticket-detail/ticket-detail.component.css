@@ -89,6 +89,27 @@
   gap: var(--space-3);
 }
 
+.action-card__input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.action-card__empty {
+  display: block;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-gray-50);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
 .detail-layout {
   display: grid;
   gap: var(--space-6);
@@ -210,6 +231,15 @@
 
 .btn-ghost:hover {
   background-color: var(--color-bg-hover);
+}
+
+.btn-ghost--danger {
+  color: var(--color-danger) !important;
+  border-color: rgba(192, 57, 43, 0.2) !important;
+}
+
+.btn-ghost--danger:hover {
+  background-color: var(--color-danger-bg) !important;
 }
 
 .btn-primary:disabled,

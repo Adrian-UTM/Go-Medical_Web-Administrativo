@@ -1,0 +1,97 @@
+<bc-loader *ngIf="isLoading()" message="Preparando devolucion..."></bc-loader>
+
+<ng-container *ngIf="!isLoading() && order()">
+  <bc-page-header
+    title="Registrar devolucion"
+    subtitle="Selecciona los productos del pedido que se recibiran en revision"
+    [breadcrumbs]="breadcrumbs">
+    <a [routerLink]="['/pedidos', order()!.id]" class="btn-ghost">Volver al pedido</a>
+  </bc-page-header>
+
+  <div *ngIf="errorMessage()" class="list-alert" role="alert">
+    {{ errorMessage() }}
+  </div>
+
+  <div *ngIf="openReturnRequest()" class="info-banner" role="status">
+    Ya existe una devolucion abierta para este pedido:
+    <a [routerLink]="['/pedidos/devoluciones', openReturnRequest()!.id]">{{ openReturnRequest()!.returnNumber }}</a>
+  </div>
+
+  <section class="form-layout">
+    <article class="form-card">
+      <div class="form-card__header">
+        <h2>Datos de la solicitud</h2>
+        <span>{{ order()!.folio }} · {{ order()!.clientNameSnapshot }}</span>
+      </div>
+
+      <div class="form-grid">
+        <label class="form-field">
+          <span class="form-field__label">Motivo</span>
+          <bc-custom-select [options]="reasonOptions" [ngModel]="reason()" (ngModelChange)="reason.set($event)"></bc-custom-select>
+        </label>
+
+        <label class="form-field form-field--wide">
+          <span class="form-field__label">Comentario del cliente o solicitud</span>
+          <textarea class="form-field__textarea" rows="4" [ngModel]="customerComments()" (ngModelChange)="customerComments.set($event)"></textarea>
+        </label>
+
+        <label class="form-field form-field--wide">
+          <span class="form-field__label">Notas administrativas</span>
+          <textarea class="form-field__textarea" rows="4" [ngModel]="adminNotes()" (ngModelChange)="adminNotes.set($event)"></textarea>
+        </label>
+      </div>
+    </article>
+
+    <aside class="summary-card">
+      <span class="summary-card__label">Resumen</span>
+      <strong>{{ selectedLines().length }} linea{{ selectedLines().length !== 1 ? 's' : '' }}</strong>
+      <span>{{ totalToReturn() | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+      <button type="button" class="btn-primary" [disabled]="!canSubmit() || isSaving()" (click)="submit()">
+        {{ isSaving() ? 'Registrando...' : 'Registrar devolucion' }}
+      </button>
+    </aside>
+  </section>
+
+  <article class="form-card">
+    <div class="form-card__header">
+      <h2>Items del pedido</h2>
+      <span>No se permite devolver mas de la cantidad comprada.</span>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="data-table" aria-label="Seleccion de items para devolucion">
+        <thead>
+          <tr>
+            <th scope="col">Seleccionar</th>
+            <th scope="col">SKU</th>
+            <th scope="col">Producto o servicio</th>
+            <th scope="col" class="text-center">Comprada</th>
+            <th scope="col" class="text-center">A devolver</th>
+            <th scope="col" class="text-right">Precio</th>
+            <th scope="col" class="text-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let line of lines()" class="data-table__row">
+            <td>
+              <input type="checkbox" [ngModel]="line.selected" (ngModelChange)="toggleLine(line, $event)">
+            </td>
+            <td class="data-table__mono">{{ line.sku || 'N/D' }}</td>
+            <td class="data-table__name">{{ line.productName }}</td>
+            <td class="text-center">{{ line.purchasedQuantity }}</td>
+            <td class="text-center">
+              <input class="quantity-input" type="number" min="1" [max]="line.purchasedQuantity" [ngModel]="line.returnQuantity" (ngModelChange)="updateLineQuantity(line, $event)" (blur)="clampQuantity(line)" [disabled]="!line.selected">
+            </td>
+            <td class="text-right">{{ line.unitPrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            <td class="text-right">{{ (line.selected ? line.returnQuantity * line.unitPrice : 0) | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </article>
+</ng-container>
+
+<div *ngIf="!isLoading() && !order()" class="not-found">
+  <p>El pedido no fue encontrado.</p>
+  <a routerLink="/pedidos" class="btn-ghost">Volver a pedidos</a>
+</div>

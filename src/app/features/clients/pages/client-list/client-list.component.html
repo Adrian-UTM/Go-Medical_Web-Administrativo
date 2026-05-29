@@ -55,7 +55,7 @@
     </div>
     <h3 class="empty-state__title">{{ emptyStateTitle }}</h3>
     <p class="empty-state__text">{{ emptyStateText }}</p>
-    <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="searchQuery.set(''); selectedType.set('all')">
+    <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">
       Limpiar filtros
     </button>
   </div>

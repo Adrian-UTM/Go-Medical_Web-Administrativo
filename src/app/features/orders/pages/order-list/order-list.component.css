@@ -6,6 +6,35 @@
   margin-bottom: var(--space-6);
 }
 
+.orders-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background-color: var(--color-gray-50);
+}
+
+.orders-tabs__item {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.orders-tabs__item--active {
+  background: #fff;
+  color: var(--color-primary);
+  box-shadow: var(--shadow-xs);
+}
+
 .quick-summary__header {
   display: flex;
   align-items: flex-start;
@@ -35,9 +64,9 @@
 }
 
 .quick-summary__filters {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 270px;
   padding: 4px;
   border-radius: var(--radius-full);
   background-color: var(--color-gray-50);
@@ -45,12 +74,17 @@
 }
 
 .quick-summary__filter {
+  width: 100%;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  padding: 8px 14px;
+  padding: 0 12px;
   border-radius: var(--radius-full);
   cursor: pointer;
 }
@@ -59,6 +93,12 @@
   background-color: #fff;
   color: var(--color-primary);
   box-shadow: var(--shadow-xs);
+}
+
+.quick-summary__actions > .btn-ghost {
+  min-width: 190px;
+  height: 48px;
+  border-radius: var(--radius-full);
 }
 
 .quick-summary__period {
@@ -286,8 +326,10 @@
 }
 
 .btn-ghost {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   background: none;
@@ -362,5 +404,6 @@
     overflow-x: auto;
   }
 }
+
 
 

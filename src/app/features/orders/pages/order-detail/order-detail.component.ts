@@ -76,10 +76,18 @@ export class OrderDetailComponent {
   }
 
   async markAsPaid(): Promise<void> {
+    if (!this.canMarkAsPaid()) {
+      return;
+    }
+
     await this.updateStatus(OrderStatus.Paid, 'Pedido marcado como pagado.');
   }
 
   async markAsShipped(): Promise<void> {
+    if (!this.canMarkAsShipped()) {
+      return;
+    }
+
     await this.updateStatus(OrderStatus.Shipped, 'Pedido marcado como enviado.');
   }
 
@@ -99,7 +107,7 @@ export class OrderDetailComponent {
 
   async cancelOrderFromAction(): Promise<void> {
     const currentOrder = this.order();
-    if (!currentOrder || this.isCanceling() || currentOrder.status === OrderStatus.Canceled) {
+    if (!currentOrder || this.isCanceling() || this.isCanceledStatus(String(currentOrder.status))) {
       return;
     }
 
@@ -175,6 +183,32 @@ export class OrderDetailComponent {
 
   getUnitsCount(order: Order): number {
     return order.items.reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  canMarkAsPaid(): boolean {
+    const status = this.currentStatusKey();
+    return !this.isCanceledStatus(status) && status !== OrderStatus.Paid;
+  }
+
+  canMarkAsShipped(): boolean {
+    const status = this.currentStatusKey();
+    return !this.isCanceledStatus(status) && !['shipped', 'delivered', 'completed'].includes(status);
+  }
+
+  canCancelOrder(): boolean {
+    return !this.isCanceledStatus(this.currentStatusKey());
+  }
+
+  canRegisterReturn(): boolean {
+    return ['paid', 'shipped', 'delivered', 'completed'].includes(this.currentStatusKey());
+  }
+
+  private currentStatusKey(): string {
+    return String(this.order()?.status ?? '').trim().toLowerCase();
+  }
+
+  private isCanceledStatus(status: string): boolean {
+    return ['canceled', 'cancelled'].includes(status);
   }
 
   private async updateStatus(status: OrderStatus, message: string): Promise<void> {

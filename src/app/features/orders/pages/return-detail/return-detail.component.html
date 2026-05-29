@@ -1,0 +1,172 @@
+<bc-loader *ngIf="isLoading()" message="Cargando devolucion..."></bc-loader>
+
+<ng-container *ngIf="!isLoading() && request()">
+  <bc-page-header
+    [title]="request()!.returnNumber"
+    [breadcrumbs]="breadcrumbs">
+    <a routerLink="/pedidos" class="btn-ghost">Volver a pedidos</a>
+  </bc-page-header>
+
+  <div *ngIf="actionMessage()" class="info-banner">
+    {{ actionMessage() }}
+  </div>
+
+  <section class="return-hero">
+    <div class="return-hero__main">
+      <div class="return-hero__meta">
+        <span class="return-hero__folio">{{ request()!.returnNumber }}</span>
+        <bc-status-badge
+          [label]="getStatusBadge(request()!.status).label"
+          [variant]="getStatusBadge(request()!.status).variant"
+          [showDot]="true">
+        </bc-status-badge>
+        <span class="return-hero__reason">{{ getReasonLabel(request()!.reason) }}</span>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="summary-item__label">Fecha de solicitud</span>
+          <span class="summary-item__value">{{ request()!.requestedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Pedido origen</span>
+          <span class="summary-item__value">{{ request()!.order?.folio || 'Pedido no disponible' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Estado del pedido</span>
+          <span class="summary-item__value">{{ getOrderStatusLabel(request()!.order?.status) }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Total del pedido</span>
+          <span class="summary-item__value">{{ request()!.order?.total || 0 | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <aside class="action-card">
+      <span class="action-card__label">Acciones administrativas</span>
+      <button *ngIf="canApprove()" type="button" class="btn-primary" [disabled]="isProcessing()" (click)="approve()">Aprobar devolucion</button>
+      <button *ngIf="canReject()" type="button" class="btn-danger" [disabled]="isProcessing()" (click)="reject()">Rechazar devolucion</button>
+      <button *ngIf="canMarkReceived()" type="button" class="btn-secondary" [disabled]="isProcessing()" (click)="markReceived()">Marcar producto recibido</button>
+      <button *ngIf="canProcessRefund()" type="button" class="btn-secondary" [disabled]="isProcessing()" (click)="processRefund()">Procesar reembolso</button>
+      <button *ngIf="canMarkReplacementSent()" type="button" class="btn-secondary" [disabled]="isProcessing()" (click)="markReplacementSent()">Marcar cambio enviado</button>
+      <button *ngIf="canClose()" type="button" class="btn-primary" [disabled]="isProcessing()" (click)="closeRequest()">Cerrar solicitud</button>
+      <button *ngIf="canCancel()" type="button" class="btn-ghost" [disabled]="isProcessing()" (click)="cancelRequest()">Cancelar solicitud</button>
+      <span *ngIf="isTerminal()" class="action-card__empty">Sin acciones operativas disponibles.</span>
+    </aside>
+  </section>
+
+  <section class="detail-layout">
+    <article class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Cliente</h2>
+        <span class="detail-card__subtitle">Datos comerciales asociados a la solicitud</span>
+      </div>
+      <div class="info-grid">
+        <div class="summary-item">
+          <span class="summary-item__label">Razon social</span>
+          <span class="summary-item__value">{{ request()!.client?.businessName || request()!.order?.clientNameSnapshot || 'Cliente no disponible' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Contacto</span>
+          <span class="summary-item__value">{{ request()!.client?.contactName || 'No disponible' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Correo</span>
+          <span class="summary-item__value">{{ request()!.client?.email || 'No disponible' }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-item__label">Telefono</span>
+          <span class="summary-item__value">{{ request()!.client?.phone || 'No disponible' }}</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="detail-card">
+      <div class="detail-card__header">
+        <h2 class="detail-card__title">Comentarios</h2>
+        <span class="detail-card__subtitle">Seguimiento administrativo y resolucion</span>
+      </div>
+      <div class="notes-grid">
+        <div class="notes-box">
+          <span class="notes-box__label">Comentario del cliente</span>
+          <p>{{ request()!.customerComments || 'Sin comentario registrado.' }}</p>
+        </div>
+        <label class="form-field">
+          <span class="notes-box__label">Notas administrativas</span>
+          <textarea class="form-field__textarea" rows="4" [ngModel]="adminNotes()" (ngModelChange)="adminNotes.set($event)"></textarea>
+        </label>
+        <label class="form-field">
+          <span class="notes-box__label">Notas de resolucion</span>
+          <textarea class="form-field__textarea" rows="4" [ngModel]="resolutionNotes()" (ngModelChange)="resolutionNotes.set($event)"></textarea>
+        </label>
+        <button type="button" class="btn-secondary btn-fit" [disabled]="isSavingNotes()" (click)="saveNotes()">
+          {{ isSavingNotes() ? 'Guardando...' : 'Guardar notas' }}
+        </button>
+      </div>
+    </article>
+  </section>
+
+  <article class="detail-card">
+    <div class="detail-card__header">
+      <h2 class="detail-card__title">Items solicitados para devolucion</h2>
+      <span class="detail-card__subtitle">Registro de recepcion y resolucion sin movimientos automaticos de inventario</span>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="data-table" aria-label="Items de devolucion">
+        <thead>
+          <tr>
+            <th scope="col">SKU</th>
+            <th scope="col">Producto o servicio</th>
+            <th scope="col" class="text-center">Solicitada</th>
+            <th scope="col" class="text-center">Recibida</th>
+            <th scope="col" class="text-right">Precio</th>
+            <th scope="col" class="text-right">Subtotal</th>
+            <th scope="col">Condicion</th>
+            <th scope="col">Resolucion</th>
+            <th scope="col">Notas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of editableItems()" class="data-table__row">
+            <td class="data-table__mono">{{ item.skuSnapshot || 'N/D' }}</td>
+            <td class="data-table__name">{{ item.productNameSnapshot }}</td>
+            <td class="text-center">{{ item.quantity }}</td>
+            <td class="text-center">
+              <input class="quantity-input" type="number" min="0" [max]="item.quantity" [(ngModel)]="item.receivedQuantity" (blur)="clampReceivedQuantity(item)">
+            </td>
+            <td class="text-right">{{ item.unitPriceMxn | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            <td class="text-right">{{ item.subtotalMxn | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            <td>
+              <bc-custom-select
+                [options]="conditionOptions"
+                [(ngModel)]="item.conditionReceived">
+              </bc-custom-select>
+            </td>
+            <td>
+              <bc-custom-select
+                [options]="resolutionOptions"
+                [(ngModel)]="item.resolution">
+              </bc-custom-select>
+            </td>
+            <td>
+              <input class="notes-input" type="text" [(ngModel)]="item.notes" placeholder="Notas">
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="detail-card__footer">
+      <button type="button" class="btn-secondary" [disabled]="isSavingItems()" (click)="saveItems()">
+        {{ isSavingItems() ? 'Guardando...' : 'Guardar items' }}
+      </button>
+    </div>
+  </article>
+</ng-container>
+
+<div *ngIf="!isLoading() && !request()" class="not-found">
+  <p>La devolucion solicitada no fue encontrada.</p>
+  <a routerLink="/pedidos" class="btn-ghost">Volver a pedidos</a>
+</div>

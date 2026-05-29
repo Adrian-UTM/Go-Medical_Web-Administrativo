@@ -137,23 +137,157 @@
 
       <ng-container *ngIf="activeTab() === 'history'">
         <div class="history-sections">
-          <section class="history-section">
-            <div class="history-section__header">
-              <h3>Historial comercial</h3>
-            </div>
-            <div class="empty-placeholder">
-              <p>No hay historial comercial disponible para este cliente.</p>
-            </div>
-          </section>
+          <!-- Alerta de error crítico si falló todo -->
+          <div *ngIf="historyError()" class="detail-alert" role="alert" style="margin-bottom: var(--space-4);">
+            {{ historyError() }}
+          </div>
 
-          <section class="history-section">
-            <div class="history-section__header">
-              <h3>Soporte tecnico</h3>
-            </div>
-            <div class="empty-placeholder">
-              <p>No hay tickets o mantenimientos vinculados para mostrar por ahora.</p>
-            </div>
-          </section>
+          <!-- Alerta global de historial totalmente vacío -->
+          <div *ngIf="!historyError() && isHistoryEmpty()" class="empty-placeholder" style="padding: var(--space-8); text-align: center; background: var(--color-bg-surface); border: 1px dashed var(--color-border); border-radius: var(--radius-xl);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-muted); margin-bottom: var(--space-3); display: inline-block;">
+              <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            <p style="margin: 0; font-size: var(--font-size-md); color: var(--color-text-primary); font-weight: var(--font-weight-medium);">No hay historial comercial disponible para este cliente.</p>
+            <p style="margin: var(--space-1) 0 0; font-size: var(--font-size-xs); color: var(--color-text-muted);">Este cliente no cuenta con cotizaciones, pedidos o tickets de soporte registrados.</p>
+          </div>
+
+          <ng-container *ngIf="!historyError() && !isHistoryEmpty()">
+            <!-- 1. Sección de Pedidos -->
+            <section class="history-section" style="margin-bottom: var(--space-6);">
+              <div class="history-section__header" style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2); margin-bottom: var(--space-4);">
+                <h3 style="font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin: 0;">Pedidos</h3>
+              </div>
+
+              <div *ngIf="!hasOrders()" class="empty-placeholder" style="padding: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
+                No hay pedidos registrados para este cliente.
+              </div>
+
+              <div *ngIf="hasOrders()" class="history-table-wrap">
+                <table class="history-table" aria-label="Pedidos del cliente">
+                  <thead>
+                    <tr>
+                      <th>Folio</th>
+                      <th>Fecha</th>
+                      <th>Estado</th>
+                      <th class="text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let order of history().orders">
+                      <td>{{ order.folio }}</td>
+                      <td>{{ order.createdAt | date:'dd/MM/yyyy' }}</td>
+                      <td>{{ getOrderStatusLabel(order.status) }}</td>
+                      <td class="text-right">{{ order.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 2. Sección de Cotizaciones -->
+            <section class="history-section" style="margin-bottom: var(--space-6);">
+              <div class="history-section__header" style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2); margin-bottom: var(--space-4);">
+                <h3 style="font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin: 0;">Cotizaciones</h3>
+              </div>
+
+              <div *ngIf="!hasQuotes()" class="empty-placeholder" style="padding: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
+                No hay cotizaciones registradas para este cliente.
+              </div>
+
+              <div *ngIf="hasQuotes()" class="history-table-wrap">
+                <table class="history-table" aria-label="Cotizaciones del cliente">
+                  <thead>
+                    <tr>
+                      <th>Folio</th>
+                      <th>Fecha</th>
+                      <th>Estado</th>
+                      <th class="text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let quote of history().quotes">
+                      <td>{{ quote.folio }}</td>
+                      <td>{{ quote.createdAt | date:'dd/MM/yyyy' }}</td>
+                      <td>{{ getQuoteStatusLabel(quote.status) }}</td>
+                      <td class="text-right">{{ quote.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 3. Sección de Devoluciones (Opcional/Complementario) -->
+            <section class="history-section" style="margin-bottom: var(--space-6);" *ngIf="!history().returnRequestsUnavailable || hasReturns()">
+              <div class="history-section__header" style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2); margin-bottom: var(--space-4);">
+                <h3 style="font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin: 0;">Devoluciones</h3>
+              </div>
+
+              <div *ngIf="!hasReturns() && !history().returnRequestsUnavailable" class="empty-placeholder" style="padding: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
+                No hay devoluciones registradas para este cliente.
+              </div>
+
+              <div *ngIf="history().returnRequestsUnavailable" class="empty-placeholder" style="padding: var(--space-4); border: 1px solid rgba(45, 106, 159, 0.12); border-radius: var(--radius-lg); text-align: center; color: var(--color-text-secondary); background-color: rgba(45, 106, 159, 0.04); font-size: var(--font-size-sm);">
+                Módulo de devoluciones no disponible temporalmente en esta sucursal.
+              </div>
+
+              <div *ngIf="hasReturns()" class="history-table-wrap">
+                <table class="history-table" aria-label="Devoluciones del cliente">
+                  <thead>
+                    <tr>
+                      <th>Folio</th>
+                      <th>Pedido relacionado</th>
+                      <th>Fecha</th>
+                      <th>Estado y motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let request of history().returnRequests">
+                      <td>{{ request.folio }}</td>
+                      <td>Pedido {{ request.orderFolio }}</td>
+                      <td>{{ request.createdAt | date:'dd/MM/yyyy' }}</td>
+                      <td>{{ getReturnStatusLabel(request.status) }} · {{ getReturnReasonLabel(request.reason) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 4. Sección de Soporte Técnico / Tickets -->
+            <section class="history-section" style="margin-bottom: var(--space-6);">
+              <div class="history-section__header" style="border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2); margin-bottom: var(--space-4);">
+                <h3 style="font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); margin: 0;">Soporte técnico y Tickets</h3>
+              </div>
+
+              <div *ngIf="!hasTickets()" class="empty-placeholder" style="padding: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm);">
+                No hay tickets o mantenimientos técnicos vinculados para este cliente.
+              </div>
+
+              <div *ngIf="hasTickets()" class="history-table-wrap">
+                <table class="history-table" aria-label="Historial técnico del cliente">
+                  <thead>
+                    <tr>
+                      <th>Folio</th>
+                      <th>Fecha</th>
+                      <th>Título</th>
+                      <th>Estado</th>
+                      <th>Prioridad</th>
+                      <th>Técnico</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let ticket of history().tickets">
+                      <td>{{ ticket.folio }}</td>
+                      <td>{{ ticket.createdAt | date:'dd/MM/yyyy' }}</td>
+                      <td>{{ ticket.title }}</td>
+                      <td>{{ getTicketStatusLabel(ticket.status) }}</td>
+                      <td>{{ ticket.priority || 'No disponible' }}</td>
+                      <td>{{ ticket.technicianName }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </ng-container>
         </div>
       </ng-container>
     </div>

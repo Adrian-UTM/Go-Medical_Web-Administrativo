@@ -65,6 +65,8 @@ export class TicketSupabaseService {
       throw this.toAppError(response.error.message, 'No fue posible cargar los tickets de soporte.');
     }
 
+    await this.ensureAssignedTechniciansAvailable(response.data ?? []);
+
     let tickets = (response.data ?? []).map(row => this.mapTicket(row));
 
     if (filters?.search?.trim()) {
@@ -128,6 +130,8 @@ export class TicketSupabaseService {
 
       throw this.toAppError(response.error.message, 'No fue posible cargar el ticket solicitado.');
     }
+
+    await this.ensureAssignedTechniciansAvailable([response.data]);
 
     return this.mapTicket(response.data);
   }
@@ -375,6 +379,71 @@ export class TicketSupabaseService {
     return this.mapTicket(data);
   }
 
+  async assignExternalTechnician(
+    id: string,
+    technicianName: string,
+    authorName = 'Coordinacion tecnica'
+  ): Promise<ServiceTicket | undefined> {
+    const current = await this.getRawTicket(id);
+    if (!current) {
+      return undefined;
+    }
+
+    const normalizedName = technicianName.trim();
+    if (!normalizedName) {
+      throw new Error('Ingresa el nombre del tecnico externo.');
+    }
+
+    const nextStatus = current.status === TicketStatus.Open ? TicketStatus.Assigned : current.status;
+    const updatePayload: Record<string, unknown> = {
+      status: nextStatus,
+      updated_at: new Date().toISOString(),
+      assigned_technician_id: null,
+      assigned_technician_custom_name: normalizedName,
+    };
+
+    const history = this.appendHistoryIfSupported(current, {
+      status: nextStatus,
+      comment: `Ticket asignado a ${normalizedName}.`,
+      authorName,
+    });
+
+    if (history) {
+      updatePayload['history'] = history;
+    }
+
+    const { data, error } = await this.supabase.client
+      .from(this.tableName)
+      .update(updatePayload)
+      .eq('id', id)
+      .select(`
+        *,
+        clients!client_id (
+          business_name,
+          trade_name,
+          contact_name,
+          email,
+          phone
+        ),
+        products!product_id (
+          name,
+          sku,
+          item_type
+        ),
+        equipment_units!equipment_unit_id (
+          serial_number
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('[Tickets] Error assigning external technician', { ticketId: id, technicianName: normalizedName, error });
+      throw this.toAppError(error.message, 'No fue posible asignar el tecnico externo.');
+    }
+
+    return this.mapTicket(data);
+  }
+
   private async buildDbPayload(payload: TicketUpsertPayload, isUpdate = false): Promise<Record<string, unknown>> {
     const product = payload.productId ? (await this.getAvailableProducts()).find(item => item.id === payload.productId) : undefined;
     const equipmentUnitId = await this.resolveEquipmentUnitId(payload, product);
@@ -473,7 +542,7 @@ export class TicketSupabaseService {
 
     const technicians = (data ?? [])
       .filter((profile: any) => profile.is_active !== false)
-      .filter((profile: any) => ['technician', 'staff', 'admin'].includes(String(profile.role ?? '').toLowerCase()))
+      .filter((profile: any) => ['technician', 'tecnico', 'técnico', 'staff', 'admin'].includes(String(profile.role ?? '').toLowerCase()))
       .map((profile: any) => ({
         id: String(profile.id ?? ''),
         fullName: String(profile.full_name ?? profile.email ?? '').trim(),
@@ -483,6 +552,50 @@ export class TicketSupabaseService {
 
     this._technicians.set(technicians.sort((a, b) => a.fullName.localeCompare(b.fullName, 'es-MX')));
     this.techniciansLoaded = true;
+  }
+
+  private async ensureAssignedTechniciansAvailable(rows: any[]): Promise<void> {
+    const missingIds = [...new Set(rows
+      .map(row => this.normalizeUuid(row?.assigned_technician_id))
+      .filter((id): id is string => !!id && !this._technicians().some(technician => technician.id === id))
+    )];
+
+    if (!missingIds.length) {
+      return;
+    }
+
+    const { data, error } = await this.supabase.client
+      .from(this.profilesTable)
+      .select('id, full_name, email, role, is_active')
+      .in('id', missingIds);
+
+    if (error) {
+      console.warn('[Tickets] No fue posible cargar perfiles de tecnicos asignados.', {
+        technicianIds: missingIds,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      return;
+    }
+
+    const assignedProfiles = (data ?? [])
+      .map((profile: any) => ({
+        id: String(profile.id ?? ''),
+        fullName: String(profile.full_name ?? profile.email ?? '').trim(),
+        role: profile.role ? String(profile.role) : undefined,
+      }))
+      .filter((technician: TicketTechnician) => this.normalizeUuid(technician.id) && technician.fullName);
+
+    if (!assignedProfiles.length) {
+      return;
+    }
+
+    const merged = new Map(this._technicians().map(technician => [technician.id, technician]));
+    assignedProfiles.forEach(technician => merged.set(technician.id, technician));
+    this._technicians.set(Array.from(merged.values()).sort((a, b) => a.fullName.localeCompare(b.fullName, 'es-MX')));
   }
 
   private mapTicket(row: any): ServiceTicket {
@@ -613,6 +726,10 @@ export class TicketSupabaseService {
     const lowered = message.toLowerCase();
     if (lowered.includes('permission') || lowered.includes('rls') || lowered.includes('policy')) {
       return new Error('No tienes permisos para consultar o modificar tickets de soporte.');
+    }
+
+    if (lowered.includes('assigned_technician_custom_name') || lowered.includes('column')) {
+      return new Error('Para asignar un técnico externo, primero debe habilitarse el campo de técnico manual.');
     }
 
     return new Error(fallback);

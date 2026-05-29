@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe, NgFor, NgIf, SlicePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -6,11 +6,13 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
 import {
   DashboardMetricCardData,
   DashboardRecentActivity,
+  DashboardReportPeriod,
   DashboardSnapshot,
   DashboardSupabaseService,
 } from '../../services/dashboard.supabase.service';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 import { SupabaseService } from '../../../../core/services/supabase.service';
+import { DashboardReportPdfService } from '../../services/dashboard-report-pdf.service';
 
 interface MetricCardView extends DashboardMetricCardData {
   valueLabel: string;
@@ -35,6 +37,7 @@ interface OperationalAlert {
 })
 export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardSupabaseService);
+  private readonly reportPdfService = inject(DashboardReportPdfService);
   private readonly pageVisibility = inject(PageVisibilityService);
   private readonly supabase = inject(SupabaseService);
   private readonly destroyRef = inject(DestroyRef);
@@ -44,6 +47,9 @@ export class DashboardComponent implements OnInit {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly snapshot = signal<DashboardSnapshot | null>(null);
+  readonly isReportMenuOpen = signal(false);
+  readonly isGeneratingReport = signal(false);
+  readonly reportError = signal('');
 
   readonly metrics = computed<MetricCardView[]>(() => {
     const safe = this.snapshot() ?? {
@@ -131,6 +137,14 @@ export class DashboardComponent implements OnInit {
   readonly recentActivity = computed(() => this.snapshot()?.recentActivity ?? []);
   readonly hasRecentOrders = computed(() => this.recentOrders().length > 0);
   readonly hasRecentActivity = computed(() => this.recentActivity().length > 0);
+  readonly activeAlertsCount = computed(() => {
+    const current = this.snapshot();
+    if (!current) {
+      return 0;
+    }
+
+    return current.openTickets + current.lowStockProducts;
+  });
   readonly operationalAlerts = computed<OperationalAlert[]>(() => {
     const current = this.snapshot();
     if (!current) {
@@ -215,6 +229,21 @@ export class DashboardComponent implements OnInit {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_tickets' }, () => {
         void this.loadDashboard();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        void this.loadDashboard();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        void this.loadDashboard();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => {
+        void this.loadDashboard();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_stock' }, () => {
+        void this.loadDashboard();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        void this.loadDashboard();
+      })
       .subscribe();
 
     this.destroyRef.onDestroy(() => {
@@ -232,15 +261,52 @@ export class DashboardComponent implements OnInit {
 
     try {
       this.snapshot.set(await this.dashboardService.getSnapshot());
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Dashboard] Error loading dashboard data', {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
       this.snapshot.set(null);
-      this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el resumen operativo.');
+      this.error.set('No fue posible cargar la información del dashboard.');
     } finally {
       this.loadInFlight = false;
       this.loading.set(false);
     }
   }
 
+  toggleReportMenu(event?: MouseEvent): void {
+    event?.stopPropagation();
+    this.reportError.set('');
+    this.isReportMenuOpen.update(value => !value);
+  }
+
+  @HostListener('document:click')
+  closeReportMenu(): void {
+    this.isReportMenuOpen.set(false);
+  }
+
+  async downloadReport(period: DashboardReportPeriod, event?: MouseEvent): Promise<void> {
+    event?.stopPropagation();
+    if (this.isGeneratingReport()) {
+      return;
+    }
+
+    this.isGeneratingReport.set(true);
+    this.isReportMenuOpen.set(false);
+    this.reportError.set('');
+
+    try {
+      await this.reportPdfService.download(period);
+    } catch (error) {
+      console.error('[Dashboard PDF] Error generating report', { period, error });
+      this.reportError.set('No fue posible generar el reporte.');
+    } finally {
+      this.isGeneratingReport.set(false);
+    }
+  }
   getStatusBadgeVariant(status: string): 'success' | 'warning' | 'info' | 'neutral' | 'danger' {
     const map: Record<string, 'success' | 'warning' | 'info' | 'neutral' | 'danger'> = {
       draft: 'neutral',
@@ -279,4 +345,6 @@ export class DashboardComponent implements OnInit {
     return new Intl.NumberFormat('es-MX').format(value);
   }
 }
+
+
 

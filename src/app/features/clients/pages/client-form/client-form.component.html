@@ -139,11 +139,13 @@
                 class="form-control"
                 formControlName="phone"
                 [class.is-invalid]="isFieldInvalid('phone')"
-                maxlength="20"
+                maxlength="10"
+                inputmode="numeric"
+                pattern="[0-9]*"
                 placeholder="9991234567">
               <div class="form-feedback">
-                <span class="form-error" *ngIf="isFieldInvalid('phone')">El teléfono es obligatorio.</span>
-                <span class="form-counter">{{ (clientForm.get('phone')?.value?.length || 0) + '/20' }}</span>
+                <span class="form-error" *ngIf="isFieldInvalid('phone')">El teléfono debe tener 10 dígitos.</span>
+                <span class="form-counter">{{ (clientForm.get('phone')?.value?.length || 0) + '/10' }}</span>
               </div>
             </div>
           </div>
@@ -301,14 +303,6 @@
       </div>
 
       <aside class="form-sidebar">
-        <section class="form-panel form-panel--sticky">
-          <h2 class="form-panel__title">Estado de la cuenta</h2>
-          <div class="form-group">
-            <label for="status" class="form-label">Estado *</label>
-            <bc-custom-select formControlName="status" [options]="statusOptions" placeholder="Selecciona un estado"></bc-custom-select>
-          </div>
-        </section>
-
         <section class="form-panel">
           <h2 class="form-panel__title">Notas internas</h2>
           <div class="form-group">

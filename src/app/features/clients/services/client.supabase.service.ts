@@ -10,11 +10,56 @@ import {
   ClientType,
 } from '../../../core/models/client.model';
 
+export interface ClientHistoryOrder {
+  id: string;
+  folio: string;
+  status: string;
+  total: number;
+  createdAt: string;
+}
+
+export interface ClientHistoryQuote {
+  id: string;
+  folio: string;
+  status: string;
+  total: number;
+  createdAt: string;
+}
+
+export interface ClientHistoryTicket {
+  id: string;
+  folio: string;
+  title: string;
+  status: string;
+  priority: string;
+  technicianName: string;
+  createdAt: string;
+}
+
+export interface ClientHistoryReturnRequest {
+  id: string;
+  folio: string;
+  orderId: string;
+  orderFolio: string;
+  status: string;
+  reason: string;
+  createdAt: string;
+}
+
+export interface ClientHistorySnapshot {
+  orders: ClientHistoryOrder[];
+  quotes: ClientHistoryQuote[];
+  tickets: ClientHistoryTicket[];
+  returnRequests: ClientHistoryReturnRequest[];
+  returnRequestsUnavailable?: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ClientSupabaseService {
   private readonly tableName = 'clients';
+  private readonly protectedDeleteMessage = 'No es posible eliminar este cliente porque tiene pedidos, cotizaciones, tickets o devoluciones asociadas.';
   private readonly allowedClientTypes = new Set<string>(Object.values(ClientType));
   private readonly allowedStatuses = new Set<string>(Object.values(ClientStatus));
 
@@ -108,18 +153,11 @@ export class ClientSupabaseService {
   }
 
   deleteClient(id: string): Observable<void> {
-    return from(
-      this.supabase.client
-        .from(this.tableName)
-        .delete()
-        .eq('id', id)
-    ).pipe(
-      map(({ error }) => {
-        if (error) {
-          throw this.toAppError(error.message, 'No fue posible eliminar el cliente.');
-        }
-      })
-    );
+    return from(this.deleteClientSafely(id));
+  }
+
+  getClientHistory(clientId: string): Observable<ClientHistorySnapshot> {
+    return from(this.loadClientHistory(clientId));
   }
 
   private async persistClient(mode: 'insert' | 'update', clientData: Partial<Client>, id?: string): Promise<Client> {
@@ -145,6 +183,234 @@ export class ClientSupabaseService {
     }
 
     return this.buildFallbackClient(savedClient, clientData, clientId);
+  }
+
+  private async deleteClientSafely(id: string): Promise<void> {
+    const relations = await this.getClientRelationCounts(id);
+    if (relations.orders + relations.quotes + relations.tickets + relations.returnRequests > 0) {
+      throw new Error(this.protectedDeleteMessage);
+    }
+
+    const { error } = await this.supabase.client
+      .from(this.tableName)
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw this.toAppError(error.message, 'No fue posible eliminar el cliente.');
+    }
+  }
+
+  private async getClientRelationCounts(id: string): Promise<{ orders: number; quotes: number; tickets: number; returnRequests: number }> {
+    const [orders, quotes, tickets, returnRequests] = await Promise.all([
+      this.countClientRelations('orders', id),
+      this.countClientRelations('quotes', id),
+      this.countClientRelations('service_tickets', id),
+      this.countClientRelations('return_requests', id),
+    ]);
+
+    return { orders, quotes, tickets, returnRequests };
+  }
+
+  private async countClientRelations(table: string, clientId: string): Promise<number> {
+    const { count, error } = await this.supabase.client
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', clientId);
+
+    if (error) {
+      console.error('[Clients] Error checking client relations', {
+        table,
+        clientId,
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      throw this.toAppError(error.message, 'No fue posible verificar si el cliente tiene historial asociado.');
+    }
+
+    return count ?? 0;
+  }
+
+  private async loadClientHistory(clientId: string): Promise<ClientHistorySnapshot> {
+    let ordersData: any[] = [];
+    let quotesData: any[] = [];
+    let ticketsData: any[] = [];
+    let returnsData: any[] = [];
+    let returnRequestsUnavailable = false;
+
+    let ordersFailed = false;
+    let quotesFailed = false;
+    let ticketsFailed = false;
+
+    // 1. Cargar Pedidos de forma segura
+    try {
+      const res = await this.supabase.client
+        .from('orders')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+      if (res.error) {
+        ordersFailed = true;
+        console.error('[Clients] Error loading client orders history', {
+          clientId,
+          error: res.error,
+          message: res.error.message,
+          code: res.error.code
+        });
+      } else {
+        ordersData = res.data ?? [];
+      }
+    } catch (err) {
+      ordersFailed = true;
+      console.error('[Clients] Exception loading client orders history', err);
+    }
+
+    // 2. Cargar Cotizaciones de forma segura
+    try {
+      const res = await this.supabase.client
+        .from('quotes')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+      if (res.error) {
+        quotesFailed = true;
+        console.error('[Clients] Error loading client quotes history', {
+          clientId,
+          error: res.error,
+          message: res.error.message,
+          code: res.error.code
+        });
+      } else {
+        quotesData = res.data ?? [];
+      }
+    } catch (err) {
+      quotesFailed = true;
+      console.error('[Clients] Exception loading client quotes history', err);
+    }
+
+    // 3. Cargar Tickets de soporte de forma segura
+    try {
+      const res = await this.supabase.client
+        .from('service_tickets')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+      if (res.error) {
+        ticketsFailed = true;
+        console.error('[Clients] Error loading client tickets history', {
+          clientId,
+          error: res.error,
+          message: res.error.message,
+          code: res.error.code
+        });
+      } else {
+        ticketsData = res.data ?? [];
+      }
+    } catch (err) {
+      ticketsFailed = true;
+      console.error('[Clients] Exception loading client tickets history', err);
+    }
+
+    // 4. Cargar Devoluciones de forma segura (Opcional/Complementaria)
+    try {
+      const res = await this.supabase.client
+        .from('return_requests')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('requested_at', { ascending: false });
+      if (res.error) {
+        returnRequestsUnavailable = true;
+        console.warn('[Clients] Return requests history unavailable', {
+          clientId,
+          error: res.error,
+          message: res.error.message,
+          code: res.error.code
+        });
+      } else {
+        returnsData = res.data ?? [];
+      }
+    } catch (err) {
+      returnRequestsUnavailable = true;
+      console.warn('[Clients] Exception loading client return requests history', err);
+    }
+
+    // Si fallan todas las consultas principales, lanzar un error fatal
+    if (ordersFailed && quotesFailed && ticketsFailed) {
+      throw new Error('No fue posible cargar el historial del cliente.');
+    }
+
+    const technicianIds = [
+      ...new Set(ticketsData
+        .map((ticket: any) => String(ticket.assigned_technician_id ?? '').trim())
+        .filter(Boolean)
+      ),
+    ];
+    const technicianNames = await this.getTechnicianNames(technicianIds);
+    const orderFolios = new Map(ordersData.map((row: any) => [
+      String(row.id),
+      String(row.order_number ?? row.folio ?? `PED-${this.getShortId(row.id)}`),
+    ]));
+
+    return {
+      orders: ordersData.map((row: any) => ({
+        id: String(row.id),
+        folio: row.order_number ?? row.folio ?? `PED-${this.getShortId(row.id)}`,
+        status: String(row.status ?? ''),
+        total: Number(row.total ?? row.total_amount ?? 0),
+        createdAt: row.created_at ?? row.updated_at ?? new Date().toISOString(),
+      })),
+      quotes: quotesData.map((row: any) => ({
+        id: String(row.id),
+        folio: row.quote_number ?? `COT-${this.getShortId(row.id)}`,
+        status: String(row.status ?? ''),
+        total: Number(row.total ?? 0),
+        createdAt: row.created_at ?? row.updated_at ?? new Date().toISOString(),
+      })),
+      tickets: ticketsData.map((row: any) => ({
+        id: String(row.id),
+        folio: row.ticket_number ?? `TKT-${this.getShortId(row.id)}`,
+        title: row.title ?? 'Ticket de soporte',
+        status: String(row.status ?? ''),
+        priority: String(row.priority ?? ''),
+        technicianName: String(row.assigned_technician_custom_name ?? '').trim()
+          || technicianNames.get(String(row.assigned_technician_id ?? '').trim())
+          || 'Sin tecnico asignado',
+        createdAt: row.requested_at ?? row.created_at ?? row.updated_at ?? new Date().toISOString(),
+      })),
+      returnRequests: returnsData.map((row: any) => ({
+        id: String(row.id),
+        folio: row.return_number ?? `DEV-${this.getShortId(row.id)}`,
+        orderId: String(row.order_id ?? ''),
+        orderFolio: orderFolios.get(String(row.order_id ?? '')) ?? (row.order_number_snapshot ?? row.order_number ?? 'Pedido no disponible'),
+        status: String(row.status ?? ''),
+        reason: String(row.reason ?? ''),
+        createdAt: row.requested_at ?? row.created_at ?? row.updated_at ?? new Date().toISOString(),
+      })),
+      returnRequestsUnavailable
+    };
+  }
+
+  private async getTechnicianNames(technicianIds: string[]): Promise<Map<string, string>> {
+    if (!technicianIds.length) {
+      return new Map();
+    }
+
+    const { data, error } = await this.supabase.client
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', technicianIds);
+
+    if (error) {
+      return new Map();
+    }
+
+    return new Map((data ?? []).map((profile: any) => [
+      String(profile.id),
+      String(profile.full_name ?? profile.email ?? '').trim(),
+    ]));
   }
 
   private async fetchRawClientById(id: string): Promise<any> {
@@ -304,6 +570,10 @@ export class ClientSupabaseService {
   private extractPostalCode(raw: string): string {
     const match = String(raw ?? '').match(/c\.?p\.?\s*([0-9A-Za-z-]+)/i);
     return match?.[1]?.trim() ?? '';
+  }
+
+  private getShortId(value: unknown): string {
+    return String(value ?? '').replace(/-/g, '').slice(0, 8).toUpperCase() || '0000';
   }
 
   private mapToSupabasePayload(clientData: Partial<Client>): Record<string, any> {

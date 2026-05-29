@@ -68,7 +68,7 @@
         </div>
         <div class="info-item">
           <span class="info-item__label">Tecnico asignado</span>
-          <span class="info-item__value">{{ ticket()!.assignedTechnicianName || 'Sin asignar' }}</span>
+          <span class="info-item__value">{{ assignedTechnicianLabel() }}</span>
         </div>
         <div class="info-item">
           <span class="info-item__label">Fecha de solicitud</span>
@@ -83,18 +83,101 @@
 
     <aside class="action-card">
       <span class="action-card__label">Acciones operativas</span>
-      <bc-custom-select
-        [options]="technicianOptions()"
-        [ngModel]="selectedTechnician()"
-        (ngModelChange)="selectedTechnician.set($event)"
-        placeholder="Seleccionar tecnico">
-      </bc-custom-select>
-      <button type="button" class="btn-primary" (click)="assignTechnician()" [disabled]="isProcessing()">Asignar tecnico</button>
-      <button type="button" class="btn-secondary" (click)="markInProgress()" [disabled]="isProcessing() || ticket()!.status === 'in_progress'">Marcar en proceso</button>
-      <button type="button" class="btn-secondary" (click)="markWaitingParts()" [disabled]="isProcessing() || ticket()!.status === 'waiting_parts'">Esperando refaccion</button>
-      <button type="button" class="btn-secondary" (click)="markResolved()" [disabled]="isProcessing() || ticket()!.status === 'resolved'">Marcar resuelto</button>
-      <button type="button" class="btn-secondary" (click)="closeTicket()" [disabled]="isProcessing() || ticket()!.status === 'closed'">Cerrar ticket</button>
-      <button type="button" class="btn-ghost" (click)="cancelTicket()" [disabled]="isProcessing() || ticket()!.status === 'cancelled'">Cancelar ticket</button>
+      
+      <!-- Técnico Asignado -->
+      <div class="action-card__technician-info" style="margin-bottom: var(--space-4); font-size: var(--font-size-sm); color: var(--color-text-primary);">
+        <strong style="color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; display: block; margin-bottom: 2px;">Técnico asignado</strong>
+        {{ assignedTechnicianLabel() }}
+      </div>
+
+      <!-- Estado Terminal: Cerrado / Cancelado -->
+      <ng-container *ngIf="hasTerminalStatus(); else activeActions">
+        <span class="action-card__empty" style="display: block; padding: var(--space-3); border-radius: var(--radius-md); background-color: var(--color-gray-50); border: 1px dashed var(--color-border); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs);">
+          {{ terminalStatusMessage() }}
+        </span>
+      </ng-container>
+
+      <ng-template #activeActions>
+        <!-- Selector de técnico (Solo disponible en Abierto, Asignado, En proceso y Esperando refacción) -->
+        <div class="action-card__technician-selector" *ngIf="canAssignTechnician()" style="display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); margin-bottom: var(--space-4);">
+          <strong style="color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase;">{{ hasAssignedTechnician() ? 'Reasignar técnico' : 'Asignar técnico' }}</strong>
+          <bc-custom-select
+            [options]="technicianOptions()"
+            [ngModel]="selectedTechnician()"
+            (ngModelChange)="selectedTechnician.set($event)"
+            [placeholder]="hasAssignedTechnician() ? 'Reasignar tecnico' : 'Seleccionar tecnico'">
+          </bc-custom-select>
+          <input
+            *ngIf="isExternalTechnicianSelected()"
+            type="text"
+            class="action-card__input"
+            maxlength="120"
+            [ngModel]="externalTechnicianName()"
+            (ngModelChange)="externalTechnicianName.set($event)"
+            placeholder="Nombre del tecnico">
+          <button type="button" class="btn-primary" (click)="assignTechnician()" [disabled]="isProcessing()">
+            {{ technicianActionLabel() }}
+          </button>
+        </div>
+
+        <!-- Panel de Acciones Operativas según el Estado del Ticket -->
+        <div class="action-card__buttons" style="display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border);">
+          <strong style="color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; margin-bottom: 2px;">Acciones de estado</strong>
+
+          <!-- 1. Estado Abierto -->
+          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'open' || normalizeStatus(ticket()!.status) === 'abierto'">
+            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
+              Cancelar ticket
+            </button>
+          </ng-container>
+
+          <!-- 2. Estado Asignado -->
+          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'assigned' || normalizeStatus(ticket()!.status) === 'asignado'">
+            <button type="button" class="btn-primary" (click)="markInProgress()" [disabled]="isProcessing()">
+              Iniciar atención
+            </button>
+            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
+              Cancelar ticket
+            </button>
+          </ng-container>
+
+          <!-- 3. Estado En proceso -->
+          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'in_progress' || normalizeStatus(ticket()!.status) === 'en proceso' || normalizeStatus(ticket()!.status) === 'en_proceso'">
+            <button type="button" class="btn-secondary" (click)="markWaitingParts()" [disabled]="isProcessing()">
+              Esperando refacción
+            </button>
+            <button type="button" class="btn-primary" (click)="markResolved()" [disabled]="isProcessing()">
+              Marcar resuelto
+            </button>
+            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
+              Cancelar ticket
+            </button>
+          </ng-container>
+
+          <!-- 4. Estado Esperando refacción -->
+          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'waiting_parts' || normalizeStatus(ticket()!.status) === 'esperando refaccion' || normalizeStatus(ticket()!.status) === 'esperando_refaccion'">
+            <button type="button" class="btn-primary" (click)="markInProgress()" [disabled]="isProcessing()">
+              Continuar atención
+            </button>
+            <button type="button" class="btn-secondary" (click)="markResolved()" [disabled]="isProcessing()">
+              Marcar resuelto
+            </button>
+            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
+              Cancelar ticket
+            </button>
+          </ng-container>
+
+          <!-- 5. Estado Resuelto -->
+          <ng-container *ngIf="isResolvedTicket()">
+            <button type="button" class="btn-primary" (click)="closeTicket()" [disabled]="isProcessing()">
+              Cerrar ticket
+            </button>
+            <button type="button" class="btn-secondary" (click)="reopenTicket()" [disabled]="isProcessing()">
+              Reabrir ticket
+            </button>
+          </ng-container>
+        </div>
+      </ng-template>
     </aside>
   </div>
 

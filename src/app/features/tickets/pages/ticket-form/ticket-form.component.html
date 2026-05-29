@@ -148,8 +148,29 @@
           <h2 class="form-section__title">Control</h2>
 
           <div class="form-field">
-            <label class="form-field__label">Estado</label>
-            <bc-custom-select formControlName="status" [options]="statusOptions" placeholder="Seleccionar estado"></bc-custom-select>
+            <!-- Modo creación: Estado inicial calculado -->
+            <div *ngIf="!isEditMode()" class="status-info-box">
+              <span class="status-info-box__label">Estado inicial</span>
+              <span class="status-info-box__badge" [ngClass]="form.get('assignedTechnicianSelection')?.value ? 'status-info-box__badge--assigned' : 'status-info-box__badge--open'">
+                {{ form.get('assignedTechnicianSelection')?.value ? 'Asignado' : 'Abierto' }}
+              </span>
+              <p class="status-info-box__desc">
+                {{ form.get('assignedTechnicianSelection')?.value 
+                  ? 'El ticket se creará asignado al técnico seleccionado.' 
+                  : 'El ticket se creará en estado abierto sin técnico asignado.' }}
+              </p>
+            </div>
+
+            <!-- Modo edición: Estado actual de solo lectura -->
+            <div *ngIf="isEditMode()" class="status-info-box">
+              <span class="status-info-box__label">Estado actual</span>
+              <span class="status-info-box__badge status-info-box__badge--current">
+                {{ getStatusLabel(form.get('status')?.value) }}
+              </span>
+              <p class="status-info-box__desc">
+                El estado operativo del ticket se gestiona desde las acciones operativas en el expediente técnico.
+              </p>
+            </div>
           </div>
         </div>
       </div>

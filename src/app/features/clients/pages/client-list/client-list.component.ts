@@ -5,10 +5,9 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
-import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { ClientSupabaseService } from '../../services/client.supabase.service';
-import { Client, ClientType, ClientStatus } from '../../../../core/models/client.model';
+import { Client, ClientType } from '../../../../core/models/client.model';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
@@ -20,7 +19,6 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
     RouterLink,
     FormsModule,
     PageHeaderComponent,
-    StatusBadgeComponent,
     LoaderComponent,
     CustomSelectComponent
   ],
@@ -147,6 +145,11 @@ export class ClientListComponent implements OnInit {
     this.searchQuery.set(query);
   }
 
+  clearFilters(): void {
+    this.searchQuery.set('');
+    this.selectedType.set('all');
+  }
+
   onTypeChangeCustom(value: string | ClientType) {
     this.selectedType.set(value as string);
   }
@@ -165,10 +168,4 @@ export class ClientListComponent implements OnInit {
     }
   }
 
-  getStatusBadge(status: ClientStatus) {
-    return {
-      label: status === ClientStatus.Active ? 'Activo' : 'Inactivo',
-      variant: status === ClientStatus.Active ? 'success' : 'neutral'
-    } as const;
-  }
 }

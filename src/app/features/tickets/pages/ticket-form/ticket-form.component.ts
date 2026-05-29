@@ -206,6 +206,22 @@ export class TicketFormComponent {
       notes: ticket.notes,
     }, { emitEvent: false });
 
+    // Bloquear técnico si el estado es Resuelto, Cerrado o Cancelado
+    const statusLower = String(ticket.status).toLowerCase();
+    const isTerminal = statusLower === 'resolved' || statusLower === 'resuelto' ||
+                       statusLower === 'closed' || statusLower === 'cerrado' ||
+                       statusLower === 'cancelled' || statusLower === 'canceled' || statusLower === 'cancelado';
+
+    if (isTerminal) {
+      this.form.get('assignedTechnicianSelection')?.disable({ emitEvent: false });
+      this.form.get('assignedTechnicianCustomName')?.disable({ emitEvent: false });
+      this.form.get('scheduledAt')?.disable({ emitEvent: false });
+    } else {
+      this.form.get('assignedTechnicianSelection')?.enable({ emitEvent: false });
+      this.form.get('assignedTechnicianCustomName')?.enable({ emitEvent: false });
+      this.form.get('scheduledAt')?.enable({ emitEvent: false });
+    }
+
     this.syncSelectedClient(ticket.clientId, ticket);
     this.syncSelectedProduct(ticket.productId ?? '', ticket);
   }
@@ -305,8 +321,46 @@ export class TicketFormComponent {
     }, { emitEvent: false });
   }
 
+  getStatusLabel(status: TicketStatus | string | null | undefined): string {
+    if (!status) return 'Abierto';
+    const normalized = String(status).trim().toLowerCase();
+    switch (normalized) {
+      case 'open':
+      case 'abierto':
+        return 'Abierto';
+      case 'assigned':
+      case 'asignado':
+        return 'Asignado';
+      case 'in_progress':
+      case 'en proceso':
+      case 'en_proceso':
+        return 'En proceso';
+      case 'waiting_parts':
+      case 'esperando refaccion':
+      case 'esperando_refaccion':
+        return 'Esperando refacción';
+      case 'resolved':
+      case 'resuelto':
+        return 'Resuelto';
+      case 'closed':
+      case 'cerrado':
+        return 'Cerrado';
+      case 'cancelled':
+      case 'canceled':
+      case 'cancelado':
+        return 'Cancelado';
+      default:
+        return String(status);
+    }
+  }
+
   private buildPayload(): TicketUpsertPayload {
     const raw = this.form.getRawValue();
+
+    let calculatedStatus = raw.status;
+    if (!this.isEditMode()) {
+      calculatedStatus = raw.assignedTechnicianSelection ? TicketStatus.Assigned : TicketStatus.Open;
+    }
 
     return {
       clientId: raw.clientId ?? '',
@@ -315,7 +369,7 @@ export class TicketFormComponent {
       description: raw.description ?? '',
       priority: raw.priority ?? TicketPriority.Medium,
       type: raw.type ?? TicketType.Corrective,
-      status: raw.status ?? TicketStatus.Open,
+      status: calculatedStatus ?? TicketStatus.Open,
       productId: raw.productId || undefined,
       productNameSnapshot: raw.productNameSnapshot || undefined,
       equipmentSerialNumber: this.isSelectedProductService ? undefined : raw.equipmentSerialNumber || undefined,

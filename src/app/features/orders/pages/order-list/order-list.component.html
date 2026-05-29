@@ -12,7 +12,16 @@
   </a>
 </bc-page-header>
 
-<section class="quick-summary">
+<div class="orders-tabs" role="tablist" aria-label="Vista de pedidos">
+  <button type="button" class="orders-tabs__item" [class.orders-tabs__item--active]="activeTab() === 'orders'" (click)="setActiveTab('orders')">
+    Todos los pedidos
+  </button>
+  <button type="button" class="orders-tabs__item" [class.orders-tabs__item--active]="activeTab() === 'returns'" (click)="setActiveTab('returns')">
+    Devoluciones
+  </button>
+</div>
+
+<section *ngIf="activeTab() === 'orders'" class="quick-summary">
   <div class="quick-summary__header">
     <div>
       <h2 class="quick-summary__title">Resumen rapido</h2>
@@ -54,7 +63,7 @@
   </div>
 </section>
 
-<div class="filters-bar">
+<div *ngIf="activeTab() === 'orders'" class="filters-bar">
   <div class="filters-bar__search">
     <span class="filters-bar__search-icon">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -86,21 +95,21 @@
   </button>
 </div>
 
-<div *ngIf="!isLoading() && errorMessage()" class="list-alert" role="alert">
+<div *ngIf="activeTab() === 'orders' && !isLoading() && errorMessage()" class="list-alert" role="alert">
   {{ errorMessage() }}
 </div>
 
-<bc-loader *ngIf="isLoading()" message="Cargando pedidos..."></bc-loader>
+<bc-loader *ngIf="activeTab() === 'orders' && isLoading()" message="Cargando pedidos..."></bc-loader>
 
 <bc-empty-state
-  *ngIf="!isLoading() && filteredOrders().length === 0"
+  *ngIf="activeTab() === 'orders' && !isLoading() && filteredOrders().length === 0"
   title="Sin pedidos"
   [description]="emptyStateDescription"
   [hasAction]="hasActiveFilters()">
   <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>
 
-<div class="table-wrapper" *ngIf="!isLoading() && filteredOrders().length > 0">
+<div class="table-wrapper" *ngIf="activeTab() === 'orders' && !isLoading() && filteredOrders().length > 0">
   <table class="data-table" aria-label="Listado de pedidos">
     <thead>
       <tr>
@@ -172,6 +181,113 @@
     <span class="table-count">{{ filteredOrders().length }} pedido{{ filteredOrders().length !== 1 ? 's' : '' }}</span>
   </div>
 </div>
+
+<ng-container *ngIf="activeTab() === 'returns'">
+  <div class="filters-bar">
+    <div class="filters-bar__search">
+      <span class="filters-bar__search-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </span>
+      <input
+        type="search"
+        class="filters-bar__input"
+        placeholder="Buscar por folio, pedido o cliente..."
+        [ngModel]="returnSearchQuery()"
+        (ngModelChange)="returnSearchQuery.set($event)"
+        aria-label="Buscar devoluciones">
+    </div>
+
+    <div class="filters-bar__select">
+      <bc-custom-select
+        [options]="returnStatusOptions"
+        [ngModel]="selectedReturnStatus()"
+        (ngModelChange)="selectedReturnStatus.set($event)"
+        placeholder="Todos los estados">
+      </bc-custom-select>
+    </div>
+
+    <div class="filters-bar__select">
+      <bc-custom-select
+        [options]="returnReasonOptions"
+        [ngModel]="selectedReturnReason()"
+        (ngModelChange)="selectedReturnReason.set($event)"
+        placeholder="Todos los motivos">
+      </bc-custom-select>
+    </div>
+
+    <button *ngIf="hasActiveReturnFilters()" class="btn-ghost btn-sm" (click)="clearReturnFilters()">
+      Limpiar filtros
+    </button>
+  </div>
+
+  <div *ngIf="!isLoadingReturns() && returnErrorMessage()" class="list-alert" role="alert">
+    {{ returnErrorMessage() }}
+  </div>
+
+  <bc-loader *ngIf="isLoadingReturns()" message="Cargando devoluciones..."></bc-loader>
+
+  <bc-empty-state
+    *ngIf="!isLoadingReturns() && filteredReturnRequests().length === 0"
+    title="Sin devoluciones"
+    [description]="returnErrorMessage() || (hasActiveReturnFilters() ? 'No se encontraron devoluciones con los filtros aplicados.' : 'No hay solicitudes de devolucion registradas.')"
+    [hasAction]="hasActiveReturnFilters()">
+    <button *ngIf="hasActiveReturnFilters()" class="btn-ghost" (click)="clearReturnFilters()">Limpiar filtros</button>
+  </bc-empty-state>
+
+  <div class="table-wrapper" *ngIf="!isLoadingReturns() && filteredReturnRequests().length > 0">
+    <table class="data-table" aria-label="Listado de devoluciones">
+      <thead>
+        <tr>
+          <th scope="col">Folio devolucion</th>
+          <th scope="col">Pedido origen</th>
+          <th scope="col">Cliente</th>
+          <th scope="col">Motivo</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Solicitud</th>
+          <th scope="col" class="text-center">Productos</th>
+          <th scope="col" class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let request of filteredReturnRequests()" class="data-table__row">
+          <td class="data-table__folio">{{ request.returnNumber }}</td>
+          <td class="data-table__secondary">{{ getReturnOrderFolio(request) }}</td>
+          <td class="data-table__name">
+            <span class="order-client">{{ getReturnClientName(request) }}</span>
+            <span class="order-meta">{{ request.items.length }} linea{{ request.items.length !== 1 ? 's' : '' }}</span>
+          </td>
+          <td>{{ getReturnReasonLabel(request.reason) }}</td>
+          <td>
+            <bc-status-badge
+              [label]="getReturnStatusBadge(request.status).label"
+              [variant]="getReturnStatusBadge(request.status).variant"
+              [showDot]="true">
+            </bc-status-badge>
+          </td>
+          <td class="data-table__secondary">{{ request.requestedAt | date:'dd/MM/yyyy' }}</td>
+          <td class="text-center">{{ getReturnItemsCount(request) }}</td>
+          <td class="text-center">
+            <div class="table-actions">
+              <a [routerLink]="['/pedidos/devoluciones', request.id]" class="btn-icon" aria-label="Ver devolucion" title="Ver devolucion">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+              </a>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="table-footer">
+      <span class="table-count">{{ filteredReturnRequests().length }} devolucion{{ filteredReturnRequests().length !== 1 ? 'es' : '' }}</span>
+    </div>
+  </div>
+</ng-container>
 
 
 
