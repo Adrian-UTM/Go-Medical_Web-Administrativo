@@ -10,6 +10,7 @@ import { ClientSupabaseService } from '../../services/client.supabase.service';
 import { Client, ClientType } from '../../../../core/models/client.model';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
+import { ActionMenuComponent } from '../../../../shared/components/action-menu/action-menu.component';
 
 @Component({
   selector: 'bc-client-list',
@@ -20,7 +21,8 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
     FormsModule,
     PageHeaderComponent,
     LoaderComponent,
-    CustomSelectComponent
+    CustomSelectComponent,
+    ActionMenuComponent
   ],
   templateUrl: './client-list.component.html',
   styleUrls: ['./client-list.component.css']

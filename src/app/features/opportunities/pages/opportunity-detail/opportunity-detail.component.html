@@ -1,20 +1,20 @@
 <bc-loader *ngIf="isLoading()" message="Cargando oportunidad..."></bc-loader>
-
+ 
 <ng-container *ngIf="!isLoading() && opportunity()">
   <bc-page-header
     [title]="opportunity()!.folio"
     [breadcrumbs]="breadcrumbs">
     <a routerLink="/oportunidades" class="btn-ghost">← Volver</a>
   </bc-page-header>
-
+ 
   <div *ngIf="actionMessage()" class="info-banner">
     {{ actionMessage() }}
   </div>
-
+ 
   <div *ngIf="errorMessage()" class="info-banner info-banner--error">
     {{ errorMessage() }}
   </div>
-
+ 
   <div class="opportunity-hero">
     <div class="opportunity-hero__main">
       <div class="opportunity-hero__meta">
@@ -30,11 +30,11 @@
           size="sm">
         </bc-status-badge>
       </div>
-
+ 
       <div class="summary-grid">
         <div class="summary-item">
           <span class="summary-item__label">Cliente / Prospecto</span>
-          <span class="summary-item__value">{{ opportunity()!.contact.companyName }}</span>
+          <span class="summary-item__value" style="font-weight: 600; color: var(--color-primary);">{{ opportunity()!.contact.companyName }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-item__label">Contacto</span>
@@ -42,11 +42,11 @@
         </div>
         <div class="summary-item">
           <span class="summary-item__label">Correo</span>
-          <span class="summary-item__value">{{ opportunity()!.contact.email || 'No disponible' }}</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.email || 'Correo no disponible' }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-item__label">Teléfono</span>
-          <span class="summary-item__value">{{ opportunity()!.contact.phone || 'No disponible' }}</span>
+          <span class="summary-item__value">{{ opportunity()!.contact.phone || 'Teléfono no disponible' }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-item__label">Responsable</span>
@@ -58,32 +58,84 @@
         </div>
       </div>
     </div>
-
+ 
     <div class="opportunity-hero__side">
       <div class="action-card">
-        <span class="action-card__label">Acciones</span>
+        <span class="action-card__label" style="margin-bottom: 4px; display: block;">Acciones de Contacto</span>
+        
+        <!-- Botón de Teléfono -->
+        <button type="button" class="btn-secondary" style="width: 100%; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; text-align: left;"
+                (click)="contactByPhone()"
+                [disabled]="!opportunity()!.contact.phone"
+                [title]="opportunity()!.contact.phone ? 'Llamar al cliente' : 'Teléfono no disponible'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {{ opportunity()!.contact.phone || 'Teléfono no disponible' }}
+          </span>
+        </button>
+
+        <!-- Botón de WhatsApp -->
+        <button type="button" class="btn-secondary" style="width: 100%; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; text-align: left; background-color: rgba(37, 211, 102, 0.08); border-color: rgba(37, 211, 102, 0.2); color: #075e54;"
+                (click)="contactByWhatsApp()"
+                [disabled]="!opportunity()!.contact.phone"
+                [title]="opportunity()!.contact.phone ? 'Enviar WhatsApp al cliente' : 'Teléfono no disponible'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {{ opportunity()!.contact.phone ? 'Contactar por WhatsApp' : 'WhatsApp no disponible' }}
+          </span>
+        </button>
+
+        <!-- Botón de Correo -->
+        <button type="button" class="btn-secondary" style="width: 100%; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; text-align: left;"
+                (click)="contactByEmail()"
+                [disabled]="!opportunity()!.contact.email"
+                [title]="opportunity()!.contact.email ? 'Enviar correo electrónico' : 'Correo no disponible'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;">
+            {{ opportunity()!.contact.email || 'Correo no disponible' }}
+          </span>
+        </button>
+
+        <!-- Advertencia de Consentimiento Promocional -->
+        <div class="consent-alert" style="margin-top: 8px; padding: 10px; background-color: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: 11px; color: #92400e; line-height: 1.4;">
+          <span style="font-weight: 600; display: block; margin-bottom: 2px;">⚠️ Nota de Consentimiento:</span>
+          El consentimiento de envío promocional de este cliente no está configurado explícitamente en el sistema.
+        </div>
+      </div>
+
+      <div class="action-card" style="margin-top: 16px;">
+        <span class="action-card__label" style="margin-bottom: 4px; display: block;">Acciones Rápidas</span>
         <button type="button" class="btn-primary" (click)="markAsContacted()">Marcar como contactado</button>
         <button type="button" class="btn-secondary" (click)="markAsInterested()">Marcar como interesado</button>
         <button type="button" class="btn-secondary" (click)="markAsNoResponse()">Marcar como no respondió</button>
         <button type="button" class="btn-secondary" (click)="convertToOrder()">Convertir a pedido</button>
         <button type="button" class="btn-secondary" (click)="convertToQuote()">Convertir a cotización</button>
-        <button type="button" class="btn-ghost" (click)="closeOpportunity()">Cerrar oportunidad</button>
+        <button type="button" class="btn-ghost" (click)="closeOpportunity()">Cerrar / Descartar</button>
       </div>
     </div>
   </div>
-
+ 
   <div class="detail-layout">
     <div class="detail-main">
+      <!-- Tabla de Productos del Carrito -->
       <section class="detail-card">
         <div class="detail-card__header">
           <h2 class="detail-card__title">Productos del carrito</h2>
           <span class="detail-card__subtitle">Resumen comercial asociado a la oportunidad</span>
         </div>
-
+ 
         <div class="table-wrapper" *ngIf="opportunity()!.items.length > 0; else emptyItems">
           <table class="data-table" aria-label="Productos del carrito">
             <thead>
               <tr>
+                <th scope="col" style="width: 60px;">Imagen</th>
                 <th scope="col">SKU</th>
                 <th scope="col">Producto</th>
                 <th scope="col">Categoría</th>
@@ -94,47 +146,102 @@
             </thead>
             <tbody>
               <tr *ngFor="let item of opportunity()!.items" class="data-table__row">
+                <td style="vertical-align: middle;">
+                  <div class="product-thumbnail-wrapper" style="width: 40px; height: 40px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-border); display: flex; align-items: center; justify-content: center; background-color: var(--color-gray-50);">
+                    <img *ngIf="item.imageUrl" [src]="item.imageUrl" [alt]="item.productName" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div *ngIf="!item.imageUrl" style="color: var(--color-text-muted); display: flex; align-items: center; justify-content: center;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                      </svg>
+                    </div>
+                  </div>
+                </td>
                 <td class="data-table__mono">{{ item.sku }}</td>
                 <td><span class="item-name">{{ item.productName }}</span></td>
                 <td class="data-table__secondary">{{ getCategoryLabel(item.productCategory) }}</td>
-                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-center" style="font-weight: 600;">{{ item.quantity }}</td>
                 <td class="text-right">{{ item.unitPrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
                 <td class="text-right item-total">{{ item.estimatedLineTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-
+ 
         <ng-template #emptyItems>
           <div class="not-found">No hay productos asociados a esta oportunidad.</div>
         </ng-template>
       </section>
 
+      <!-- Formulario para Registrar Nota de Seguimiento Comercial -->
+      <section class="detail-card">
+        <div class="detail-card__header">
+          <h2 class="detail-card__title">Registrar Nota de Seguimiento</h2>
+          <span class="detail-card__subtitle">Añadir una actividad comercial e historial de contacto</span>
+        </div>
+
+        <form (ngSubmit)="submitFollowUp()" style="padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4);">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+            <div class="form-group">
+              <label for="followUpChannel" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--color-text-secondary);">Canal de Contacto</label>
+              <select id="followUpChannel" [ngModel]="followUpChannel()" (ngModelChange)="followUpChannel.set($event)" name="followUpChannel" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                <option *ngFor="let opt of channelOptions" [value]="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="followUpStatus" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--color-text-secondary);">Nuevo Estado</label>
+              <select id="followUpStatus" [ngModel]="followUpStatus()" (ngModelChange)="followUpStatus.set($event)" name="followUpStatus" style="width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm); background: var(--color-bg-surface); color: var(--color-text-primary);">
+                <option *ngFor="let opt of statusOptions" [value]="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="followUpNote" style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--color-text-secondary);">Nota de Seguimiento Comercial</label>
+            <textarea id="followUpNote" [ngModel]="followUpNote()" (ngModelChange)="followUpNote.set($event)" name="followUpNote" rows="3" placeholder="Escribe detalles del contacto con el cliente, dudas resueltas o promociones ofrecidas..." required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm); resize: vertical; background: var(--color-bg-surface); color: var(--color-text-primary); font-family: inherit;"></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button type="submit" class="btn-primary" [disabled]="isSubmittingFollowUp() || !followUpNote().trim()" style="padding: 10px 20px;">
+              {{ isSubmittingFollowUp() ? 'Guardando...' : 'Registrar Nota' }}
+            </button>
+          </div>
+        </form>
+      </section>
+ 
+      <!-- Historial de SeguimientoTimeline -->
       <section class="detail-card">
         <div class="detail-card__header">
           <h2 class="detail-card__title">Historial de seguimiento</h2>
           <span class="detail-card__subtitle">Registro de actividades comerciales</span>
         </div>
-
+ 
         <div class="timeline" *ngIf="opportunity()!.followUps.length > 0; else emptyFollowUps">
           <div *ngFor="let followUp of opportunity()!.followUps" class="timeline-item">
             <div class="timeline-item__content">
               <div class="timeline-item__top">
-                <span class="timeline-item__title">{{ followUp.title }}</span>
+                <span class="timeline-item__title" style="display: inline-flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 700;">{{ followUp.title }}</span>
+                  <span *ngIf="followUp.contactChannel" class="contact-channel-badge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: 600; text-transform: uppercase;">
+                    {{ followUp.contactChannel }}
+                  </span>
+                </span>
                 <span class="timeline-item__date">{{ followUp.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
               </div>
               <p class="timeline-item__note">{{ followUp.note }}</p>
-              <span class="timeline-item__author">{{ followUp.createdBy }}</span>
+              <span class="timeline-item__author" style="font-style: italic;">Responsable: {{ followUp.createdBy }}</span>
             </div>
           </div>
         </div>
-
+ 
         <ng-template #emptyFollowUps>
           <div class="not-found">No hay seguimiento registrado para esta oportunidad.</div>
         </ng-template>
       </section>
     </div>
-
+ 
     <aside class="detail-side">
       <section class="detail-card detail-card--side">
         <div class="totals-card">
@@ -148,7 +255,7 @@
           </div>
         </div>
       </section>
-
+ 
       <section class="detail-card detail-card--side">
         <div class="detail-card__header detail-card__header--compact">
           <h2 class="detail-card__title">Notas comerciales</h2>
@@ -158,7 +265,7 @@
     </aside>
   </div>
 </ng-container>
-
+ 
 <div *ngIf="!isLoading() && !opportunity()" class="not-found">
   <p>{{ errorMessage() || 'La oportunidad no fue encontrada.' }}</p>
   <a routerLink="/oportunidades" class="btn-ghost">← Volver a oportunidades</a>

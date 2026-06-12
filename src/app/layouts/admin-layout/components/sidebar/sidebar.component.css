@@ -129,20 +129,49 @@
   margin-bottom: 8px;
 }
 
-.sidebar__group-label {
-  padding: 14px 8px 6px;
+.sidebar__group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 8px 7px;
+  border: 0;
+  background: transparent;
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: rgba(255, 255, 255, 0.42);
   text-transform: uppercase;
+  text-align: left;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.sidebar__group-toggle:hover,
+.sidebar__group--active .sidebar__group-toggle {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.sidebar__group-chevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: transform 160ms ease;
+}
+
+.sidebar__group-chevron--open {
+  transform: rotate(180deg);
 }
 
 .sidebar__nav-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.sidebar--collapsed .sidebar__group {
+  margin-bottom: 4px;
 }
 
 /* ---- Nav Links ---- */

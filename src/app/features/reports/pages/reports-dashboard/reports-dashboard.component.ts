@@ -211,6 +211,7 @@ export class ReportsDashboardComponent implements OnInit {
   periodMode: ReportPeriodMode = 'day';
   dateFrom = this.filters.dateFrom ?? '';
   dateTo = this.filters.dateTo ?? '';
+  selectedMonth = this.dateFrom.substring(0, 7);
   activeTab: 'top' | 'low' | 'customers' = 'top';
   lastUpdated = new Date().toISOString();
 
@@ -254,6 +255,9 @@ export class ReportsDashboardComponent implements OnInit {
     this.filters = this.createPeriodFilters(mode);
     this.dateFrom = this.filters.dateFrom ?? '';
     this.dateTo = this.filters.dateTo ?? '';
+    if (this.dateFrom) {
+      this.selectedMonth = this.dateFrom.substring(0, 7);
+    }
   }
 
   async applyPeriodMode(mode: ReportPeriodMode): Promise<void> {
@@ -283,6 +287,16 @@ export class ReportsDashboardComponent implements OnInit {
     }
 
     this.dateTo = normalized;
+  }
+
+  onMonthInputChange(value: string): void {
+    if (!value) return;
+    this.selectedMonth = value;
+    const [year, month] = value.split('-').map(Number);
+    const dateFrom = new Date(year, month - 1, 1);
+    const dateTo = new Date(year, month, 0);
+    this.dateFrom = this.toDateInputValue(dateFrom);
+    this.dateTo = this.toDateInputValue(dateTo);
   }
 
   get periodLabel(): string {

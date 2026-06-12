@@ -113,6 +113,8 @@ export class OrderSupabaseService {
       tax: totals.tax,
       total: totals.total,
       notes: payload.notes ?? '',
+      shipping_address: payload.shippingAddress ?? null,
+      payment_method: payload.paymentMethod ?? 'other',
     };
 
     const { data, error } = await this.supabase.client
@@ -158,7 +160,9 @@ export class OrderSupabaseService {
       tax_exempt: !!payload.taxExempt,
       tax: totals.tax,
       total: totals.total,
-      notes: payload.notes ?? '',
+      notes: payload.notes !== undefined ? payload.notes : existing.notes,
+      shipping_address: payload.shippingAddress !== undefined ? payload.shippingAddress : existing.shippingAddress,
+      payment_method: payload.paymentMethod !== undefined ? payload.paymentMethod : existing.paymentMethod,
       updated_at: new Date().toISOString(),
     };
 
@@ -270,6 +274,8 @@ export class OrderSupabaseService {
       tax: Number(row.tax ?? 0),
       total: Number(row.total ?? 0),
       notes: row.notes ?? '',
+      shippingAddress: row.shipping_address ?? '',
+      paymentMethod: row.payment_method ?? '',
       createdAt: row.created_at ?? new Date().toISOString(),
       updatedAt: row.updated_at ?? row.created_at ?? new Date().toISOString(),
     };

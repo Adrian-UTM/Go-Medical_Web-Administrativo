@@ -59,7 +59,7 @@
   --color-info-bg:        #E8F5F2;
 
   /* Tipografía */
-  --font-family:          system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family:          'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-size-xs:         0.75rem;
   --font-size-sm:         0.875rem;
   --font-size-base:       1rem;
@@ -413,6 +413,10 @@ body {
 .data-table__row,
 .data-table tr,
 .table tbody tr,
+.report-table tbody tr,
+.services-table tbody tr,
+.kpi-card,
+.chart-card,
 .document-card,
 .activity-item,
 .timeline-item,
@@ -422,8 +426,31 @@ body {
 
 .data-table__row:hover,
 .data-table tbody tr:hover,
-.table tbody tr:hover {
+.table tbody tr:hover,
+.report-table tbody tr:hover,
+.services-table tbody tr:hover {
   background: rgba(203, 230, 226, 0.24) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .data-table__row:hover,
+  .data-table tbody tr:hover,
+  .table tbody tr:hover,
+  .report-table tbody tr:hover {
+    position: relative;
+    z-index: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(29, 76, 85, 0.12) !important;
+  }
+
+  .services-table tbody tr:hover,
+  .kpi-card:hover,
+  .chart-card:hover {
+    position: relative;
+    z-index: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(29, 76, 85, 0.12) !important;
+  }
 }
 
 .document-card:hover,

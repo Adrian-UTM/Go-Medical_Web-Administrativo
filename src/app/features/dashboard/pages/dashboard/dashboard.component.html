@@ -84,7 +84,7 @@
   <!-- Right: two SLA / counter cards -->
   <div class="db-hero__side">
 
-    <div class="db-hero__sla-card">
+    <div class="db-hero__sla-card" (click)="scrollToActivity()">
       <div class="db-hero__sla-label">ALERTAS ACTIVAS</div>
       <div class="db-hero__sla-ring">
         <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" width="90" height="90">
@@ -101,7 +101,7 @@
       <p class="db-hero__sla-sub">Seguimiento inmediato</p>
     </div>
 
-    <div class="db-hero__sla-card">
+    <div class="db-hero__sla-card" [routerLink]="['/pedidos']">
       <div class="db-hero__sla-label">PEDIDOS RECIENTES</div>
       <div class="db-hero__sla-ring">
         <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" width="90" height="90">
@@ -129,18 +129,26 @@
 </div>
 
 <section class="db-metrics" aria-label="Métricas principales">
-  <article *ngFor="let m of metrics(); let i = index"
-           class="db-metric-card"
-           [id]="m.id"
-           [attr.data-tone]="m.accentTone"
-           [style.animation-delay]="(i * 60) + 'ms'">
+  <a *ngFor="let m of metrics(); let i = index"
+     class="db-metric-card"
+     [routerLink]="getMetricRoute(m.id)"
+     [id]="m.id"
+     [attr.data-tone]="m.accentTone"
+     [style.animation-delay]="(i * 60) + 'ms'">
     <div class="db-metric-card__top">
       <span class="db-metric-card__label">{{ m.label }}</span>
-      <div class="db-metric-card__icon" [innerHTML]="m.icon"></div>
+      <div class="db-metric-card__icon">
+        <svg *ngIf="m.id === 'metric-productos'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <svg *ngIf="m.id === 'metric-clientes'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <svg *ngIf="m.id === 'metric-pedidos'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <svg *ngIf="m.id === 'metric-cotizaciones'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <svg *ngIf="m.id === 'metric-tickets'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg *ngIf="m.id === 'metric-stock-bajo'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
     </div>
     <div class="db-metric-card__value">{{ m.valueLabel }}</div>
     <div class="db-metric-card__delta">{{ m.delta }}</div>
-  </article>
+  </a>
 </section>
 
 <!-- ============================================================
@@ -148,63 +156,94 @@
      ============================================================ -->
 <section class="db-bottom">
 
-  <!-- Actividad Operativa Reciente -->
-  <article class="db-panel">
-    <h2 class="db-panel__title">Actividad Operativa Reciente</h2>
+  <!-- Left: Operational content list (stacked vertically) -->
+  <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+    
+    <!-- Mensajes Nuevos de Clientes -->
+    <article class="db-panel" id="mensajes-nuevos">
+      <h2 class="db-panel__title" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <span style="display: flex; align-items: center; gap: 8px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Mensajes Nuevos de Clientes
+        </span>
+        <span *ngIf="unreadNotifications().length > 0" class="db-badge-counter">{{ unreadNotifications().length }}</span>
+      </h2>
 
-    <div *ngIf="operationalAlerts().length || hasRecentActivity(); else emptyActivity" class="db-activity">
+      <div *ngIf="unreadNotifications().length > 0; else emptyMessages" class="db-notifications">
+        <a *ngFor="let notification of unreadNotifications()" 
+           [routerLink]="['/tickets', notification.ticketId]" 
+           [queryParams]="{panel: 'messages'}"
+           class="db-notification-item">
+          
+          <div class="db-notification-item__icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
 
-      <!-- Alerts -->
-      <div *ngFor="let alert of operationalAlerts()"
-           class="db-activity__item"
-           [attr.data-tone]="alert.tone">
-        <div class="db-activity__icon">
-          <svg *ngIf="alert.tone === 'warning'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          <svg *ngIf="alert.tone === 'info'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="16" x2="12" y2="12"/>
-            <line x1="12" y1="8" x2="12.01" y2="8"/>
-          </svg>
-          <svg *ngIf="alert.tone === 'success'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-        </div>
-        <div class="db-activity__content">
-          <p>{{ alert.title }}</p>
-          <span>{{ alert.description }}</span>
-        </div>
-        <div class="db-activity__time">Alerta</div>
+          <div class="db-notification-item__content">
+            <div class="db-notification-item__header">
+              <strong class="db-notification-item__client">{{ notification.clientName }}</strong>
+              <span class="db-notification-item__time">{{ notification.lastMessageAt | date:'HH:mm · d MMM' }}</span>
+            </div>
+            <p class="db-notification-item__message">{{ notification.lastMessage }}</p>
+            <span class="db-notification-item__ticket">Ticket: {{ notification.ticketNumber }}</span>
+          </div>
+
+          <div class="db-notification-item__badge">
+            <span>{{ notification.count }}</span>
+          </div>
+        </a>
       </div>
 
-      <!-- Recent activity items -->
-      <div *ngFor="let item of recentActivity() | slice:0:4"
-           class="db-activity__item"
-           [attr.data-tone]="getActivityTone(item)">
-        <div class="db-activity__icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-        </div>
-        <div class="db-activity__content">
-          <p>{{ item.description }}</p>
-          <span>{{ item.type }}</span>
-        </div>
-        <div class="db-activity__time">{{ item.time }}</div>
-      </div>
-    </div>
+      <ng-template #emptyMessages>
+        <div class="db-empty">No hay mensajes nuevos sin responder.</div>
+      </ng-template>
+    </article>
 
-    <ng-template #emptyActivity>
-      <div class="db-empty">Sin actividad operativa reciente.</div>
-    </ng-template>
-  </article>
+    <!-- Actividad Operativa Reciente -->
+    <article class="db-panel" id="actividad-operativa">
+      <h2 class="db-panel__title">Actividad Operativa Reciente</h2>
+
+      <div *ngIf="operationalAlerts().length; else emptyActivity" class="db-activity">
+
+        <!-- Alerts -->
+        <div *ngFor="let alert of operationalAlerts()"
+             class="db-activity__item"
+             [attr.data-tone]="alert.tone">
+          <div class="db-activity__icon">
+            <svg *ngIf="alert.tone === 'warning'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <svg *ngIf="alert.tone === 'info'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <svg *ngIf="alert.tone === 'success'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
+          <div class="db-activity__content">
+            <p>{{ alert.title }}</p>
+            <span>{{ alert.description }}</span>
+          </div>
+          <div class="db-activity__time">Alerta</div>
+        </div>
+      </div>
+
+      <ng-template #emptyActivity>
+        <div class="db-empty">No tienes alertas pendientes de revisión. ¡Todo al día!</div>
+      </ng-template>
+    </article>
+  </div>
 
   <!-- Acciones Rápidas -->
   <article class="db-panel">

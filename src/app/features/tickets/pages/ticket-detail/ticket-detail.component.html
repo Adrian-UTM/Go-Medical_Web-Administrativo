@@ -1,4 +1,4 @@
-<bc-loader *ngIf="isLoading()" message="Cargando expediente tecnico..."></bc-loader>
+<bc-loader *ngIf="isLoading()" message="Cargando expediente técnico..."></bc-loader>
 
 <ng-container *ngIf="!isLoading() && ticket()">
   <bc-page-header
@@ -8,238 +8,625 @@
     <a routerLink="/tickets" class="btn-ghost">← Volver</a>
   </bc-page-header>
 
-  <div *ngIf="actionMessage()" class="info-banner">
+  <!-- Flash message -->
+  <div *ngIf="actionMessage()" class="info-banner" (click)="actionMessage.set('')">
     {{ actionMessage() }}
   </div>
 
-  <div class="document-hero">
-    <div class="document-hero__main">
-      <div class="document-hero__meta">
-        <span class="document-hero__file">{{ ticket()!.ticketNumber }}</span>
-        <bc-status-badge
-          [label]="getStatusBadge(ticket()!.status).label"
-          [variant]="getStatusBadge(ticket()!.status).variant"
-          [showDot]="true">
-        </bc-status-badge>
-        <bc-status-badge
-          [label]="getPriorityBadge(ticket()!.priority).label"
-          [variant]="getPriorityBadge(ticket()!.priority).variant"
-          [showDot]="true">
-        </bc-status-badge>
+  <!-- ════════════════════════════════════════════════════════════
+       DETALLE PRINCIPAL
+  ════════════════════════════════════════════════════════════ -->
+  <div class="detail-page">
+
+    <!-- ── A. ENCABEZADO ── -->
+    <header class="ticket-header-card">
+      <div class="ticket-header-card__left">
+        <span class="ticket-folio">{{ ticket()!.ticketNumber }}</span>
+        <div class="ticket-badges">
+          <bc-status-badge [label]="getStatusBadge(ticket()!.status).label" [variant]="getStatusBadge(ticket()!.status).variant" [showDot]="true"></bc-status-badge>
+          <bc-status-badge [label]="getPriorityBadge(ticket()!.priority).label" [variant]="getPriorityBadge(ticket()!.priority).variant" [showDot]="false"></bc-status-badge>
+        </div>
+        <span class="ticket-requested">Solicitado el {{ ticket()!.requestedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+      </div>
+      <div class="ticket-header-card__right" style="display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
+        <button type="button" class="btn-messages-header" style="justify-content: center;" (click)="scrollToChat()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Mensajes
+        </button>
+        <button type="button" class="btn-messages-header" style="justify-content: center;" (click)="openPanel('status')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Estado operativo
+        </button>
+      </div>
+    </header>
+
+    <div class="detail-main-grid">
+
+      <!-- ── LEFT COLUMN ── -->
+      <div class="detail-left">
+
+        <!-- B. RESUMEN DE SOLICITUD -->
+        <section class="detail-card">
+          <h2 class="detail-card__title">Resumen de la solicitud</h2>
+          <div class="info-rows">
+            <div class="info-row">
+              <span class="info-row__label">Cliente</span>
+              <span class="info-row__value">{{ ticket()!.clientNameSnapshot }}</span>
+            </div>
+            <div class="info-row" *ngIf="client()">
+              <span class="info-row__label">Contacto</span>
+              <span class="info-row__value">{{ client()!.contactName || '—' }}</span>
+            </div>
+            <div class="info-row" *ngIf="client()?.phone">
+              <span class="info-row__label">Teléfono</span>
+              <span class="info-row__value">
+                <a [href]="'tel:' + client()!.phone" class="link-subtle">{{ client()!.phone }}</a>
+              </span>
+            </div>
+            <div class="info-row" *ngIf="client()?.email">
+              <span class="info-row__label">Correo</span>
+              <span class="info-row__value">
+                <a [href]="'mailto:' + client()!.email" class="link-subtle">{{ client()!.email }}</a>
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="info-row__label">Equipo / Producto</span>
+              <span class="info-row__value">{{ ticket()!.productNameSnapshot || 'Sin asociar' }}</span>
+            </div>
+            <div class="info-row" *ngIf="ticket()!.equipmentSerialNumber">
+              <span class="info-row__label">Número de serie</span>
+              <span class="info-row__value info-row__value--mono">{{ ticket()!.equipmentSerialNumber }}</span>
+            </div>
+            <div class="info-row" *ngIf="parsedDescription()?.area">
+              <span class="info-row__label">Área / Depto</span>
+              <span class="info-row__value">{{ parsedDescription()!.area }}</span>
+            </div>
+          </div>
+
+          <!-- Descripción del problema -->
+          <div class="problem-desc" *ngIf="parsedDescription()">
+            <span class="problem-desc__label">Descripción de la falla</span>
+            <p class="problem-desc__text">{{ parsedDescription()!.issueDescription || ticket()!.description }}</p>
+          </div>
+          <div class="problem-desc" *ngIf="!parsedDescription() && ticket()!.description">
+            <span class="problem-desc__label">Descripción</span>
+            <p class="problem-desc__text">{{ ticket()!.description }}</p>
+          </div>
+
+          <!-- Adjuntos -->
+          <div class="attachments-row" *ngIf="ticket()!.attachments?.length">
+            <span class="info-row__label">Adjuntos del cliente</span>
+            <div class="attachment-list">
+              <a *ngFor="let att of ticket()!.attachments" [href]="att" target="_blank" class="attachment-chip">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                Ver adjunto
+              </a>
+            </div>
+          </div>
+          <div class="attachments-row" *ngIf="!ticket()!.attachments?.length">
+            <span class="info-row__label">Adjuntos del cliente</span>
+            <span class="info-row__value info-row__value--muted">Sin adjuntos</span>
+          </div>
+        </section>
+
+        <!-- C. ESTADO DEL FLUJO -->
+        <section class="detail-card">
+          <h2 class="detail-card__title">Estado del flujo</h2>
+          <div class="flow-steps">
+            <div class="flow-step" [class.flow-step--done]="getFlowStep() > 0" [class.flow-step--active]="getFlowStep() === 0">
+              <div class="flow-step__dot"></div><span>Solicitud</span>
+            </div>
+            <div class="flow-connector"></div>
+            <div class="flow-step" [class.flow-step--done]="getFlowStep() > 1" [class.flow-step--active]="getFlowStep() === 1">
+              <div class="flow-step__dot"></div><span>Caso</span>
+            </div>
+            <div class="flow-connector"></div>
+            <div class="flow-step" [class.flow-step--done]="getFlowStep() > 2" [class.flow-step--active]="getFlowStep() === 2">
+              <div class="flow-step__dot"></div><span>En atención</span>
+            </div>
+            <div class="flow-connector"></div>
+            <div class="flow-step" [class.flow-step--done]="getFlowStep() > 3" [class.flow-step--active]="getFlowStep() === 3">
+              <div class="flow-step__dot"></div><span>Resuelto</span>
+            </div>
+            <div class="flow-connector"></div>
+            <div class="flow-step" [class.flow-step--done]="getFlowStep() >= 4" [class.flow-step--active]="getFlowStep() === 4">
+              <div class="flow-step__dot"></div><span>Cerrado</span>
+            </div>
+          </div>
+          <div class="flow-hint" *ngIf="!hasTerminalStatus()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Siguiente acción: {{ getNextActionHint() }}
+          </div>
+          <div class="flow-hint flow-hint--terminal" *ngIf="hasTerminalStatus()">
+            {{ terminalStatusMessage() }}
+          </div>
+
+          <!-- Mensajes summary -->
+          <button type="button" class="messages-summary-btn" (click)="scrollToChat()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>{{ messages().length > 0 ? messages().length + ' mensajes en la conversación' : 'Sin mensajes aún' }}</span>
+            <span class="messages-summary-btn__arrow">↓</span>
+          </button>
+        </section>
+
+
+
       </div>
 
-      <p class="document-hero__description">{{ ticket()!.description }}</p>
+      <!-- ── RIGHT COLUMN ── -->
+      <div class="detail-right">
 
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-item__label">Tipo</span>
-          <span class="info-item__value">{{ getTypeLabel(ticket()!.type) }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item__label">Cliente</span>
-          <span class="info-item__value">{{ ticket()!.clientNameSnapshot }}</span>
-        </div>
-        <div class="info-item" *ngIf="client()">
-          <span class="info-item__label">Contacto</span>
-          <div class="info-item__value" style="display: flex; flex-direction: column; gap: 2px;">
-            <div style="font-weight: var(--font-weight-medium); color: var(--color-text-primary);">{{ client()!.contactName || 'Sin contacto' }}</div>
-            <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary);">{{ client()!.email || 'Sin correo' }}</div>
-            <div style="font-size: var(--font-size-xs); color: var(--color-text-secondary);">{{ client()!.phone || 'Sin teléfono' }}</div>
-          </div>
-        </div>
-        <div class="info-item" *ngIf="!client()">
-          <span class="info-item__label">Contacto</span>
-          <span class="info-item__value">Contacto no disponible</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item__label">{{ isProductService() ? 'Servicio relacionado' : 'Producto / Equipo' }}</span>
-          <div class="info-item__value" style="display: flex; flex-direction: column; gap: 2px;">
-            <div style="font-weight: var(--font-weight-medium); color: var(--color-text-primary);">
-              {{ product() ? product()!.name : (ticket()!.productNameSnapshot || 'Sin asociar') }}
+        <!-- D. INFORMACIÓN TÉCNICA -->
+        <section class="detail-card">
+          <h2 class="detail-card__title">Información técnica</h2>
+          <div class="info-rows">
+            <div class="info-row">
+              <span class="info-row__label">Caso técnico</span>
+              <span class="info-row__value">{{ hasTerminalStatus() ? 'Cerrado' : (ticket()!.assignedTechnicianName ? 'Abierto' : 'Nueva solicitud') }}</span>
             </div>
-            <div *ngIf="product()" style="font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: 2px;">
-              SKU: {{ product()!.sku }} · {{ isProductService() ? 'Servicio' : 'Producto físico' }}
+            <div class="info-row">
+              <span class="info-row__label">Ingeniero asignado</span>
+              <span class="info-row__value">{{ ticket()!.assignedTechnicianName || 'Sin asignar' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row__label">Fecha programada</span>
+              <span class="info-row__value">{{ ticket()!.scheduledStartAt ? (ticket()!.scheduledStartAt | date:'dd/MM/yyyy HH:mm') : 'Sin programar' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row__label">Tipo de servicio</span>
+              <span class="info-row__value">{{ getTypeLabel(ticket()!.type) }}</span>
+            </div>
+            <div class="info-row" *ngIf="ticket()!.notes">
+              <span class="info-row__label">Notas técnicas</span>
+              <span class="info-row__value">{{ ticket()!.notes }}</span>
+            </div>
+            <div class="info-row" *ngIf="!ticket()!.notes">
+              <span class="info-row__label">Notas técnicas</span>
+              <span class="info-row__value info-row__value--muted">Sin notas</span>
             </div>
           </div>
-        </div>
-        <div class="info-item" *ngIf="productCategoryLabel()">
-          <span class="info-item__label">Categoria</span>
-          <span class="info-item__value">{{ productCategoryLabel() }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item__label">Tecnico asignado</span>
-          <span class="info-item__value">{{ assignedTechnicianLabel() }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item__label">Fecha de solicitud</span>
-          <span class="info-item__value">{{ ticket()!.requestedAt | date:'dd/MM/yyyy HH:mm' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-item__label">Atencion tentativa</span>
-          <span class="info-item__value">{{ ticket()!.scheduledAt ? (ticket()!.scheduledAt | date:'dd/MM/yyyy HH:mm') : 'Sin programar' }}</span>
-        </div>
+          <button type="button" class="btn-action-card" *ngIf="!hasTerminalStatus()" (click)="openPanel('schedule')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Programar servicio
+          </button>
+        </section>
+
+        <!-- E. UBICACIÓN -->
+        <section class="detail-card">
+          <h2 class="detail-card__title">Ubicación</h2>
+          <div class="info-rows">
+            <div class="info-row">
+              <span class="info-row__label">Dirección</span>
+              <span class="info-row__value">{{ ticket()!.serviceAddress || ticket()!.clientAddress || 'Dirección pendiente' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row__label">Ciudad</span>
+              <span class="info-row__value">{{ ticket()!.serviceCity || ticket()!.clientCity || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row__label">Estado</span>
+              <span class="info-row__value">{{ ticket()!.serviceState || ticket()!.clientState || '—' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-row__label">Tipo de atención</span>
+              <span class="info-row__value">{{ ticket()!.isLocalService ? 'Local' : (ticket()!.routeRequired ? 'Ruta externa' : 'Sin clasificar') }}</span>
+            </div>
+          </div>
+          <div class="location-alert" *ngIf="!ticket()!.serviceAddress && !ticket()!.clientAddress">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Falta dirección de atención
+          </div>
+          <button type="button" class="btn-action-card" (click)="openPanel('location')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Ver ubicación completa
+          </button>
+        </section>
+
       </div>
     </div>
 
-    <aside class="action-card">
-      <span class="action-card__label">Acciones operativas</span>
-      
-      <!-- Técnico Asignado -->
-      <div class="action-card__technician-info" style="margin-bottom: var(--space-4); font-size: var(--font-size-sm); color: var(--color-text-primary);">
-        <strong style="color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; display: block; margin-bottom: 2px;">Técnico asignado</strong>
-        {{ assignedTechnicianLabel() }}
+    <!-- ── CHAT AL FONDO ── -->
+    <!-- Mensajes / Chat Section at Bottom -->
+    <section id="chat-section" class="detail-chat-section" *ngIf="ticket()">
+      <div class="chat-header">
+        <h2 class="chat-header__title">Mensajes del cliente</h2>
+      </div>
+      <div class="chat-container">
+        <!-- Messages Area -->
+        <div class="chat-messages" #chatMessages>
+          <div *ngIf="messages().length === 0" class="chat-empty">
+            <div class="chat-empty__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            </div>
+            <p class="chat-empty__title">Sin mensajes aún</p>
+            <p class="chat-empty__hint">Escribe el primer mensaje para iniciar la conversación.</p>
+          </div>
+
+          <ng-container *ngFor="let msg of messages(); let i = index">
+            <div class="chat-date-separator" *ngIf="i === 0 || (msg.createdAt | date:'yyyyMMdd') !== (messages()[i-1].createdAt | date:'yyyyMMdd')">
+              <span>{{ msg.createdAt | date:"d 'de' MMMM, yyyy" }}</span>
+            </div>
+
+            <div class="chat-bubble-row" [class.chat-bubble-row--staff]="msg.senderType !== 'client'" [class.chat-bubble-row--client]="msg.senderType === 'client'">
+              <div class="chat-avatar chat-avatar--client" *ngIf="msg.senderType === 'client'">
+                {{ msg.senderName?.charAt(0)?.toUpperCase() || 'C' }}
+              </div>
+              <div class="chat-bubble-wrapper">
+                <div class="chat-bubble" [class.chat-bubble--staff]="msg.senderType !== 'client'" [class.chat-bubble--client]="msg.senderType === 'client'">
+                  <div class="chat-bubble__image-wrapper" *ngIf="msg.attachmentUrl" [class.chat-bubble__image-wrapper--has-text]="msg.message">
+                    <a [href]="msg.attachmentUrl" target="_blank" title="Ver imagen original">
+                      <img [src]="msg.attachmentUrl" class="chat-bubble__image" alt="Imagen enviada">
+                    </a>
+                  </div>
+                  <p class="chat-bubble__text" *ngIf="msg.message">{{ msg.message }}</p>
+                </div>
+                <div class="chat-bubble-meta" [class.chat-bubble-meta--staff]="msg.senderType !== 'client'">
+                  <span class="chat-bubble-meta__name">{{ msg.senderType === 'client' ? msg.senderName : 'Soporte' }}</span>
+                  <span class="chat-bubble-meta__time">{{ msg.createdAt | date:'HH:mm' }}</span>
+                  <span *ngIf="msg.senderType !== 'client'" class="chat-checks" [class.chat-checks--read]="msg.readAt">
+                    <svg class="chat-check chat-check--1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    <svg class="chat-check chat-check--2" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="chat-avatar chat-avatar--staff" *ngIf="msg.senderType !== 'client'">S</div>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- Composer -->
+        <div class="chat-composer-container" *ngIf="!hasTerminalStatus()">
+          <div class="chat-composer__preview" *ngIf="selectedFilePreview()">
+            <div class="chat-composer__preview-image-wrapper">
+              <img [src]="selectedFilePreview()" class="chat-composer__preview-image" alt="Previsualización">
+              <button type="button" class="chat-composer__preview-remove" (click)="clearSelectedFile()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="chat-composer">
+            <button type="button" class="chat-composer__attach" (click)="fileInput.click()" [disabled]="isSendingMessage()" title="Adjuntar imagen">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            </button>
+            <input #fileInput type="file" accept="image/*" style="display:none" (change)="onFileSelected($event)">
+            <div class="chat-composer__input-wrap">
+              <textarea
+                class="chat-composer__textarea"
+                [ngModel]="newMessage()"
+                (ngModelChange)="newMessage.set($event)"
+                placeholder="Escribe un mensaje..."
+                rows="1"
+                [disabled]="isSendingMessage()"
+                (keydown.enter)="onKeydownEnter($event)"></textarea>
+            </div>
+            <button
+              type="button"
+              class="chat-composer__send"
+              [disabled]="(!newMessage().trim() && !selectedFile()) || isSendingMessage()"
+              [class.chat-composer__send--active]="(newMessage().trim() || selectedFile()) && !isSendingMessage()"
+              (click)="sendMessage()">
+              <svg *ngIf="!isSendingMessage()" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <span *ngIf="isSendingMessage()" class="chat-composer__spinner"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Disabled Message -->
+        <div class="chat-disabled-message" *ngIf="hasTerminalStatus()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <p>Este ticket está {{ isClosedTicket() ? 'cerrado' : 'cancelado' }}. Ya no se pueden enviar nuevos mensajes a esta conversación.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</ng-container>
+
+<!-- ════════════════════════════════════════════════════════════
+     DRAWER OVERLAY BACKDROP
+════════════════════════════════════════════════════════════ -->
+<div class="drawer-backdrop" *ngIf="activePanel() && !isLoading() && ticket()" (click)="closePanel()"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     DRAWER: ACCIONES (menu de categorías)
+════════════════════════════════════════════════════════════ -->
+<aside class="drawer drawer--actions" *ngIf="activePanel() === 'actions' && !isLoading() && ticket()" role="dialog" aria-label="Acciones rápidas">
+  <div class="drawer__header">
+    <div>
+      <h2 class="drawer__title">Acciones rápidas</h2>
+      <p class="drawer__subtitle">{{ ticket()!.ticketNumber }}</p>
+    </div>
+    <button type="button" class="drawer__close" (click)="closePanel()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer__body">
+
+    <!-- A. Comunicación -->
+    <div class="action-cat">
+      <div class="action-cat__title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Comunicación
+      </div>
+      <button type="button" class="action-item" (click)="closePanel(); openPanel('messages')">Ir a Mensajes del cliente</button>
+      <a class="action-item" [href]="getWhatsAppShareUrl()" target="_blank" (click)="closePanel()">Abrir WhatsApp</a>
+      <a class="action-item" *ngIf="client()?.email" [href]="'mailto:' + client()!.email" (click)="closePanel()">Abrir correo</a>
+    </div>
+
+    <!-- B. Caso técnico -->
+    <div class="action-cat" *ngIf="!hasTerminalStatus()">
+      <div class="action-cat__title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        Caso técnico
+      </div>
+      <button type="button" class="action-item" (click)="closePanel(); openPanel('schedule')">Programar servicio</button>
+    </div>
+
+    <!-- C. Estado operativo -->
+    <div class="action-cat">
+      <div class="action-cat__title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Estado operativo
+      </div>
+      <button type="button" class="action-item" (click)="closePanel(); openPanel('status')">Abrir monitoreo operativo</button>
+    </div>
+
+    <!-- D. Ubicación y ruta -->
+    <div class="action-cat">
+      <div class="action-cat__title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Ubicación y ruta
+      </div>
+      <button type="button" class="action-item" (click)="closePanel(); openPanel('location')">Ver ubicación completa</button>
+      <a class="action-item" *ngIf="getGoogleMapsUrl()" [href]="getGoogleMapsUrl()" target="_blank" (click)="closePanel()">Abrir en Google Maps</a>
+      <button type="button" class="action-item" (click)="copyAddressToClipboard(); closePanel()">Copiar dirección</button>
+    </div>
+
+  </div>
+</aside>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     DRAWER: PROGRAMAR SERVICIO
+════════════════════════════════════════════════════════════ -->
+<aside class="drawer drawer--schedule" *ngIf="activePanel() === 'schedule' && !isLoading() && ticket()" role="dialog" aria-label="Programar servicio">
+  <div class="drawer__header">
+    <div>
+      <h2 class="drawer__title">Programar servicio técnico</h2>
+      <p class="drawer__subtitle">{{ ticket()!.ticketNumber }}</p>
+    </div>
+    <button type="button" class="drawer__close" (click)="closePanel()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer__body">
+    <!-- Terminal status -->
+    <div class="schedule-terminal-msg" *ngIf="hasTerminalStatus()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+      {{ terminalStatusMessage() }}
+    </div>
+
+    <ng-container *ngIf="!hasTerminalStatus()">
+      <!-- No address warning -->
+      <div class="schedule-no-address" *ngIf="!ticket()!.serviceAddress && !ticket()!.clientAddress">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Falta dirección de atención. No se puede programar el servicio.
       </div>
 
-      <!-- Estado Terminal: Cerrado / Cancelado -->
-      <ng-container *ngIf="hasTerminalStatus(); else activeActions">
-        <span class="action-card__empty" style="display: block; padding: var(--space-3); border-radius: var(--radius-md); background-color: var(--color-gray-50); border: 1px dashed var(--color-border); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs);">
-          {{ terminalStatusMessage() }}
-        </span>
-      </ng-container>
+      <div class="schedule-form">
+        <div class="schedule-row-2">
+          <label class="form-group">
+            <span class="form-label">Fecha del servicio *</span>
+            <input type="date" class="form-input" [ngModel]="scheduleDate()" (ngModelChange)="scheduleDate.set($event)">
+          </label>
+          <label class="form-group">
+            <span class="form-label">Hora *</span>
+            <input type="time" class="form-input" [ngModel]="scheduleTimeStr()" (ngModelChange)="scheduleTimeStr.set($event)">
+          </label>
+        </div>
 
-      <ng-template #activeActions>
-        <!-- Selector de técnico (Solo disponible en Abierto, Asignado, En proceso y Esperando refacción) -->
-        <div class="action-card__technician-selector" *ngIf="canAssignTechnician()" style="display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); margin-bottom: var(--space-4);">
-          <strong style="color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase;">{{ hasAssignedTechnician() ? 'Reasignar técnico' : 'Asignar técnico' }}</strong>
+        <div class="schedule-row-2">
+          <label class="form-group">
+            <span class="form-label">Duración estimada</span>
+            <select class="form-input" [ngModel]="scheduleDuration()" (ngModelChange)="scheduleDuration.set($event)">
+              <option value="1">1 hora</option>
+              <option value="2">2 horas</option>
+              <option value="3">3 horas</option>
+              <option value="4">4 horas</option>
+              <option value="6">6 horas</option>
+              <option value="8">8 horas (día completo)</option>
+            </select>
+          </label>
+          <label class="form-group">
+            <span class="form-label">Tipo de atención *</span>
+            <select class="form-input" [ngModel]="scheduleType()" (ngModelChange)="scheduleType.set($event)">
+              <option value="">Seleccionar tipo</option>
+              <option value="preventivo">Preventivo</option>
+              <option value="correctivo">Correctivo</option>
+              <option value="garantia">Garantía</option>
+              <option value="instalacion">Instalación</option>
+              <option value="revision">Revisión</option>
+              <option value="otro">Otro</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Ingeniero -->
+        <div class="form-group">
+          <span class="form-label">Ingeniero asignado</span>
           <bc-custom-select
             [options]="technicianOptions()"
             [ngModel]="selectedTechnician()"
             (ngModelChange)="selectedTechnician.set($event)"
-            [placeholder]="hasAssignedTechnician() ? 'Reasignar tecnico' : 'Seleccionar tecnico'">
+            [placeholder]="hasAssignedTechnician() ? 'Reasignar ingeniero registrado' : 'Seleccionar ingeniero registrado'">
           </bc-custom-select>
-          <input
-            *ngIf="isExternalTechnicianSelected()"
-            type="text"
-            class="action-card__input"
-            maxlength="120"
+          <input type="text" class="form-input form-input--mt" maxlength="120"
             [ngModel]="externalTechnicianName()"
             (ngModelChange)="externalTechnicianName.set($event)"
-            placeholder="Nombre del tecnico">
-          <button type="button" class="btn-primary" (click)="assignTechnician()" [disabled]="isProcessing()">
-            {{ technicianActionLabel() }}
+            placeholder="O escribe el nombre del ingeniero (si no está en lista)">
+        </div>
+
+        <!-- Dirección -->
+        <div class="form-group">
+          <span class="form-label">Dirección de atención</span>
+          <div class="address-display">
+            {{ ticket()!.serviceAddress || ticket()!.clientAddress || 'Pendiente' }}
+            <span class="address-city" *ngIf="ticket()!.serviceCity || ticket()!.clientCity">
+              · {{ ticket()!.serviceCity || ticket()!.clientCity }}, {{ ticket()!.serviceState || ticket()!.clientState }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Notas técnicas -->
+        <div class="form-group">
+          <span class="form-label">Notas técnicas</span>
+          <textarea class="form-input form-textarea" rows="3"
+            [ngModel]="scheduleNotes()"
+            (ngModelChange)="scheduleNotes.set($event)"
+            placeholder="Escribe una observación (opcional)"></textarea>
+        </div>
+
+        <!-- Error -->
+        <div class="schedule-error" *ngIf="scheduleError()">{{ scheduleError() }}</div>
+
+        <div class="schedule-actions">
+          <button type="button" class="btn-ghost" (click)="closePanel()" [disabled]="isSavingSchedule()">Cancelar</button>
+          <button type="button" class="btn-primary" (click)="saveSchedule()" [disabled]="isSavingSchedule() || (!scheduleDate() || !scheduleTimeStr())">
+            <span *ngIf="!isSavingSchedule()">Programar servicio</span>
+            <span *ngIf="isSavingSchedule()">Guardando...</span>
           </button>
         </div>
-
-        <!-- Panel de Acciones Operativas según el Estado del Ticket -->
-        <div class="action-card__buttons" style="display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border);">
-          <strong style="color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; margin-bottom: 2px;">Acciones de estado</strong>
-
-          <!-- 1. Estado Abierto -->
-          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'open' || normalizeStatus(ticket()!.status) === 'abierto'">
-            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
-              Cancelar ticket
-            </button>
-          </ng-container>
-
-          <!-- 2. Estado Asignado -->
-          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'assigned' || normalizeStatus(ticket()!.status) === 'asignado'">
-            <button type="button" class="btn-primary" (click)="markInProgress()" [disabled]="isProcessing()">
-              Iniciar atención
-            </button>
-            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
-              Cancelar ticket
-            </button>
-          </ng-container>
-
-          <!-- 3. Estado En proceso -->
-          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'in_progress' || normalizeStatus(ticket()!.status) === 'en proceso' || normalizeStatus(ticket()!.status) === 'en_proceso'">
-            <button type="button" class="btn-secondary" (click)="markWaitingParts()" [disabled]="isProcessing()">
-              Esperando refacción
-            </button>
-            <button type="button" class="btn-primary" (click)="markResolved()" [disabled]="isProcessing()">
-              Marcar resuelto
-            </button>
-            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
-              Cancelar ticket
-            </button>
-          </ng-container>
-
-          <!-- 4. Estado Esperando refacción -->
-          <ng-container *ngIf="normalizeStatus(ticket()!.status) === 'waiting_parts' || normalizeStatus(ticket()!.status) === 'esperando refaccion' || normalizeStatus(ticket()!.status) === 'esperando_refaccion'">
-            <button type="button" class="btn-primary" (click)="markInProgress()" [disabled]="isProcessing()">
-              Continuar atención
-            </button>
-            <button type="button" class="btn-secondary" (click)="markResolved()" [disabled]="isProcessing()">
-              Marcar resuelto
-            </button>
-            <button type="button" class="btn-ghost btn-ghost--danger" (click)="cancelTicket()" [disabled]="isProcessing()">
-              Cancelar ticket
-            </button>
-          </ng-container>
-
-          <!-- 5. Estado Resuelto -->
-          <ng-container *ngIf="isResolvedTicket()">
-            <button type="button" class="btn-primary" (click)="closeTicket()" [disabled]="isProcessing()">
-              Cerrar ticket
-            </button>
-            <button type="button" class="btn-secondary" (click)="reopenTicket()" [disabled]="isProcessing()">
-              Reabrir ticket
-            </button>
-          </ng-container>
-        </div>
-      </ng-template>
-    </aside>
+      </div>
+    </ng-container>
   </div>
+</aside>
 
-  <div class="detail-layout">
-    <section class="detail-card">
-      <div class="detail-card__header">
-        <h2 class="detail-card__title">Expediente tecnico</h2>
-        <span class="detail-card__subtitle">Resumen del ticket, notas internas y archivos de referencia</span>
-      </div>
-
-      <div class="detail-grid">
-        <div class="detail-row">
-          <span class="detail-row__label">Titulo</span>
-          <span class="detail-row__value">{{ ticket()!.title }}</span>
-        </div>
-        <div class="detail-row" *ngIf="!isProductService() && ticket()!.equipmentSerialNumber">
-          <span class="detail-row__label">Numero de serie</span>
-          <span class="detail-row__value detail-row__value--mono">{{ ticket()!.equipmentSerialNumber }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-row__label">Ultima actualizacion</span>
-          <span class="detail-row__value">{{ ticket()!.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-row__label">Adjuntos</span>
-          <span class="detail-row__value">{{ ticket()!.attachments?.length ? ticket()!.attachments!.join(', ') : 'Sin adjuntos' }}</span>
-        </div>
-      </div>
-
-      <div class="notes-box" *ngIf="ticket()!.notes">
-        <span class="notes-box__label">Notas internas</span>
-        <p>{{ ticket()!.notes }}</p>
-      </div>
-    </section>
-
-    <section class="detail-card">
-      <div class="detail-card__header">
-        <h2 class="detail-card__title">Historial de seguimiento</h2>
-        <span class="detail-card__subtitle">Eventos registrados automaticamente sobre el ticket</span>
-      </div>
-
-      <div class="history-list">
-        <article class="history-item" *ngFor="let item of sortedHistory()">
-          <div class="history-item__head">
-            <span class="history-item__date">{{ item.date | date:'dd/MM/yyyy HH:mm' }}</span>
-            <bc-status-badge
-              [label]="getStatusBadge(item.status).label"
-              [variant]="getStatusBadge(item.status).variant"
-              [showDot]="true">
-            </bc-status-badge>
-          </div>
-          <p class="history-item__comment">{{ item.comment }}</p>
-          <span class="history-item__author">{{ item.authorName }}</span>
-        </article>
-      </div>
-    </section>
+<!-- ════════════════════════════════════════════════════════════
+     DRAWER: ESTADO OPERATIVO
+════════════════════════════════════════════════════════════ -->
+<aside class="drawer drawer--status" *ngIf="activePanel() === 'status' && !isLoading() && ticket()" role="dialog" aria-label="Estado operativo">
+  <div class="drawer__header">
+    <div>
+      <h2 class="drawer__title">Estado operativo</h2>
+      <p class="drawer__subtitle">{{ ticket()!.ticketNumber }}</p>
+    </div>
+    <button type="button" class="drawer__close" (click)="closePanel()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
-</ng-container>
+  <div class="drawer__body">
+    <!-- Current state -->
+    <div class="status-current">
+      <span class="status-current__label">Estado actual</span>
+      <bc-status-badge [label]="getStatusBadge(ticket()!.status).label" [variant]="getStatusBadge(ticket()!.status).variant" [showDot]="true"></bc-status-badge>
+    </div>
+
+    <!-- Change state -->
+    <div class="status-change-section" *ngIf="!hasTerminalStatus() && getAllowedTransitions().length > 0">
+      <span class="status-change__label">Cambiar estado</span>
+      <bc-custom-select
+        [options]="statusTransitionOptions()"
+        [ngModel]="pendingNewStatus()"
+        (ngModelChange)="pendingNewStatus.set($event)"
+        placeholder="Selecciona el nuevo estado...">
+      </bc-custom-select>
+      <div class="form-group" *ngIf="pendingNewStatus()">
+        <span class="form-label">Observación del cambio</span>
+        <textarea class="form-input form-textarea" rows="2"
+          [ngModel]="statusChangeNote()"
+          (ngModelChange)="statusChangeNote.set($event)"
+          placeholder="Escribe una observación (opcional)"></textarea>
+      </div>
+      <button type="button" class="btn-primary" *ngIf="pendingNewStatus()" (click)="applyStatusChange()" [disabled]="isChangingStatus()">
+        <span *ngIf="!isChangingStatus()">Guardar cambio</span>
+        <span *ngIf="isChangingStatus()">Guardando...</span>
+      </button>
+    </div>
+
+    <div class="status-terminal-section" *ngIf="hasTerminalStatus()" style="display: flex; flex-direction: column; gap: 12px;">
+      <div class="status-terminal-msg">
+        {{ terminalStatusMessage() }}
+      </div>
+      <button type="button" class="btn-primary" (click)="reopenTicket()" [disabled]="isProcessing()">
+        <span *ngIf="!isProcessing()">Reabrir ticket</span>
+        <span *ngIf="isProcessing()">Procesando...</span>
+      </button>
+    </div>
+
+  </div>
+</aside>
+
+<!-- ════════════════════════════════════════════════════════════
+     DRAWER: UBICACIÓN Y RUTA
+════════════════════════════════════════════════════════════ -->
+<aside class="drawer drawer--location" *ngIf="activePanel() === 'location' && !isLoading() && ticket()" role="dialog" aria-label="Ubicación y ruta">
+  <div class="drawer__header">
+    <div>
+      <h2 class="drawer__title">Ubicación y ruta</h2>
+      <p class="drawer__subtitle">{{ ticket()!.ticketNumber }}</p>
+    </div>
+    <button type="button" class="drawer__close" (click)="closePanel()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer__body">
+    <div class="location-card">
+      <div class="location-info">
+        <div class="location-info__row">
+          <span class="info-row__label">Dirección completa</span>
+          <span class="info-row__value">{{ ticket()!.serviceAddress || ticket()!.clientAddress || 'Dirección pendiente' }}</span>
+        </div>
+        <div class="location-info__row">
+          <span class="info-row__label">Ciudad</span>
+          <span class="info-row__value">{{ ticket()!.serviceCity || ticket()!.clientCity || '—' }}</span>
+        </div>
+        <div class="location-info__row">
+          <span class="info-row__label">Estado</span>
+          <span class="info-row__value">{{ ticket()!.serviceState || ticket()!.clientState || '—' }}</span>
+        </div>
+        <div class="location-info__row" *ngIf="ticket()!.serviceRegion">
+          <span class="info-row__label">Región</span>
+          <span class="info-row__value">{{ ticket()!.serviceRegion }}</span>
+        </div>
+      </div>
+
+      <!-- Tipo de atención badge -->
+      <div class="location-type-badge" [class.location-type-badge--local]="ticket()!.isLocalService" [class.location-type-badge--ext]="!ticket()!.isLocalService">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        {{ ticket()!.isLocalService ? 'Mérida y alrededores' : (ticket()!.serviceCity || ticket()!.clientCity || 'Foráneo') }}
+      </div>
+
+      <div class="location-missing" *ngIf="!ticket()!.serviceAddress && !ticket()!.clientAddress">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Dirección pendiente
+      </div>
+    </div>
+
+    <!-- Google Maps placeholder -->
+    <div class="maps-placeholder" *ngIf="getGoogleMapsUrl()">
+      <div class="maps-placeholder__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+      <span>Ver en Google Maps</span>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="location-actions">
+      <a class="location-btn location-btn--maps" *ngIf="getGoogleMapsUrl()" [href]="getGoogleMapsUrl()" target="_blank">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Abrir en Google Maps
+      </a>
+
+      <button type="button" class="location-btn location-btn--copy" (click)="copyAddressToClipboard()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar dirección
+      </button>
+    </div>
+  </div>
+</aside>
 
 <div *ngIf="!isLoading() && !ticket()" class="not-found">
   <p>El ticket solicitado no fue encontrado.</p>
   <a routerLink="/tickets" class="btn-ghost">← Volver a tickets</a>
 </div>
-
-

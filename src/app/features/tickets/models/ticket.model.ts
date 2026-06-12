@@ -48,6 +48,21 @@ export interface ServiceTicket {
   assignedTechnicianId?: string;
   assignedTechnicianCustomName?: string;
   assignedTechnicianName?: string;
+  clientAddress?: string;
+  clientCity?: string;
+  clientState?: string;
+  clientCountry?: string;
+  serviceAddress?: string;
+  serviceCity?: string;
+  serviceState?: string;
+  serviceRegion?: string;
+  requestedServiceDate?: string;
+  scheduledStartAt?: string;
+  scheduledEndAt?: string;
+  isLocalService?: boolean;
+  routeRequired?: boolean;
+  routeAuthorized?: boolean;
+  routeNotes?: string;
   requestedAt: string;
   scheduledAt?: string;
   updatedAt: string;
@@ -85,8 +100,47 @@ export interface TicketUpsertPayload {
   assignedTechnicianName?: string;
   equipmentUnitId?: string | null;
   scheduledAt?: string;
+  scheduledStartAt?: string;
+  scheduledEndAt?: string;
+  requestedServiceDate?: string;
+  serviceAddress?: string;
+  serviceCity?: string;
+  serviceState?: string;
+  serviceRegion?: string;
+  routeAuthorized?: boolean;
+  routeNotes?: string;
   notes?: string;
   attachments?: string[];
 }
 
+export interface TechnicalRouteCandidate {
+  serviceCity: string;
+  serviceState: string;
+  serviceRegion?: string;
+  count: number;
+  servicesCount: number;
+}
 
+export interface ServiceTicketMessage {
+  id: string;
+  ticketId: string;
+  senderType: 'admin' | 'client' | 'system' | string;
+  senderProfileId: string;
+  message: string;
+  attachmentUrl?: string;
+  isInternal: boolean;
+  createdAt: string;
+  readAt?: string;
+  senderName?: string;
+  senderRole?: string;
+}
+
+export interface ParsedTicketDescription {
+  rawDescription: string;
+  equipment: string;
+  responsible: string;
+  phone: string;
+  area: string;
+  dateStr: string;
+  issueDescription: string;
+}

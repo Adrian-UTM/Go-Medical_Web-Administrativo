@@ -45,9 +45,9 @@ export class ProductFormComponent implements OnInit {
     is_active: [true, Validators.required],
     brand: ['', Validators.maxLength(80)],
     model: ['', Validators.maxLength(80)],
-    unit_price_mxn: [0, [Validators.required, Validators.min(0)]],
-    cost_price_mxn: [0, [Validators.required, Validators.min(0)]],
-    reference_price_usd: [null, Validators.min(0)],
+    unit_price_mxn: [null as number | null, [Validators.required, Validators.min(0)]],
+    cost_price_mxn: [null as number | null, [Validators.required, Validators.min(0)]],
+    reference_price_usd: [null as number | null, Validators.min(0)],
     currency: ['MXN', Validators.required],
     unit: [StockUnit.Pieza, Validators.required],
     image_url: [''],
@@ -72,6 +72,7 @@ export class ProductFormComponent implements OnInit {
   readonly productConditions = [
     { value: ProductCondition.New, label: 'Nuevo' },
     { value: ProductCondition.Preowned, label: 'Seminuevo' },
+    { value: ProductCondition.Remanufactured, label: 'Remanufacturado' },
   ];
 
   readonly physicalConditions = [
@@ -95,6 +96,14 @@ export class ProductFormComponent implements OnInit {
     { value: ProductCategory.Accesorio, label: 'Accesorios' },
     { value: ProductCategory.Servicio, label: 'Servicios' },
   ];
+
+  get filteredCategories() {
+    if (this.isService) {
+      return this.categories.filter(c => c.value === ProductCategory.Servicio);
+    } else {
+      return this.categories.filter(c => c.value !== ProductCategory.Servicio);
+    }
+  }
 
   readonly applications = [
     { value: ProductApplication.Humano, label: 'Uso Humano' },
@@ -127,7 +136,8 @@ export class ProductFormComponent implements OnInit {
   }
 
   get isPreowned(): boolean {
-    return this.isPhysicalProduct && this.form.get('product_condition')?.value === ProductCondition.Preowned;
+    const condition = this.form.get('product_condition')?.value;
+    return this.isPhysicalProduct && (condition === ProductCondition.Preowned || condition === ProductCondition.Remanufactured);
   }
 
   get nameLabel(): string {
@@ -272,7 +282,7 @@ export class ProductFormComponent implements OnInit {
         category: ProductCategory.Servicio,
         application: ProductApplication.General,
         unit: StockUnit.Servicio,
-        cost_price_mxn: 0,
+        cost_price_mxn: null,
         reference_price_usd: null,
         brand: '',
         model: '',
@@ -303,7 +313,7 @@ export class ProductFormComponent implements OnInit {
   }
 
   private applyConditionRules(condition: unknown, emitEvent = true): void {
-    if (condition !== ProductCondition.Preowned) {
+    if (condition !== ProductCondition.Preowned && condition !== ProductCondition.Remanufactured) {
       this.form.patchValue({
         physical_condition: null,
         functional_condition: null,
@@ -338,7 +348,7 @@ export class ProductFormComponent implements OnInit {
     dto.service_includes = null;
     dto.service_notes = null;
 
-    if (dto.product_condition !== ProductCondition.Preowned) {
+    if (dto.product_condition !== ProductCondition.Preowned && dto.product_condition !== ProductCondition.Remanufactured) {
       dto.physical_condition = null;
       dto.functional_condition = null;
       dto.inspection_date = null;

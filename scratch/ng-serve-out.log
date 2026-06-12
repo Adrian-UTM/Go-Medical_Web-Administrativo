@@ -1,0 +1,36 @@
+[33m>[39m Building...
+[32m√[39m Building...
+[1mInitial chunk files[22m[2m | [22m[1mNames[22m                       [2m | [22m [1mRaw size[22m
+[32mpolyfills.js[39m       [2m | [22m[2mpolyfills[22m                   [2m | [22m [36m90.20 kB[39m[2m | [22m
+[32mstyles.css[39m         [2m | [22m[2mstyles[22m                      [2m | [22m [36m14.13 kB[39m[2m | [22m
+[32mchunk-P45SUJVI.js[39m  [2m | [22m[2m-[22m                           [2m | [22m  [36m8.20 kB[39m[2m | [22m
+[32mmain.js[39m            [2m | [22m[2mmain[22m                        [2m | [22m  [36m4.94 kB[39m[2m | [22m
+[32mchunk-Y5RQAIA6.js[39m  [2m | [22m[2m-[22m                           [2m | [22m  [36m1.50 kB[39m[2m | [22m
+[32mchunk-TRKZOUWS.js[39m  [2m | [22m[2m-[22m                           [2m | [22m  [36m1.42 kB[39m[2m | [22m
+
+[1m [22m                  [2m | [22m[1mInitial total[22m               [2m | [22m[1m120.38 kB[22m
+
+[1mLazy chunk files[22m   [2m | [22m[1mNames[22m                       [2m | [22m [1mRaw size[22m
+[32mchunk-ZSGUHF7B.js[39m  [2m | [22m[2mreports-dashboard-component[22m [2m | [22m[36m106.39 kB[39m[2m | [22m
+[32mchunk-4JI3D76P.js[39m  [2m | [22m[2mquote-detail-component[22m      [2m | [22m [36m83.08 kB[39m[2m | [22m
+[32mchunk-LRTI5ZRH.js[39m  [2m | [22m[2mdashboard-component[22m         [2m | [22m [36m71.37 kB[39m[2m | [22m
+[32mchunk-W5J4RBRC.js[39m  [2m | [22m[2morder-list-component[22m        [2m | [22m [36m64.27 kB[39m[2m | [22m
+[32mchunk-OKQC4UQ6.js[39m  [2m | [22m[2mproduct-form-component[22m      [2m | [22m [36m62.33 kB[39m[2m | [22m
+[32mchunk-D4XGRB2T.js[39m  [2m | [22m[2mproduct-detail-component[22m    [2m | [22m [36m60.46 kB[39m[2m | [22m
+[32mchunk-MVZIXJE6.js[39m  [2m | [22m[2mquote-form-component[22m        [2m | [22m [36m55.22 kB[39m[2m | [22m
+[32mchunk-MLGOCPR4.js[39m  [2m | [22m[2mopportunity-detail-component[22m[2m | [22m [36m54.12 kB[39m[2m | [22m
+[32mchunk-2M4Z7NFF.js[39m  [2m | [22m[2mticket-detail-component[22m     [2m | [22m [36m54.00 kB[39m[2m | [22m
+[32mchunk-4FNXGCAX.js[39m  [2m | [22m[2mclient-detail-component[22m     [2m | [22m [36m53.72 kB[39m[2m | [22m
+[32mchunk-GAYT7UKK.js[39m  [2m | [22m[2mclient-form-component[22m       [2m | [22m [36m50.81 kB[39m[2m | [22m
+[32mchunk-H4PVHNQ7.js[39m  [2m | [22m[2mticket-form-component[22m       [2m | [22m [36m45.45 kB[39m[2m | [22m
+[32mchunk-TL2JJYRD.js[39m  [2m | [22m[2mproduct-list-component[22m      [2m | [22m [36m44.18 kB[39m[2m | [22m
+[32mchunk-TDMHIT3O.js[39m  [2m | [22m[2morder-form-component[22m        [2m | [22m [36m43.98 kB[39m[2m | [22m
+[32mchunk-K5Z6RC5R.js[39m  [2m | [22m[2mreturn-detail-component[22m     [2m | [22m [36m43.15 kB[39m[2m | [22m
+[2m...and 43 more lazy chunks files. Use "--verbose" to show all the files.[22m
+
+Application bundle generation complete. [7.275 seconds]
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4300[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m

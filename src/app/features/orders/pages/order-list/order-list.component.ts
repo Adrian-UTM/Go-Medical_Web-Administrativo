@@ -8,6 +8,7 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
+import { ActionMenuComponent } from '../../../../shared/components/action-menu/action-menu.component';
 import { OrderSupabaseService } from '../../services/order.supabase.service';
 import { Order, OrderStatsPeriodPreset, OrderStatus } from '../../../../models/order.model';
 import { buildOrderStatsSnapshot } from '../../utils/order-stats.helper';
@@ -37,6 +38,7 @@ import {
     LoaderComponent,
     EmptyStateComponent,
     CustomSelectComponent,
+    ActionMenuComponent,
   ],
   templateUrl: './order-list.component.html',
   styleUrl: './order-list.component.css',
@@ -290,6 +292,16 @@ export class OrderListComponent implements OnInit {
 
   getItemsCount(order: Order): number {
     return order.items.reduce((sum, item) => sum + item.quantity, 0);
+  }
+
+  getCompactItemNames(order: Order): string {
+    if (!order.items || order.items.length === 0) return 'Sin artículos';
+    const firstItem = order.items[0].productName;
+    const remainingCount = order.items.length - 1;
+    if (remainingCount > 0) {
+      return `${firstItem} y ${remainingCount} más`;
+    }
+    return firstItem;
   }
 
   getReturnStatusBadge(status: ReturnRequestStatus): { label: string; variant: BadgeVariant } {

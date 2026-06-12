@@ -2,7 +2,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
@@ -19,7 +18,6 @@ import { InventoryMovement, MovementType, ReferenceType } from '../../../../mode
     FormsModule,
     RouterLink,
     DatePipe,
-    PageHeaderComponent,
     StatusBadgeComponent,
     LoaderComponent,
     EmptyStateComponent,
@@ -43,14 +41,9 @@ export class MovementsListComponent {
 
   readonly movementTypeOptions = [
     { value: '', label: 'Todos los movimientos' },
-    { value: MovementType.InitialLoad, label: 'Carga inicial' },
     { value: MovementType.Entry, label: 'Entrada' },
     { value: MovementType.Exit, label: 'Salida' },
-    { value: MovementType.Adjustment, label: 'Ajuste' },
-    { value: MovementType.OrderReserve, label: 'Reserva de pedido' },
-    { value: MovementType.OrderDiscount, label: 'Descuento por pedido' },
-    { value: MovementType.Return, label: 'Devolucion' },
-    { value: MovementType.ServiceUsage, label: 'Uso en servicio' },
+    { value: MovementType.Return, label: 'Devolución recibida' },
   ];
 
   readonly categoryOptions = [
@@ -61,7 +54,6 @@ export class MovementsListComponent {
     { value: ProductCategory.Consumible, label: 'Consumibles' },
     { value: ProductCategory.Refaccion, label: 'Refacciones' },
     { value: ProductCategory.Accesorio, label: 'Accesorios' },
-    { value: ProductCategory.Servicio, label: 'Servicios' },
   ];
 
   readonly sortOptions = [
@@ -84,10 +76,17 @@ export class MovementsListComponent {
     const sortDirection = this.sortDirection();
 
     const result = this.movements().filter(movement => {
-      const matchesType = !movementType || movement.movementType === movementType;
+      const normalizedType = this.getNormalizedMovementType(movement.movementType);
+      if (!normalizedType) {
+        return false;
+      }
+
+      const matchesType = !movementType || normalizedType === movementType;
       const matchesProduct = !productId || movement.productId === productId;
       const matchesCategory = !category || movement.productCategory === category;
-      return matchesType && matchesProduct && matchesCategory;
+      const isPhysicalProduct = movement.productCategory !== ProductCategory.Servicio
+        && movement.productCategory !== ProductCategory.Services;
+      return isPhysicalProduct && matchesType && matchesProduct && matchesCategory;
     });
 
     return [...result].sort((a, b) => {
@@ -166,31 +165,97 @@ export class MovementsListComponent {
     return labels[category] ?? 'Sin categoria';
   }
 
-  getReferenceLabel(type: ReferenceType): string {
+  getOriginLabel(movement: InventoryMovement): string {
+    if (movement.movementType === MovementType.Return) {
+      return 'Devolución';
+    }
+
     const labels: Record<ReferenceType, string> = {
       [ReferenceType.Manual]: 'Manual',
       [ReferenceType.Order]: 'Pedido',
-      [ReferenceType.Product]: 'Producto',
-      [ReferenceType.Service]: 'Servicio',
-      [ReferenceType.Inventory]: 'Inventario',
+      [ReferenceType.Product]: 'Sistema',
+      [ReferenceType.Service]: 'Sistema',
+      [ReferenceType.Inventory]: 'Sistema',
     };
 
-    return labels[type];
+    return labels[movement.referenceType] ?? 'Manual';
+  }
+
+  getUserLabel(movement: InventoryMovement): string {
+    const createdBy = movement.createdBy?.trim();
+    if (!createdBy || this.isUuid(createdBy)) {
+      return 'Usuario no disponible';
+    }
+
+    return createdBy;
+  }
+
+  getNotePreview(movement: InventoryMovement): string {
+    const note = this.getFullNote(movement);
+    if (!note) {
+      return '—';
+    }
+
+    return note.length > 34 ? `${note.slice(0, 31).trim()}...` : note;
+  }
+
+  getFullNote(movement: InventoryMovement): string {
+    return movement.notes?.trim() ?? '';
+  }
+
+  hasLongNote(movement: InventoryMovement): boolean {
+    return this.getFullNote(movement).length > 34;
+  }
+
+  showFullNote(movement: InventoryMovement): void {
+    const note = this.getFullNote(movement);
+    if (!note) {
+      return;
+    }
+
+    window.alert(note);
   }
 
   getMovementBadge(type: MovementType): { label: string; variant: BadgeVariant } {
-    const map: Record<MovementType, { label: string; variant: BadgeVariant }> = {
-      [MovementType.InitialLoad]: { label: 'Carga inicial', variant: 'primary' },
-      [MovementType.Entry]: { label: 'Entrada', variant: 'success' },
-      [MovementType.Exit]: { label: 'Salida', variant: 'danger' },
-      [MovementType.Adjustment]: { label: 'Ajuste', variant: 'info' },
-      [MovementType.OrderReserve]: { label: 'Reserva', variant: 'warning' },
-      [MovementType.OrderDiscount]: { label: 'Descuento', variant: 'danger' },
-      [MovementType.Return]: { label: 'Devolucion', variant: 'success' },
-      [MovementType.ServiceUsage]: { label: 'Servicio', variant: 'warning' },
-    };
+    const normalizedType = this.getNormalizedMovementType(type);
+    if (normalizedType === MovementType.Exit) {
+      return { label: 'Salida', variant: 'danger' };
+    }
 
-    return map[type];
+    if (normalizedType === MovementType.Return) {
+      return { label: 'Devolución recibida', variant: 'info' };
+    }
+
+    return { label: 'Entrada', variant: 'success' };
+  }
+
+  getQuantityClass(movement: InventoryMovement): string {
+    const normalizedType = this.getNormalizedMovementType(movement.movementType);
+    if (normalizedType === MovementType.Exit || movement.quantity < 0) {
+      return 'quantity-negative';
+    }
+
+    return 'quantity-positive';
+  }
+
+  private getNormalizedMovementType(type: MovementType): MovementType.Entry | MovementType.Exit | MovementType.Return | null {
+    if (type === MovementType.InitialLoad || type === MovementType.Entry) {
+      return MovementType.Entry;
+    }
+
+    if (type === MovementType.Exit) {
+      return MovementType.Exit;
+    }
+
+    if (type === MovementType.Return) {
+      return MovementType.Return;
+    }
+
+    return null;
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 }
 

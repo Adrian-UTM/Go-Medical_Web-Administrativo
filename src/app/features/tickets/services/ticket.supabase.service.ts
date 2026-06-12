@@ -6,6 +6,7 @@ import { Client, ClientStatus } from '../../../core/models/client.model';
 import { Product, ProductItemType } from '../../../models/product.model';
 import {
   ServiceTicket,
+  TechnicalRouteCandidate,
   TicketFilters,
   TicketHistoryItem,
   TicketPriority,
@@ -13,6 +14,7 @@ import {
   TicketType,
   TicketTechnician,
   TicketUpsertPayload,
+  ServiceTicketMessage,
 } from '../models/ticket.model';
 import { SupabaseService } from '../../../core/services/supabase.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -21,8 +23,11 @@ import { AuthService } from '../../../core/services/auth.service';
 export class TicketSupabaseService {
   private readonly tableName = 'service_tickets';
   private readonly profilesTable = 'profiles';
+  private readonly engineerRoles = new Set(['technician']);
+  private readonly nonEngineerRoles = new Set(['admin', 'super_admin', 'staff', 'client']);
 
   private readonly _technicians = signal<TicketTechnician[]>([]);
+  private readonly assignedProfileNames = new Map<string, string>();
   readonly technicians = computed(() => this._technicians());
   private techniciansLoaded = false;
   private techniciansLoadingPromise: Promise<void> | null = null;
@@ -35,7 +40,6 @@ export class TicketSupabaseService {
   ) {
     void this.loadTechnicians();
   }
-
   async getTickets(filters?: TicketFilters): Promise<ServiceTicket[]> {
     await this.loadTechnicians();
 
@@ -48,7 +52,12 @@ export class TicketSupabaseService {
           trade_name,
           contact_name,
           email,
-          phone
+          phone,
+          billing_address,
+          shipping_address,
+          city,
+          state,
+          country
         ),
         products!product_id (
           name,
@@ -109,7 +118,12 @@ export class TicketSupabaseService {
           trade_name,
           contact_name,
           email,
-          phone
+          phone,
+          billing_address,
+          shipping_address,
+          city,
+          state,
+          country
         ),
         products!product_id (
           name,
@@ -159,6 +173,143 @@ export class TicketSupabaseService {
     return this._technicians();
   }
 
+  async getRouteCandidates(): Promise<TechnicalRouteCandidate[]> {
+    const { data, error } = await this.supabase.client
+      .from('technical_route_candidates')
+      .select('service_city, service_state, service_region, services_count')
+      .order('services_count', { ascending: false });
+
+    if (error) {
+      console.warn('[Tickets] No fue posible cargar candidatos de ruta tecnica.', {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      return [];
+    }
+
+    return (data ?? []).map((row: any) => ({
+      serviceCity: String(row.service_city ?? '').trim(),
+      serviceState: String(row.service_state ?? '').trim(),
+      serviceRegion: String(row.service_region ?? '').trim() || undefined,
+      count: Number(row.services_count ?? 0),
+      servicesCount: Number(row.services_count ?? 0),
+    })).filter(candidate => candidate.serviceCity && candidate.serviceState);
+  }
+
+  async authorizeExternalRouteForTicket(
+    ticketId: string,
+    notes = 'Ruta externa autorizada administrativamente.'
+  ): Promise<ServiceTicket | undefined> {
+    const current = await this.getRawTicket(ticketId);
+    if (!current) {
+      return undefined;
+    }
+
+    if (this.isTerminalStatus(current.status)) {
+      throw new Error('Los tickets cerrados o cancelados no permiten acciones operativas.');
+    }
+
+    const city = String(current.service_city ?? '').trim();
+    const state = String(current.service_state ?? '').trim();
+    const region = String(current.service_region ?? '').trim() || null;
+
+    if (!city || !state || this.isMeridaLocation(city, state)) {
+      throw new Error('Solo las solicitudes fuera de Mérida requieren autorización de ruta.');
+    }
+
+    const compatibleTickets = await this.getCompatibleExternalTickets(city, state);
+    if (compatibleTickets.length < 3) {
+      throw new Error('Ruta pendiente: se requieren al menos 3 servicios en esta ubicación.');
+    }
+
+    const now = new Date().toISOString();
+    const routePayload: Record<string, unknown> = {
+      city,
+      state,
+      region,
+      status: 'authorized',
+      authorized_by: this.normalizeUuid(this.authService.currentUserId()),
+      authorized_at: now,
+      notes: notes.trim() || null,
+      updated_at: now,
+    };
+
+    const { data: route, error: routeError } = await this.supabase.client
+      .from('technical_service_routes')
+      .insert(routePayload)
+      .select('id')
+      .single();
+
+    if (routeError) {
+      console.error('[Tickets] Error authorizing technical route', {
+        city,
+        state,
+        error: routeError,
+        message: routeError?.message,
+        details: routeError?.details,
+        hint: routeError?.hint,
+        code: routeError?.code,
+      });
+      throw this.toAppError(routeError.message, 'No fue posible autorizar la ruta técnica.');
+    }
+
+    const routeId = String(route?.id ?? '');
+    if (!routeId) {
+      throw new Error('No fue posible identificar la ruta técnica autorizada.');
+    }
+
+    const routeItems = compatibleTickets.map(ticket => ({
+      route_id: routeId,
+      ticket_id: ticket.id,
+    }));
+
+    const { error: itemsError } = await this.supabase.client
+      .from('technical_service_route_tickets')
+      .insert(routeItems);
+
+    if (itemsError) {
+      console.error('[Tickets] Error linking tickets to technical route', {
+        routeId,
+        routeItems,
+        error: itemsError,
+        message: itemsError?.message,
+        details: itemsError?.details,
+        hint: itemsError?.hint,
+        code: itemsError?.code,
+      });
+      throw this.toAppError(itemsError.message, 'No fue posible vincular los tickets a la ruta técnica.');
+    }
+
+    const compatibleIds = compatibleTickets.map(ticket => ticket.id);
+    const { error: updateError } = await this.supabase.client
+      .from(this.tableName)
+      .update({
+        route_required: true,
+        route_authorized: true,
+        route_notes: notes.trim() || null,
+        updated_at: now,
+      })
+      .in('id', compatibleIds);
+
+    if (updateError) {
+      console.error('[Tickets] Error marking route as authorized on tickets', {
+        routeId,
+        ticketIds: compatibleIds,
+        error: updateError,
+        message: updateError?.message,
+        details: updateError?.details,
+        hint: updateError?.hint,
+        code: updateError?.code,
+      });
+      throw this.toAppError(updateError.message, 'La ruta fue creada, pero no fue posible actualizar los tickets.');
+    }
+
+    return this.getTicketById(ticketId);
+  }
+
   supportsExternalTechnicianName(): boolean {
     return true;
   }
@@ -192,7 +343,12 @@ export class TicketSupabaseService {
           trade_name,
           contact_name,
           email,
-          phone
+          phone,
+          billing_address,
+          shipping_address,
+          city,
+          state,
+          country
         ),
         products!product_id (
           name,
@@ -225,7 +381,7 @@ export class TicketSupabaseService {
       return undefined;
     }
 
-    const updatePayload = await this.buildDbPayload(payload, true);
+    const updatePayload = await this.buildDbPayload(payload, true, current);
     updatePayload['updated_at'] = new Date().toISOString();
 
     const { data, error } = await this.supabase.client
@@ -239,7 +395,12 @@ export class TicketSupabaseService {
           trade_name,
           contact_name,
           email,
-          phone
+          phone,
+          billing_address,
+          shipping_address,
+          city,
+          state,
+          country
         ),
         products!product_id (
           name,
@@ -298,7 +459,12 @@ export class TicketSupabaseService {
           trade_name,
           contact_name,
           email,
-          phone
+          phone,
+          billing_address,
+          shipping_address,
+          city,
+          state,
+          country
         ),
         products!product_id (
           name,
@@ -329,7 +495,16 @@ export class TicketSupabaseService {
       return undefined;
     }
 
+    if (this.isTerminalStatus(current.status)) {
+      throw new Error('Los tickets cerrados o cancelados no permiten reasignar ingeniero.');
+    }
+
     const nextStatus = current.status === TicketStatus.Open ? TicketStatus.Assigned : current.status;
+    const selectedEngineer = this._technicians().find(technician => technician.id === technicianId);
+    if (!selectedEngineer) {
+      throw new Error('Selecciona un ingeniero de servicio válido.');
+    }
+
     const updatePayload: Record<string, unknown> = {
       status: nextStatus,
       updated_at: new Date().toISOString(),
@@ -339,7 +514,7 @@ export class TicketSupabaseService {
 
     const history = this.appendHistoryIfSupported(current, {
       status: nextStatus,
-      comment: `Ticket asignado a ${this._technicians().find(technician => technician.id === technicianId)?.fullName ?? 'tecnico'}.`,
+      comment: `Ticket asignado a ${selectedEngineer.fullName}.`,
       authorName,
     });
 
@@ -358,7 +533,12 @@ export class TicketSupabaseService {
           trade_name,
           contact_name,
           email,
-          phone
+          phone,
+          billing_address,
+          shipping_address,
+          city,
+          state,
+          country
         ),
         products!product_id (
           name,
@@ -373,7 +553,7 @@ export class TicketSupabaseService {
 
     if (error) {
       console.error('[Tickets] Error assigning technician', { ticketId: id, technicianId, error });
-      throw this.toAppError(error.message, 'No fue posible asignar el técnico.');
+      throw this.toAppError(error.message, 'No fue posible asignar el ingeniero de servicio.');
     }
 
     return this.mapTicket(data);
@@ -389,9 +569,13 @@ export class TicketSupabaseService {
       return undefined;
     }
 
+    if (this.isTerminalStatus(current.status)) {
+      throw new Error('Los tickets cerrados o cancelados no permiten reasignar ingeniero.');
+    }
+
     const normalizedName = technicianName.trim();
     if (!normalizedName) {
-      throw new Error('Ingresa el nombre del tecnico externo.');
+      throw new Error('Ingresa el nombre del ingeniero externo.');
     }
 
     const nextStatus = current.status === TicketStatus.Open ? TicketStatus.Assigned : current.status;
@@ -438,19 +622,123 @@ export class TicketSupabaseService {
 
     if (error) {
       console.error('[Tickets] Error assigning external technician', { ticketId: id, technicianName: normalizedName, error });
-      throw this.toAppError(error.message, 'No fue posible asignar el tecnico externo.');
+      throw this.toAppError(error.message, 'No fue posible asignar el ingeniero externo.');
     }
 
     return this.mapTicket(data);
   }
 
-  private async buildDbPayload(payload: TicketUpsertPayload, isUpdate = false): Promise<Record<string, unknown>> {
+  async scheduleService(
+    id: string,
+    scheduledStartAt: string,
+    scheduledEndAt: string | null,
+    notes: string,
+    technicianId?: string | null,
+    customTechName?: string | null,
+    serviceType?: TicketType
+  ): Promise<ServiceTicket | undefined> {
+    const current = await this.getRawTicket(id);
+    if (!current) return undefined;
+
+    if (this.isTerminalStatus(current.status)) {
+      throw new Error('Los tickets cerrados o cancelados no permiten programar servicio.');
+    }
+
+    const address = String(current.service_address ?? current.client_address ?? '').trim();
+    const city = String(current.service_city ?? current.client_city ?? '').trim();
+    const state = String(current.service_state ?? current.client_state ?? '').trim();
+    if (!address && !city) {
+      throw new Error('Falta dirección de atención. No se puede programar el servicio.');
+    }
+
+    const startIso = this.toIsoOrNull(scheduledStartAt);
+    const endIso = scheduledEndAt ? this.toIsoOrNull(scheduledEndAt) : null;
+
+    if (startIso && endIso && new Date(endIso).getTime() <= new Date(startIso).getTime()) {
+      throw new Error('La hora de fin debe ser posterior a la hora de inicio.');
+    }
+
+    const resolvedTechId = technicianId ? this.normalizeUuid(technicianId) : null;
+    if (resolvedTechId && startIso) {
+      const hasConflict = await this.hasTechnicianScheduleConflict(resolvedTechId, startIso, id);
+      if (hasConflict) {
+        throw new Error('El ingeniero seleccionado ya tiene un servicio programado en ese horario.');
+      }
+    }
+
+    const resolvedCustomName = !resolvedTechId && customTechName ? customTechName.trim() : null;
+    const nextStatus = current.status === TicketStatus.Open || current.status === TicketStatus.Assigned
+      ? TicketStatus.InProgress
+      : current.status;
+
+    const updatePayload: Record<string, unknown> = {
+      scheduled_start_at: startIso,
+      scheduled_end_at: endIso,
+      notes: notes.trim() || current.notes || null,
+      status: nextStatus,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (serviceType) updatePayload['type'] = serviceType;
+    if (resolvedTechId) {
+      updatePayload['assigned_technician_id'] = resolvedTechId;
+      updatePayload['assigned_technician_custom_name'] = null;
+    } else if (resolvedCustomName) {
+      updatePayload['assigned_technician_id'] = null;
+      updatePayload['assigned_technician_custom_name'] = resolvedCustomName;
+    }
+
+    const history = this.appendHistoryIfSupported(current, {
+      status: nextStatus as TicketStatus,
+      comment: `Servicio programado para ${new Date(startIso!).toLocaleString('es-MX')}.`,
+      authorName: 'Coordinacion tecnica',
+    });
+    if (history) updatePayload['history'] = history;
+
+    const { data, error } = await this.supabase.client
+      .from(this.tableName)
+      .update(updatePayload)
+      .eq('id', id)
+      .select(`*, clients!client_id(business_name,trade_name,contact_name,email,phone,billing_address,shipping_address,city,state,country), products!product_id(name,sku,item_type), equipment_units!equipment_unit_id(serial_number)`)
+      .single();
+
+    if (error) {
+      console.error('[Tickets] Error scheduling service', { ticketId: id, error });
+      throw this.toAppError(error.message, 'No fue posible programar el servicio.');
+    }
+
+    return this.mapTicket(data);
+  }
+
+  private async buildDbPayload(payload: TicketUpsertPayload, isUpdate = false, current?: any): Promise<Record<string, unknown>> {
     const product = payload.productId ? (await this.getAvailableProducts()).find(item => item.id === payload.productId) : undefined;
     const equipmentUnitId = await this.resolveEquipmentUnitId(payload, product);
     const assignedTechnicianId = this.normalizeUuid(payload.assignedTechnicianId);
     const assignedTechnicianCustomName = assignedTechnicianId
       ? null
       : payload.assignedTechnicianCustomName?.trim() || null;
+    const client = payload.clientId ? await this.getClientById(payload.clientId) : undefined;
+    const serviceAddress = this.toNullable(payload.serviceAddress ?? current?.service_address ?? client?.formattedShippingAddress ?? client?.formattedBillingAddress ?? client?.shippingAddress ?? client?.address);
+    const serviceCity = this.toNullable(payload.serviceCity ?? current?.service_city ?? client?.city);
+    const serviceState = this.toNullable(payload.serviceState ?? current?.service_state ?? client?.state);
+    const serviceRegion = this.toNullable(payload.serviceRegion ?? current?.service_region);
+    const scheduledStartAt = this.toIsoOrNull(payload.scheduledStartAt ?? payload.scheduledAt ?? current?.scheduled_start_at);
+    const scheduledEndAt = this.toIsoOrNull(payload.scheduledEndAt ?? current?.scheduled_end_at);
+    const requestedServiceDate = this.toDateOrNull(payload.requestedServiceDate ?? current?.requested_service_date);
+    const isLocalService = serviceCity && serviceState ? this.isMeridaLocation(serviceCity, serviceState) : false;
+    const routeRequired = !!serviceCity && !!serviceState && !isLocalService;
+    const routeAuthorized = routeRequired ? Boolean(payload.routeAuthorized ?? current?.route_authorized ?? false) : false;
+
+    if (scheduledStartAt && scheduledEndAt && new Date(scheduledEndAt).getTime() <= new Date(scheduledStartAt).getTime()) {
+      throw new Error('La hora de fin debe ser posterior a la hora de inicio.');
+    }
+
+    if (assignedTechnicianId && scheduledStartAt) {
+      const hasConflict = await this.hasTechnicianScheduleConflict(assignedTechnicianId, scheduledStartAt, current?.id);
+      if (hasConflict) {
+        throw new Error('El ingeniero seleccionado ya tiene un servicio programado en ese horario.');
+      }
+    }
 
     const dbPayload: Record<string, unknown> = {
       client_id: payload.clientId,
@@ -463,6 +751,17 @@ export class TicketSupabaseService {
       equipment_unit_id: equipmentUnitId,
       assigned_technician_id: assignedTechnicianId,
       assigned_technician_custom_name: assignedTechnicianCustomName,
+      service_address: serviceAddress,
+      service_city: serviceCity,
+      service_state: serviceState,
+      service_region: serviceRegion,
+      requested_service_date: requestedServiceDate,
+      scheduled_start_at: scheduledStartAt,
+      scheduled_end_at: scheduledEndAt,
+      is_local_service: isLocalService,
+      route_required: routeRequired,
+      route_authorized: routeAuthorized,
+      route_notes: this.toNullable(payload.routeNotes ?? current?.route_notes),
     };
 
     if (!isUpdate) {
@@ -542,13 +841,15 @@ export class TicketSupabaseService {
 
     const technicians = (data ?? [])
       .filter((profile: any) => profile.is_active !== false)
-      .filter((profile: any) => ['technician', 'tecnico', 'técnico', 'staff', 'admin'].includes(String(profile.role ?? '').toLowerCase()))
+      .filter((profile: any) => this.isServiceEngineerRole(profile.role))
       .map((profile: any) => ({
         id: String(profile.id ?? ''),
         fullName: String(profile.full_name ?? profile.email ?? '').trim(),
         role: profile.role ? String(profile.role) : undefined,
       }))
       .filter((technician: TicketTechnician) => this.normalizeUuid(technician.id) && technician.fullName);
+
+    technicians.forEach(technician => this.assignedProfileNames.set(technician.id, technician.fullName));
 
     this._technicians.set(technicians.sort((a, b) => a.fullName.localeCompare(b.fullName, 'es-MX')));
     this.techniciansLoaded = true;
@@ -570,7 +871,7 @@ export class TicketSupabaseService {
       .in('id', missingIds);
 
     if (error) {
-      console.warn('[Tickets] No fue posible cargar perfiles de tecnicos asignados.', {
+      console.warn('[Tickets] No fue posible cargar perfiles de ingenieros asignados.', {
         technicianIds: missingIds,
         error,
         message: error?.message,
@@ -593,8 +894,10 @@ export class TicketSupabaseService {
       return;
     }
 
+    assignedProfiles.forEach(profile => this.assignedProfileNames.set(profile.id, profile.fullName));
+    const assignableProfiles = assignedProfiles.filter(profile => this.isServiceEngineerRole(profile.role));
     const merged = new Map(this._technicians().map(technician => [technician.id, technician]));
-    assignedProfiles.forEach(technician => merged.set(technician.id, technician));
+    assignableProfiles.forEach(technician => merged.set(technician.id, technician));
     this._technicians.set(Array.from(merged.values()).sort((a, b) => a.fullName.localeCompare(b.fullName, 'es-MX')));
   }
 
@@ -619,6 +922,17 @@ export class TicketSupabaseService {
     } else if (row.client_name_snapshot) {
       clientName = row.client_name_snapshot;
     }
+    const clientAddress = String(clientObj?.shipping_address ?? clientObj?.billing_address ?? '').trim() || undefined;
+    const clientCity = String(clientObj?.city ?? '').trim() || undefined;
+    const clientState = String(clientObj?.state ?? '').trim() || undefined;
+    const clientCountry = String(clientObj?.country ?? '').trim() || undefined;
+    const serviceAddress = String(row.service_address ?? clientAddress ?? '').trim() || undefined;
+    const serviceCity = String(row.service_city ?? clientCity ?? '').trim() || undefined;
+    const serviceState = String(row.service_state ?? clientState ?? '').trim() || undefined;
+    const serviceRegion = String(row.service_region ?? '').trim() || undefined;
+    const isLocalService = typeof row.is_local_service === 'boolean'
+      ? row.is_local_service
+      : !!serviceCity && !!serviceState && this.isMeridaLocation(serviceCity, serviceState);
 
     // Resolver detalles del producto vía join relacional
     const productObj = row.products;
@@ -648,9 +962,24 @@ export class TicketSupabaseService {
       equipmentSerialNumber: serialNumber,
       assignedTechnicianId: assignedTechnicianId ?? undefined,
       assignedTechnicianCustomName,
-      assignedTechnicianName: assignedTechnicianCustomName ?? assignedTechnician?.fullName ?? row.assigned_technician?.full_name ?? undefined,
+      assignedTechnicianName: assignedTechnicianCustomName ?? assignedTechnician?.fullName ?? (assignedTechnicianId ? this.assignedProfileNames.get(assignedTechnicianId) : undefined) ?? row.assigned_technician?.full_name ?? undefined,
+      clientAddress,
+      clientCity,
+      clientState,
+      clientCountry,
+      serviceAddress,
+      serviceCity,
+      serviceState,
+      serviceRegion,
+      requestedServiceDate: row.requested_service_date ?? undefined,
+      scheduledStartAt: row.scheduled_start_at ?? undefined,
+      scheduledEndAt: row.scheduled_end_at ?? undefined,
+      isLocalService,
+      routeRequired: typeof row.route_required === 'boolean' ? row.route_required : (!!serviceCity && !!serviceState && !isLocalService),
+      routeAuthorized: Boolean(row.route_authorized),
+      routeNotes: row.route_notes ?? undefined,
       requestedAt: row.requested_at ?? row.created_at ?? new Date().toISOString(),
-      scheduledAt: row.scheduled_at ?? undefined,
+      scheduledAt: row.scheduled_start_at ?? row.scheduled_at ?? undefined,
       updatedAt: row.updated_at ?? row.requested_at ?? new Date().toISOString(),
       notes: row.notes ?? '',
       attachments: Array.isArray(row.attachments) ? row.attachments : [],
@@ -722,6 +1051,251 @@ export class TicketSupabaseService {
     return `GST-${year}-${String(sequence + 1).padStart(4, '0')}`;
   }
 
+  private isServiceEngineerRole(role: unknown): boolean {
+    const normalized = this.normalizeLocationText(role);
+    return this.engineerRoles.has(normalized) && !this.nonEngineerRoles.has(normalized);
+  }
+
+  private async getCompatibleExternalTickets(city: string, state: string): Promise<any[]> {
+    const { data, error } = await this.supabase.client
+      .from(this.tableName)
+      .select('id, status, service_city, service_state, service_region, route_required, route_authorized')
+      .eq('route_required', true);
+
+    if (error) {
+      console.error('[Tickets] Error loading compatible external tickets', {
+        city,
+        state,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      throw this.toAppError(error.message, 'No fue posible validar los servicios compatibles para la ruta.');
+    }
+
+    const normalizedCity = this.normalizeLocationText(city);
+    const normalizedState = this.normalizeLocationText(state);
+
+    return (data ?? []).filter((ticket: any) =>
+      this.normalizeLocationText(ticket.service_city) === normalizedCity &&
+      this.normalizeLocationText(ticket.service_state) === normalizedState &&
+      !this.isTerminalStatus(ticket.status) &&
+      ticket.route_authorized !== true
+    );
+  }
+
+  async getMessages(ticketId: string): Promise<ServiceTicketMessage[]> {
+    const { data, error } = await this.supabase.client
+      .from('service_ticket_messages')
+      .select(`
+        *,
+        profiles (
+          full_name,
+          role
+        )
+      `)
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.warn('No se pudieron cargar los mensajes del ticket.', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => {
+      const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+      return {
+        id: row.id,
+        ticketId: row.ticket_id,
+        senderType: row.sender_type,
+        senderProfileId: row.sender_profile_id,
+        message: row.message,
+        attachmentUrl: row.attachment_url,
+        isInternal: row.is_internal,
+        createdAt: row.created_at,
+        readAt: row.read_at,
+        senderName: profile?.full_name || 'Usuario desconocido',
+        senderRole: profile?.role || 'admin'
+      };
+    });
+  }
+
+  async uploadMessageAttachment(file: File, ticketId: string): Promise<string> {
+    const ext = file.name.split('.').pop();
+    const fileName = `${ticketId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+    
+    const { data, error } = await this.supabase.client.storage
+      .from('ticket-attachments')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+    if (error) {
+      console.error('Error uploading message attachment:', error);
+      throw new Error('No fue posible subir la imagen.');
+    }
+
+    const { data: publicUrlData } = this.supabase.client.storage
+      .from('ticket-attachments')
+      .getPublicUrl(data.path);
+
+    return publicUrlData.publicUrl;
+  }
+
+  async sendMessage(ticketId: string, message: string, attachmentUrl?: string, isInternal = false): Promise<ServiceTicketMessage | null> {
+    const userId = this.authService.currentUserId();
+    if (!userId) throw new Error('Usuario no autenticado.');
+
+    const payload = {
+      ticket_id: ticketId,
+      sender_type: 'staff',
+      sender_profile_id: userId,
+      message: message.trim(),
+      attachment_url: attachmentUrl || null,
+      is_internal: isInternal
+    };
+
+    const { data, error } = await this.supabase.client
+      .from('service_ticket_messages')
+      .insert(payload)
+      .select(`
+        *,
+        profiles (
+          full_name,
+          role
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error al enviar mensaje del ticket:', error);
+      throw new Error('No fue posible enviar el mensaje.');
+    }
+
+    return {
+      id: data.id,
+      ticketId: data.ticket_id,
+      senderType: data.sender_type,
+      senderProfileId: data.sender_profile_id,
+      message: data.message,
+      attachmentUrl: data.attachment_url,
+      isInternal: data.is_internal,
+      createdAt: data.created_at,
+      readAt: data.read_at,
+      senderName: data.profiles?.full_name || 'Tú',
+      senderRole: data.profiles?.role || 'admin'
+    };
+  }
+
+  async getUnreadMessagesCountByTicket(): Promise<Record<string, number>> {
+    const { data, error } = await this.supabase.client
+      .from('service_ticket_messages')
+      .select('ticket_id')
+      .eq('sender_type', 'client')
+      .is('read_at', null);
+
+    if (error) {
+      console.warn('Error al obtener conteo de mensajes no leídos:', error);
+      return {};
+    }
+
+    const counts: Record<string, number> = {};
+    (data || []).forEach((row: any) => {
+      if (row.ticket_id) {
+        counts[row.ticket_id] = (counts[row.ticket_id] || 0) + 1;
+      }
+    });
+    return counts;
+  }
+
+  async markMessagesAsRead(ticketId: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from('service_ticket_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('ticket_id', ticketId)
+      .eq('sender_type', 'client')
+      .is('read_at', null);
+
+    if (error) {
+      console.warn(`Error al marcar mensajes como leídos para ticket ${ticketId}:`, error);
+    }
+  }
+
+  private async hasTechnicianScheduleConflict(technicianId: string, scheduledStartAt: string, exceptTicketId?: string): Promise<boolean> {
+    let query = this.supabase.client
+      .from(this.tableName)
+      .select('id, status', { count: 'exact', head: true })
+      .eq('assigned_technician_id', technicianId)
+      .eq('scheduled_start_at', scheduledStartAt)
+      .neq('status', 'closed')
+      .neq('status', 'cancelled');
+
+    if (exceptTicketId) {
+      query = query.neq('id', exceptTicketId);
+    }
+
+    const { count, error } = await query;
+    if (error) {
+      console.warn('[Tickets] No fue posible validar conflicto de agenda.', {
+        technicianId,
+        scheduledStartAt,
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      return false;
+    }
+
+    return (count ?? 0) > 0;
+  }
+
+  private isTerminalStatus(status: unknown): boolean {
+    const normalized = this.normalizeLocationText(status);
+    return normalized === 'closed' || normalized === 'cancelled' || normalized === 'canceled' || normalized === 'cerrado' || normalized === 'cancelado';
+  }
+
+  private isMeridaLocation(city?: string | null, state?: string | null): boolean {
+    const normalizedCity = this.normalizeLocationText(city);
+    const normalizedState = this.normalizeLocationText(state);
+
+    return normalizedCity === 'merida' && (normalizedState === 'yucatan' || normalizedState === 'yuc');
+  }
+
+  private normalizeLocationText(value: unknown): string {
+    return String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  private toNullable(value: unknown): string | null {
+    const normalized = String(value ?? '').trim();
+    return normalized ? normalized : null;
+  }
+
+  private toIsoOrNull(value: unknown): string | null {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  private toDateOrNull(value: unknown): string | null {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    return normalized.slice(0, 10);
+  }
+
   private toAppError(message: string, fallback: string): Error {
     const lowered = message.toLowerCase();
     if (lowered.includes('permission') || lowered.includes('rls') || lowered.includes('policy')) {
@@ -729,7 +1303,7 @@ export class TicketSupabaseService {
     }
 
     if (lowered.includes('assigned_technician_custom_name') || lowered.includes('column')) {
-      return new Error('Para asignar un técnico externo, primero debe habilitarse el campo de técnico manual.');
+      return new Error('Para asignar un ingeniero externo, primero debe habilitarse el campo de nombre manual.');
     }
 
     return new Error(fallback);

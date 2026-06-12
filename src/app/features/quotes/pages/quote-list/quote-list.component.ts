@@ -8,6 +8,7 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
+import { ActionMenuComponent } from '../../../../shared/components/action-menu/action-menu.component';
 import { Quote, QuoteStatus } from '../../models/quote.model';
 import { QuoteSupabaseService } from '../../services/quote.supabase.service';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
@@ -26,6 +27,7 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
     LoaderComponent,
     EmptyStateComponent,
     CustomSelectComponent,
+    ActionMenuComponent,
   ],
   templateUrl: './quote-list.component.html',
   styleUrl: './quote-list.component.css',

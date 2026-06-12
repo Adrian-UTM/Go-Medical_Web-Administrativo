@@ -40,6 +40,11 @@ export interface DashboardSnapshot {
   lowStockProducts: number;
   recentOrders: DashboardRecentOrder[];
   recentActivity: DashboardRecentActivity[];
+  openTicketsList: Array<{ id: string; ticketNumber: string; title: string; status: string; clientName: string; occurredAt: string }>;
+  lowStockItems: Array<{ productId: string; productName: string; quantity: number; minStock: number }>;
+  pendingRequestsList: Array<{ id: string; requestNumber: string; clientName: string; title: string }>;
+  pendingOrdersList: Array<{ id: string; folio: string; clientName: string; total: number }>;
+  pendingQuotesList: Array<{ id: string; quoteNumber: string; clientName: string; total: number }>;
 }
 
 export interface DashboardReportRange {
@@ -70,6 +75,55 @@ export class DashboardSupabaseService {
     return this.buildSnapshot(data);
   }
 
+  async getUnreadTicketNotifications(): Promise<Array<{ ticketId: string; ticketNumber: string; clientName: string; count: number; lastMessage: string; lastMessageAt: string }>> {
+    const { data: messages, error: msgError } = await this.supabase.client
+      .from('service_ticket_messages')
+      .select(`
+        ticket_id,
+        message,
+        created_at,
+        service_tickets (
+          ticket_number,
+          client_name_snapshot
+        )
+      `)
+      .eq('sender_type', 'client')
+      .is('read_at', null)
+      .order('created_at', { ascending: false });
+
+    if (msgError) {
+      console.error('Error fetching unread notifications:', msgError);
+      return [];
+    }
+
+    const notificationMap = new Map<string, { ticketId: string; ticketNumber: string; clientName: string; count: number; lastMessage: string; lastMessageAt: string }>();
+
+    (messages || []).forEach((row: any) => {
+      const ticketId = row.ticket_id;
+      const ticket = row.service_tickets;
+      if (!ticket) return;
+
+      const ticketNumber = ticket.ticket_number || 'TKT';
+      const clientName = ticket.client_name_snapshot || 'Cliente';
+
+      if (!notificationMap.has(ticketId)) {
+        notificationMap.set(ticketId, {
+          ticketId,
+          ticketNumber,
+          clientName,
+          count: 1,
+          lastMessage: row.message || '',
+          lastMessageAt: row.created_at
+        });
+      } else {
+        const existing = notificationMap.get(ticketId)!;
+        existing.count += 1;
+      }
+    });
+
+    return Array.from(notificationMap.values());
+  }
+
   async getReportData(period: DashboardReportPeriod): Promise<DashboardReportData> {
     const data = await this.loadDashboardRows();
     const range = this.resolveReportRange(period);
@@ -97,8 +151,8 @@ export class DashboardSupabaseService {
     };
   }
 
-  private async loadDashboardRows(): Promise<{ products: any[]; clients: any[]; internalEmails: Set<string>; orders: any[]; quotes: any[]; tickets: any[]; stock: any[] }> {
-    const [products, clients, profiles, orders, quotes, tickets, stock] = await Promise.all([
+  private async loadDashboardRows(): Promise<{ products: any[]; clients: any[]; internalEmails: Set<string>; orders: any[]; quotes: any[]; tickets: any[]; stock: any[]; supportRequests: any[] }> {
+    const [products, clients, profiles, orders, quotes, tickets, stock, supportRequests] = await Promise.all([
       this.supabase.client.from('products').select('*').order('created_at', { ascending: false }),
       this.supabase.client.from('clients').select('*').order('created_at', { ascending: false }),
       this.supabase.client.from('profiles').select('email, role').neq('role', 'client'),
@@ -106,9 +160,10 @@ export class DashboardSupabaseService {
       this.supabase.client.from('quotes').select('*').order('created_at', { ascending: false }),
       this.supabase.client.from('service_tickets').select('*').order('updated_at', { ascending: false }),
       this.supabase.client.from('inventory_stock').select('*').order('updated_at', { ascending: false }),
+      this.supabase.client.from('customer_support_requests').select('*, clients!client_id(business_name, trade_name)').eq('status', 'pending').order('created_at', { ascending: false }),
     ]);
 
-    const responses = [products, clients, profiles, orders, quotes, tickets, stock];
+    const responses = [products, clients, profiles, orders, quotes, tickets, stock, supportRequests];
     const failed = responses.find(response => response.error);
     if (failed?.error) {
       throw this.toAppError(failed.error.message, 'No fue posible cargar la información del dashboard.');
@@ -122,15 +177,17 @@ export class DashboardSupabaseService {
       quotes: quotes.data ?? [],
       tickets: tickets.data ?? [],
       stock: stock.data ?? [],
+      supportRequests: supportRequests.data ?? [],
     };
   }
 
-  private buildSnapshot(data: { products: any[]; clients: any[]; internalEmails: Set<string>; orders: any[]; quotes: any[]; tickets: any[]; stock: any[] }): DashboardSnapshot {
+  private buildSnapshot(data: { products: any[]; clients: any[]; internalEmails: Set<string>; orders: any[]; quotes: any[]; tickets: any[]; stock: any[]; supportRequests: any[] }): DashboardSnapshot {
     const recentOrders = this.mapRecentOrders(data.orders);
     const tickets = data.tickets.map(row => this.mapTicket(row));
     const quotes = data.quotes.map(row => this.mapQuote(row));
     const lowStockItems = this.getLowStockItems(data.stock, data.products);
     const openTickets = tickets.filter(ticket => this.isOpenTicketStatus(ticket.status)).length;
+    const openTicketsList = tickets.filter(ticket => this.isOpenTicketStatus(ticket.status));
     const lowStockActivities = lowStockItems.slice(0, 3).map(item => ({
       id: `stock-${item.productId}`,
       type: 'Inventario',
@@ -171,6 +228,20 @@ export class DashboardSupabaseService {
       occurredAt: ticket.occurredAt,
     }));
 
+    const pendingOrdersList = recentOrders.filter(o => ['pending', 'pending_review', 'pending_payment'].includes(String(o.status).toLowerCase()));
+    const pendingQuotesList = quotes.filter(q => String(q.status).toLowerCase() === 'sent').map(q => ({
+      id: q.id,
+      quoteNumber: q.quoteNumber,
+      clientName: q.clientName,
+      total: 0 // Podríamos extraer el total si estuviera disponible fácilmente
+    }));
+    const pendingRequestsList = data.supportRequests.map(row => ({
+      id: row.id,
+      requestNumber: row.request_number || 'SR-000',
+      clientName: row.clients?.trade_name || row.clients?.business_name || 'Cliente',
+      title: row.title || 'Solicitud'
+    }));
+
     return {
       totalProducts: data.products.filter(product => product.is_active !== false).length,
       totalClients: data.clients.filter(client => this.isCommercialClientRecord(client, data.internalEmails)).length,
@@ -182,6 +253,11 @@ export class DashboardSupabaseService {
       recentActivity: [...orderActivities, ...quoteActivities, ...ticketActivities, ...lowStockActivities]
         .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
         .slice(0, 8),
+      openTicketsList,
+      lowStockItems,
+      pendingRequestsList,
+      pendingOrdersList,
+      pendingQuotesList,
     };
   }
 

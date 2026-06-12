@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { SupabaseService } from '../../../core/services/supabase.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { ProductCategory } from '../../../models/product.model';
 import {
   Opportunity,
@@ -14,29 +15,136 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class OpportunitiesSupabaseService {
-  private readonly candidateTables = ['abandoned_cart_opportunities', 'opportunities', 'carts'];
-  private readonly itemsTable = 'cart_items';
-  private resolvedTable: string | null | undefined;
-
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly authService: AuthService
+  ) {}
 
   async getOpportunities(filters?: OpportunityFilters): Promise<Opportunity[]> {
-    const table = await this.resolveSourceTable();
-    if (!table) {
-      return [];
+    const table = 'carts';
+
+    const response = await this.supabase.client
+      .from(table)
+      .select(`
+        *,
+        client:clients!carts_client_id_fkey (
+          id,
+          business_name,
+          trade_name,
+          rfc,
+          contact_name,
+          email,
+          phone,
+          client_type,
+          created_at,
+          profiles (
+            id,
+            full_name,
+            email,
+            phone,
+            role
+          )
+        ),
+        assigned_user:profiles!carts_assigned_to_fkey (
+          id,
+          full_name
+        ),
+        cart_followups (
+          id,
+          contact_channel,
+          status,
+          comment,
+          created_at,
+          created_by,
+          profiles (
+            full_name
+          )
+        ),
+        cart_items (
+          id,
+          quantity,
+          unit_price,
+          total_line_price,
+          sku_snapshot,
+          product_name_snapshot,
+          product_category_snapshot,
+          product:products (
+            id,
+            name,
+            sku,
+            category,
+            is_active,
+            media:product_media (
+              file_path,
+              is_primary
+            )
+          )
+        )
+      `)
+      .eq('source', 'mobile_app')
+      .order('last_activity_at', { ascending: false });
+
+    if (response.error) {
+      throw this.toAppError(response.error.message, 'No fue posible cargar las oportunidades comerciales.');
     }
 
-    const rows = await this.fetchRows(table);
-    const itemsByParent = await this.loadItemsMap(table, rows.map(row => String(row.id)));
-    let opportunities = rows.map(row => this.mapOpportunity(row, table, itemsByParent.get(String(row.id)) ?? []));
+    let rows = response.data ?? [];
 
+    // Apply strict filters in memory
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+    rows = rows.filter(row => {
+      // 1. Must have a client associated
+      if (!row.client) {
+        return false;
+      }
+
+      // 2. Client must not be an internal user (admin, staff, technician)
+      const profiles = row.client.profiles || [];
+      const hasInternalRole = profiles.some((p: any) => ['admin', 'staff', 'technician'].includes(p.role));
+      if (hasInternalRole) {
+        return false;
+      }
+
+      // 3. Must have at least 1 item
+      const items = row.cart_items || [];
+      if (items.length === 0) {
+        return false;
+      }
+
+      // 4. Must not be converted or closed
+      if (row.converted_order_id || row.converted_quote_id) {
+        return false;
+      }
+      const cartStatus = String(row.status ?? '').toLowerCase();
+      if (['converted_to_order', 'converted_to_quote', 'closed', 'converted'].includes(cartStatus)) {
+        return false;
+      }
+
+      // 5. Inactivity of at least 5 minutes
+      const lastActivity = new Date(row.last_activity_at || row.updated_at || row.created_at);
+      if (lastActivity > fiveMinutesAgo) {
+        return false;
+      }
+
+      return true;
+    });
+
+    let opportunities = rows.map(row => this.mapOpportunityFromJoin(row));
+
+    // Client-side search and filters
     if (filters?.search?.trim()) {
       const query = filters.search.trim().toLowerCase();
       opportunities = opportunities.filter(opportunity =>
         opportunity.folio.toLowerCase().includes(query) ||
         opportunity.contact.displayName.toLowerCase().includes(query) ||
         opportunity.contact.companyName.toLowerCase().includes(query) ||
-        opportunity.items.some(item => item.productName.toLowerCase().includes(query) || item.sku.toLowerCase().includes(query))
+        opportunity.contact.email.toLowerCase().includes(query) ||
+        opportunity.contact.phone.toLowerCase().includes(query) ||
+        opportunity.items.some(item => 
+          item.productName.toLowerCase().includes(query) || 
+          item.sku.toLowerCase().includes(query)
+        )
       );
     }
 
@@ -53,26 +161,74 @@ export class OpportunitiesSupabaseService {
       opportunities = opportunities.filter(opportunity => opportunity.assignedTo.toLowerCase().includes(assignedTo));
     }
 
-    return opportunities.sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
+    return opportunities;
   }
 
   async getOpportunityById(id: string): Promise<Opportunity | undefined> {
-    const table = await this.resolveSourceTable();
-    if (!table) {
-      return undefined;
-    }
+    const table = 'carts';
 
     const response = await this.supabase.client
       .from(table)
-      .select('*')
+      .select(`
+        *,
+        client:clients!carts_client_id_fkey (
+          id,
+          business_name,
+          trade_name,
+          rfc,
+          contact_name,
+          email,
+          phone,
+          client_type,
+          created_at,
+          profiles (
+            id,
+            full_name,
+            email,
+            phone,
+            role
+          )
+        ),
+        assigned_user:profiles!carts_assigned_to_fkey (
+          id,
+          full_name
+        ),
+        cart_followups (
+          id,
+          contact_channel,
+          status,
+          comment,
+          created_at,
+          created_by,
+          profiles (
+            full_name
+          )
+        ),
+        cart_items (
+          id,
+          quantity,
+          unit_price,
+          total_line_price,
+          sku_snapshot,
+          product_name_snapshot,
+          product_category_snapshot,
+          product:products (
+            id,
+            name,
+            sku,
+            category,
+            is_active,
+            media:product_media (
+              file_path,
+              is_primary
+            )
+          )
+        )
+      `)
       .eq('id', id)
       .maybeSingle();
 
     if (response.error) {
-      if (this.isMissingTableError(response.error)) {
-        return undefined;
-      }
-
       throw this.toAppError(response.error.message, 'No fue posible cargar la oportunidad solicitada.');
     }
 
@@ -80,391 +236,247 @@ export class OpportunitiesSupabaseService {
       return undefined;
     }
 
-    const itemsByParent = await this.loadItemsMap(table, [String(response.data.id)]);
-    return this.mapOpportunity(response.data, table, itemsByParent.get(String(response.data.id)) ?? []);
+    return this.mapOpportunityFromJoin(response.data);
   }
 
   async markAsContacted(id: string): Promise<Opportunity | undefined> {
-    return this.updateOpportunity(id, OpportunityStatus.Contacted, OpportunityCartStatus.Recovered, OpportunityActionType.Contacted, 'Cliente contactado');
+    return this.updateOpportunityState(id, OpportunityStatus.Contacted, OpportunityCartStatus.Abandoned, 'other', 'Cliente contactado comercialmente');
   }
 
   async markAsInterested(id: string): Promise<Opportunity | undefined> {
-    return this.updateOpportunity(id, OpportunityStatus.Interested, OpportunityCartStatus.Recovered, OpportunityActionType.Interested, 'Cliente interesado');
+    return this.updateOpportunityState(id, OpportunityStatus.Interested, OpportunityCartStatus.Abandoned, 'other', 'Cliente interesado en los productos');
   }
 
   async markAsNoResponse(id: string): Promise<Opportunity | undefined> {
-    return this.updateOpportunity(id, OpportunityStatus.NoResponse, OpportunityCartStatus.Abandoned, OpportunityActionType.NoResponse, 'Sin respuesta');
+    return this.updateOpportunityState(id, OpportunityStatus.NoResponse, OpportunityCartStatus.Abandoned, 'other', 'Cliente contactado pero sin respuesta');
   }
 
   async convertToOrder(id: string): Promise<Opportunity | undefined> {
-    return this.updateOpportunity(id, OpportunityStatus.ConvertedToOrder, OpportunityCartStatus.Converted, OpportunityActionType.ConvertedToOrder, 'Convertida a pedido');
+    return this.updateOpportunityState(id, OpportunityStatus.ConvertedToOrder, OpportunityCartStatus.Converted, 'other', 'Carrito convertido a pedido');
   }
 
   async convertToQuote(id: string): Promise<Opportunity | undefined> {
-    return this.updateOpportunity(id, OpportunityStatus.ConvertedToQuote, OpportunityCartStatus.Converted, OpportunityActionType.ConvertedToQuote, 'Convertida a cotización');
+    return this.updateOpportunityState(id, OpportunityStatus.ConvertedToQuote, OpportunityCartStatus.Converted, 'other', 'Carrito convertido a cotización');
   }
 
   async closeOpportunity(id: string): Promise<Opportunity | undefined> {
-    return this.updateOpportunity(id, OpportunityStatus.Closed, OpportunityCartStatus.Closed, OpportunityActionType.Closed, 'Oportunidad cerrada');
+    return this.updateOpportunityState(id, OpportunityStatus.Closed, OpportunityCartStatus.Closed, 'other', 'Oportunidad comercial cerrada');
   }
 
-  private async resolveSourceTable(): Promise<string | null> {
-    if (this.resolvedTable !== undefined) {
-      return this.resolvedTable;
+  async addCustomFollowUp(
+    id: string,
+    opportunityStatus: OpportunityStatus,
+    contactChannel: 'whatsapp' | 'phone' | 'email' | 'in_person' | 'other',
+    comment: string
+  ): Promise<Opportunity | undefined> {
+    let cartStatus = OpportunityCartStatus.Abandoned;
+    if (opportunityStatus === OpportunityStatus.ConvertedToOrder || opportunityStatus === OpportunityStatus.ConvertedToQuote) {
+      cartStatus = OpportunityCartStatus.Converted;
+    } else if (opportunityStatus === OpportunityStatus.Closed) {
+      cartStatus = OpportunityCartStatus.Closed;
     }
-
-    for (const table of this.candidateTables) {
-      const response = await this.supabase.client.from(table).select('*').limit(1);
-      if (!response.error) {
-        this.resolvedTable = table;
-        return table;
-      }
-
-      if (!this.isMissingTableError(response.error)) {
-        throw this.toAppError(response.error.message, 'No fue posible cargar las oportunidades comerciales.');
-      }
-    }
-
-    this.resolvedTable = null;
-    return null;
+    
+    return this.updateOpportunityState(id, opportunityStatus, cartStatus, contactChannel, comment);
   }
 
-  private async fetchRows(table: string): Promise<any[]> {
-    const response = await this.supabase.client
-      .from(table)
-      .select('*')
-      .order('updated_at', { ascending: false });
+  private async updateOpportunityState(
+    id: string,
+    opportunityStatus: OpportunityStatus,
+    cartStatus: OpportunityCartStatus,
+    contactChannel: 'whatsapp' | 'phone' | 'email' | 'in_person' | 'other',
+    comment: string
+  ): Promise<Opportunity | undefined> {
+    const currentUserId = this.authService.currentUserId();
+    const now = new Date().toISOString();
 
-    if (response.error) {
-      if (this.isMissingTableError(response.error)) {
-        return [];
-      }
-
-      throw this.toAppError(response.error.message, 'No fue posible cargar las oportunidades comerciales.');
+    // Map Angular OpportunityStatus to DB opportunity_status enum
+    let dbOpportunityStatus = opportunityStatus as string;
+    if (opportunityStatus === OpportunityStatus.ConvertedToOrder || opportunityStatus === OpportunityStatus.ConvertedToQuote) {
+      dbOpportunityStatus = 'converted';
     }
 
-    return response.data ?? [];
+    // Map Angular OpportunityCartStatus / Status to DB cart_status enum
+    let dbCartStatus = cartStatus as string;
+    if (opportunityStatus === OpportunityStatus.ConvertedToOrder) {
+      dbCartStatus = 'converted_to_order';
+    } else if (opportunityStatus === OpportunityStatus.ConvertedToQuote) {
+      dbCartStatus = 'converted_to_quote';
+    }
+
+    // 1. Update carts table
+    const cartUpdate: any = {
+      opportunity_status: dbOpportunityStatus,
+      status: dbCartStatus,
+      last_activity_at: now,
+      updated_at: now
+    };
+
+    const cartResponse = await this.supabase.client
+      .from('carts')
+      .update(cartUpdate)
+      .eq('id', id);
+
+    if (cartResponse.error) {
+      throw this.toAppError(cartResponse.error.message, 'No fue posible actualizar el estado de la oportunidad.');
+    }
+
+    // 2. Insert into cart_followups table
+    const followUpInsert = {
+      cart_id: id,
+      contact_channel: contactChannel,
+      status: dbOpportunityStatus,
+      comment: comment,
+      created_by: currentUserId || null
+    };
+
+    const followUpResponse = await this.supabase.client
+      .from('cart_followups')
+      .insert(followUpInsert);
+
+    if (followUpResponse.error) {
+      throw this.toAppError(followUpResponse.error.message, 'No fue posible registrar la nota de seguimiento.');
+    }
+
+    // 3. Return the fully refreshed opportunity
+    return this.getOpportunityById(id);
   }
 
-  private async loadItemsMap(table: string, parentIds: string[]): Promise<Map<string, OpportunityItem[]>> {
-    const map = new Map<string, OpportunityItem[]>();
-    if (!parentIds.length) {
-      return map;
-    }
+  private mapOpportunityFromJoin(row: any): Opportunity {
+    const items: OpportunityItem[] = (row.cart_items || []).map((item: any) => {
+      const quantity = Number(item.quantity ?? 0);
+      const unitPrice = Number(item.unit_price ?? 0);
+      const productMedia = item.product?.media || [];
+      const primaryMedia = productMedia.find((m: any) => m.is_primary) || productMedia[0];
+      const imageUrl = primaryMedia ? primaryMedia.file_path : undefined;
 
-    if (table !== 'carts') {
-      return map;
-    }
+      return {
+        productId: String(item.product_id ?? ''),
+        sku: item.sku_snapshot || item.product?.sku || 'Sin SKU',
+        productName: item.product_name_snapshot || item.product?.name || 'Producto no disponible',
+        productCategory: (item.product_category_snapshot || item.product?.category || ProductCategory.Consumible) as ProductCategory,
+        quantity,
+        unitPrice,
+        estimatedLineTotal: Number(item.total_line_price ?? (quantity * unitPrice)),
+        imageUrl
+      };
+    });
 
-    const response = await this.supabase.client
-      .from(this.itemsTable)
-      .select('*')
-      .in('cart_id', parentIds);
-
-    if (response.error) {
-      if (this.isMissingTableError(response.error) || this.isMissingColumnError(response.error)) {
-        return map;
-      }
-
-      throw this.toAppError(response.error.message, 'No fue posible cargar los productos de las oportunidades.');
-    }
-
-    for (const row of response.data ?? []) {
-      const parentId = String(row.cart_id ?? row.opportunity_id ?? '');
-      if (!parentId) {
-        continue;
-      }
-
-      const current = map.get(parentId) ?? [];
-      current.push(this.mapItem(row));
-      map.set(parentId, current);
-    }
-
-    return map;
-  }
-
-  private mapOpportunity(row: any, table: string, tableItems: OpportunityItem[]): Opportunity {
-    const inlineItems = this.extractInlineItems(row);
-    const items = inlineItems.length > 0 ? inlineItems : tableItems;
-    const estimatedSubtotal = this.resolveNumber(row.estimated_subtotal, row.subtotal, items.reduce((sum, item) => sum + item.estimatedLineTotal, 0));
-    const estimatedTotal = this.resolveNumber(row.estimated_total, row.total, estimatedSubtotal);
-    const lastActivityAt = this.firstNonEmpty(row.last_activity_at, row.updated_at, row.abandoned_at, row.created_at, new Date().toISOString());
-    const abandonedAt = this.firstNonEmpty(row.abandoned_at, lastActivityAt);
-    const cartStatus = this.resolveCartStatus(row, table);
+    const estimatedSubtotal = Number(row.subtotal ?? items.reduce((sum: number, item: OpportunityItem) => sum + item.estimatedLineTotal, 0));
+    const estimatedTotal = Number(row.total ?? estimatedSubtotal);
+    const lastActivityAt = row.last_activity_at || row.updated_at || row.created_at || new Date().toISOString();
+    const abandonedAt = row.last_activity_at || lastActivityAt;
+    const cartStatus = this.resolveCartStatus(row, 'carts');
     const opportunityStatus = this.resolveOpportunityStatus(row, cartStatus);
+
+    const client = row.client || {};
+    const profiles = client.profiles || [];
+    const clientProfile = profiles.find((p: any) => p.role === 'client') || profiles[0] || {};
+
+    const displayName = row.lead_name || client.contact_name || clientProfile.full_name || client.business_name || 'Contacto no disponible';
+    const companyName = client.trade_name || client.business_name || 'Sin nombre comercial';
+    const email = row.lead_email || client.email || clientProfile.email || '';
+    const phone = row.lead_phone || client.phone || clientProfile.phone || '';
+
+    const contact: OpportunityContact = {
+      clientId: client.id || undefined,
+      isProspect: false,
+      displayName,
+      companyName,
+      email,
+      phone,
+      city: client.city || undefined,
+      state: client.state || undefined
+    };
+
+    const followUps = (row.cart_followups || [])
+      .map((fu: any) => {
+        const creatorName = fu.profiles?.full_name || 'Sistema';
+        
+        let actionType = OpportunityActionType.Note;
+        const dbStatus = String(fu.status ?? '').toLowerCase();
+        if (dbStatus === 'contacted') actionType = OpportunityActionType.Contacted;
+        else if (dbStatus === 'interested') actionType = OpportunityActionType.Interested;
+        else if (dbStatus === 'no_response') actionType = OpportunityActionType.NoResponse;
+        else if (dbStatus === 'converted') actionType = OpportunityActionType.ConvertedToOrder;
+        else if (dbStatus === 'closed') actionType = OpportunityActionType.Closed;
+
+        const channelLabelMap: Record<string, string> = {
+          whatsapp: 'WhatsApp',
+          phone: 'Teléfono',
+          email: 'Correo',
+          in_person: 'En persona',
+          other: 'Otro'
+        };
+        const channelLabel = channelLabelMap[fu.contact_channel] || 'Contacto';
+        const title = `Seguimiento por ${channelLabel}`;
+
+        return {
+          id: String(fu.id),
+          actionType,
+          title,
+          note: fu.comment || 'Actualización registrada.',
+          createdAt: fu.created_at,
+          createdBy: creatorName,
+          contactChannel: fu.contact_channel
+        };
+      })
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return {
       id: String(row.id),
-      folio: this.firstNonEmpty(row.folio, row.opportunity_number, row.cart_number, row.reference, `OP-${this.getShortId(row.id)}`),
+      folio: `OP-${this.getShortId(row.id)}`,
       cartStatus,
       opportunityStatus,
-      contact: this.mapContact(row),
+      contact,
       items,
       estimatedSubtotal,
       estimatedTotal,
       lastActivityAt,
       abandonedAt,
-      assignedTo: this.firstNonEmpty(row.assigned_to_name, row.assigned_to, row.owner_name, row.responsible_name, 'Sin responsable'),
-      commercialNotes: this.firstNonEmpty(row.commercial_notes, row.notes, row.description, ''),
-      followUps: this.mapFollowUps(row.follow_ups ?? row.history),
-      createdAt: this.firstNonEmpty(row.created_at, lastActivityAt),
-      updatedAt: this.firstNonEmpty(row.updated_at, lastActivityAt),
+      assignedTo: row.assigned_user?.full_name || 'Sin responsable',
+      commercialNotes: row.notes || '',
+      followUps,
+      createdAt: row.created_at || lastActivityAt,
+      updatedAt: row.updated_at || lastActivityAt
     };
-  }
-
-  private mapContact(row: any): OpportunityContact {
-    return {
-      clientId: row.client_id ?? row.contact_id ?? undefined,
-      isProspect: !!(row.is_prospect ?? row.prospect ?? false),
-      displayName: this.firstNonEmpty(row.contact_name, row.display_name, row.client_name, row.customer_name, row.client_name_snapshot, 'Contacto no disponible'),
-      companyName: this.firstNonEmpty(row.company_name, row.business_name, row.client_name_snapshot, row.client_name, row.customer_name, 'Sin nombre comercial'),
-      email: this.firstNonEmpty(row.contact_email, row.email, row.customer_email, ''),
-      phone: this.firstNonEmpty(row.contact_phone, row.phone, row.customer_phone, ''),
-      city: this.firstNonEmpty(row.city, row.contact_city, undefined),
-      state: this.firstNonEmpty(row.state, row.contact_state, undefined),
-    };
-  }
-
-  private extractInlineItems(row: any): OpportunityItem[] {
-    const candidates = [row.items, row.cart_items, row.products, row.product_items];
-    for (const candidate of candidates) {
-      if (Array.isArray(candidate)) {
-        return candidate.map(item => this.mapItem(item));
-      }
-    }
-
-    return [];
-  }
-
-  private mapItem(row: any): OpportunityItem {
-    const quantity = Number(row.quantity ?? row.qty ?? 0);
-    const unitPrice = this.resolveNumber(row.unit_price, row.unitPrice, row.price, 0);
-    return {
-      productId: String(row.product_id ?? row.productId ?? row.id ?? ''),
-      sku: this.firstNonEmpty(row.sku, row.product_sku, 'Sin SKU'),
-      productName: this.firstNonEmpty(row.product_name, row.productName, row.name, 'Producto no disponible'),
-      productCategory: (this.firstNonEmpty(row.product_category, row.category, ProductCategory.Consumible) as ProductCategory),
-      quantity,
-      unitPrice,
-      estimatedLineTotal: this.resolveNumber(row.estimated_line_total, row.total_line_price, row.line_total, quantity * unitPrice),
-    };
-  }
-
-  private mapFollowUps(source: any): OpportunityFollowUp[] {
-    if (!Array.isArray(source)) {
-      return [];
-    }
-
-    return source.map((item: any, index: number) => ({
-      id: String(item?.id ?? `follow-up-${index}`),
-      actionType: this.resolveActionType(item?.action_type ?? item?.status),
-      title: this.firstNonEmpty(item?.title, item?.label, 'Seguimiento registrado'),
-      note: this.firstNonEmpty(item?.note, item?.comment, item?.message, 'Actualización registrada.'),
-      createdAt: this.firstNonEmpty(item?.created_at, item?.date, new Date().toISOString()),
-      createdBy: this.firstNonEmpty(item?.created_by, item?.author_name, item?.authorName, 'Sistema'),
-    }));
   }
 
   private resolveCartStatus(row: any, table: string): OpportunityCartStatus {
-    const value = String(row.cart_status ?? '').toLowerCase();
-    if (Object.values(OpportunityCartStatus).includes(value as OpportunityCartStatus)) {
-      return value as OpportunityCartStatus;
-    }
-
     const status = String(row.status ?? '').toLowerCase();
-    if (Object.values(OpportunityCartStatus).includes(status as OpportunityCartStatus)) {
-      return status as OpportunityCartStatus;
-    }
-
-    if (status === 'converted_to_order' || status === 'converted_to_quote' || row.converted_at) {
+    
+    if (status === 'converted_to_order' || status === 'converted_to_quote' || status === 'converted') {
       return OpportunityCartStatus.Converted;
     }
-
-    if (row.closed_at || status === 'closed') {
+    if (status === 'closed') {
       return OpportunityCartStatus.Closed;
     }
-
-    if (table === 'carts' && (status === 'abandoned' || row.abandoned_at)) {
+    if (status === 'abandoned') {
       return OpportunityCartStatus.Abandoned;
     }
-
-    if (row.abandoned_at) {
-      return OpportunityCartStatus.Abandoned;
-    }
-
     return OpportunityCartStatus.Active;
   }
 
   private resolveOpportunityStatus(row: any, cartStatus: OpportunityCartStatus): OpportunityStatus {
-    const value = String(row.opportunity_status ?? '').toLowerCase();
-    if (Object.values(OpportunityStatus).includes(value as OpportunityStatus)) {
-      return value as OpportunityStatus;
-    }
-
-    const status = String(row.status ?? '').toLowerCase();
-    if (Object.values(OpportunityStatus).includes(status as OpportunityStatus)) {
-      return status as OpportunityStatus;
-    }
-
-    if (cartStatus === OpportunityCartStatus.Converted) {
+    const status = String(row.opportunity_status ?? '').toLowerCase();
+    
+    if (status === 'converted') {
+      const dbStatus = String(row.status ?? '').toLowerCase();
+      if (dbStatus === 'converted_to_quote') {
+        return OpportunityStatus.ConvertedToQuote;
+      }
       return OpportunityStatus.ConvertedToOrder;
     }
-
-    if (cartStatus === OpportunityCartStatus.Closed) {
-      return OpportunityStatus.Closed;
-    }
+    
+    if (status === 'contacted') return OpportunityStatus.Contacted;
+    if (status === 'interested') return OpportunityStatus.Interested;
+    if (status === 'no_response') return OpportunityStatus.NoResponse;
+    if (status === 'closed') return OpportunityStatus.Closed;
 
     return OpportunityStatus.New;
   }
 
-  private resolveActionType(value: unknown): OpportunityActionType {
-    const normalized = String(value ?? '').toLowerCase();
-    if (Object.values(OpportunityActionType).includes(normalized as OpportunityActionType)) {
-      return normalized as OpportunityActionType;
-    }
-
-    return OpportunityActionType.Note;
-  }
-
-  private async updateOpportunity(
-    id: string,
-    opportunityStatus: OpportunityStatus,
-    cartStatus: OpportunityCartStatus,
-    actionType: OpportunityActionType,
-    title: string,
-  ): Promise<Opportunity | undefined> {
-    const table = await this.resolveSourceTable();
-    if (!table) {
-      return undefined;
-    }
-
-    const currentResponse = await this.supabase.client
-      .from(table)
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (currentResponse.error) {
-      throw this.toAppError(currentResponse.error.message, 'No fue posible actualizar la oportunidad.');
-    }
-
-    if (!currentResponse.data) {
-      return undefined;
-    }
-
-    const payload = this.buildUpdatePayload(currentResponse.data, table, opportunityStatus, cartStatus, actionType, title);
-    if (Object.keys(payload).length === 0) {
-      return undefined;
-    }
-
-    const response = await this.supabase.client
-      .from(table)
-      .update(payload)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (response.error) {
-      throw this.toAppError(response.error.message, 'No fue posible actualizar la oportunidad.');
-    }
-
-    const itemsByParent = await this.loadItemsMap(table, [String(response.data.id)]);
-    return this.mapOpportunity(response.data, table, itemsByParent.get(String(response.data.id)) ?? []);
-  }
-
-  private buildUpdatePayload(
-    current: any,
-    table: string,
-    opportunityStatus: OpportunityStatus,
-    cartStatus: OpportunityCartStatus,
-    actionType: OpportunityActionType,
-    title: string,
-  ): Record<string, unknown> {
-    const payload: Record<string, unknown> = {};
-    const now = new Date().toISOString();
-
-    if (Object.prototype.hasOwnProperty.call(current, 'opportunity_status')) {
-      payload['opportunity_status'] = opportunityStatus;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(current, 'cart_status')) {
-      payload['cart_status'] = cartStatus;
-    } else if (Object.prototype.hasOwnProperty.call(current, 'status')) {
-      const currentStatus = String(current.status ?? '').toLowerCase();
-      const shouldUseCartStatus = table === 'carts' || Object.values(OpportunityCartStatus).includes(currentStatus as OpportunityCartStatus);
-      payload['status'] = shouldUseCartStatus ? cartStatus : opportunityStatus;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(current, 'updated_at')) {
-      payload['updated_at'] = now;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(current, 'last_activity_at')) {
-      payload['last_activity_at'] = now;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(current, 'follow_ups')) {
-      const currentFollowUps = Array.isArray(current.follow_ups) ? [...current.follow_ups] : [];
-      currentFollowUps.unshift({
-        id: `follow-up-${Date.now()}`,
-        action_type: actionType,
-        title,
-        note: `${title}.`,
-        created_at: now,
-        created_by: 'Equipo comercial',
-      });
-      payload['follow_ups'] = currentFollowUps;
-    } else if (Object.prototype.hasOwnProperty.call(current, 'history')) {
-      const currentHistory = Array.isArray(current.history) ? [...current.history] : [];
-      currentHistory.unshift({
-        id: `history-${Date.now()}`,
-        status: opportunityStatus,
-        title,
-        comment: `${title}.`,
-        created_at: now,
-        created_by: 'Equipo comercial',
-      });
-      payload['history'] = currentHistory;
-    }
-
-    return payload;
-  }
-
-  private resolveNumber(...values: unknown[]): number {
-    for (const value of values) {
-      const numeric = Number(value);
-      if (Number.isFinite(numeric)) {
-        return Math.round((numeric + Number.EPSILON) * 100) / 100;
-      }
-    }
-
-    return 0;
-  }
-
-  private firstNonEmpty<T>(...values: Array<T | undefined | null | ''>): T {
-    for (const value of values) {
-      if (value !== undefined && value !== null && value !== '') {
-        return value as T;
-      }
-    }
-
-    return '' as T;
-  }
-
   private getShortId(value: unknown): string {
     return String(value ?? '').replace(/-/g, '').slice(0, 8).toUpperCase() || '0000';
-  }
-
-  private isMissingTableError(error: { message?: string | null; code?: string | null }): boolean {
-    const code = String(error.code ?? '');
-    const message = String(error.message ?? '').toLowerCase();
-    return code === '42P01' || code === 'PGRST205' || message.includes('does not exist') || message.includes('could not find the table');
-  }
-
-  private isMissingColumnError(error: { message?: string | null; code?: string | null }): boolean {
-    const code = String(error.code ?? '');
-    const message = String(error.message ?? '').toLowerCase();
-    return code === '42703' || message.includes('column') && message.includes('does not exist');
   }
 
   private toAppError(message: string, fallback: string): Error {
@@ -476,4 +488,3 @@ export class OpportunitiesSupabaseService {
     return new Error(fallback);
   }
 }
-

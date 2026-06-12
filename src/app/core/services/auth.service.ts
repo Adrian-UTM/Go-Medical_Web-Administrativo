@@ -47,7 +47,7 @@ export class AuthService {
   private async applyAuthState(event: string, session: any, resolveSessionReady: () => void): Promise<void> {
     try {
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session) {
-        await this.loadUserProfile(session);
+        this._session.set(this.buildBasicSession(session));
         return;
       }
 
@@ -64,6 +64,39 @@ export class AuthService {
       this._isSessionReady.set(true);
       resolveSessionReady();
     }
+  }
+
+  private buildBasicSession(supabaseSession: any): AuthSession {
+    const user: User = {
+      id: supabaseSession.user.id,
+      email: supabaseSession.user.email,
+      full_name: supabaseSession.user.user_metadata?.full_name ?? '',
+      role: (supabaseSession.user.user_metadata?.role ?? 'admin') as UserRole,
+      avatar_url: supabaseSession.user.user_metadata?.avatar_url,
+      is_active: true,
+      created_at: supabaseSession.user.created_at,
+      updated_at: supabaseSession.user.updated_at
+    };
+
+    return {
+      user,
+      access_token: supabaseSession.access_token,
+      refresh_token: supabaseSession.refresh_token,
+      expires_at: supabaseSession.expires_at ? supabaseSession.expires_at * 1000 : Date.now() + 3600 * 1000
+    };
+  }
+
+  async validateAdminAccessAsync(): Promise<boolean> {
+    const { data: { session } } = await this.supabase.client.auth.getSession();
+    if (!session) return false;
+
+    const profile = await this.fetchProfileForSession(session);
+    if (!profile || !this.canAccessAdminPanel(profile)) {
+      return false;
+    }
+
+    this._session.set(this.buildSessionFromProfile(session, profile));
+    return true;
   }
 
   private async loadUserProfile(supabaseSession: any): Promise<void> {

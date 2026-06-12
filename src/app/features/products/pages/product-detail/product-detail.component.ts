@@ -63,15 +63,15 @@ export class ProductDetailComponent implements OnInit {
     });
   }
 
-  async deleteProduct(): Promise<void> {
+  deleteProduct(product?: Product): Promise<void> {
     const currentProduct = this.product();
     if (!currentProduct) {
-      return;
+      return Promise.resolve();
     }
 
     const confirmed = window.confirm(`Se eliminara el producto ${currentProduct.name}. Esta accion quitara el registro del catalogo actual. Deseas continuar?`);
     if (!confirmed) {
-      return;
+      return Promise.resolve();
     }
 
     this.isDeleting.set(true);
@@ -85,7 +85,42 @@ export class ProductDetailComponent implements OnInit {
         this.actionMessage.set('No fue posible eliminar el producto. Intenta nuevamente.');
       }
     });
+    return Promise.resolve();
   }
+
+  toggleProductActive(): void {
+    const currentProduct = this.product();
+    if (!currentProduct) {
+      return;
+    }
+
+    const currentStatus = currentProduct.is_active ?? false;
+    const nextStatus = !currentStatus;
+    const actionLabel = nextStatus ? 'activar' : 'desactivar';
+    const confirmed = window.confirm(`Deseas ${actionLabel} el producto "${currentProduct.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.productsService.toggleActive(currentProduct.id, currentStatus).subscribe({
+      next: (updatedProduct) => {
+        this.product.set({ ...currentProduct, is_active: updatedProduct.is_active });
+        const stateWord = nextStatus ? 'activado' : 'desactivado';
+        this.actionMessage.set(`Producto "${currentProduct.name}" ${stateWord} correctamente.`);
+        
+        setTimeout(() => {
+          this.actionMessage.set('');
+        }, 5000);
+      },
+      error: () => {
+        this.actionMessage.set(`No fue posible ${actionLabel} el producto. Intenta nuevamente.`);
+        setTimeout(() => {
+          this.actionMessage.set('');
+        }, 5000);
+      }
+    });
+  }
+
 
   async addTechnicalDocument(): Promise<void> {
     const currentProduct = this.product();

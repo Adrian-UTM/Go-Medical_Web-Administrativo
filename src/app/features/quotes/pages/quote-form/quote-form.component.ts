@@ -9,6 +9,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Client } from '../../../../core/models/client.model';
 import { Product } from '../../../../models/product.model';
+
 import {
   DEFAULT_QUOTE_TAX_PCT,
   Quote,
@@ -45,10 +46,12 @@ export class QuoteFormComponent {
   readonly isLoadingData = signal(true);
   readonly isSaving = signal(false);
   readonly errorMessage = signal('');
+  readonly duplicateWarning = signal('');
   readonly clients = signal<Client[]>([]);
   readonly products = signal<Product[]>([]);
   readonly selectedClient = signal<Client | null>(null);
-  readonly totals = signal<QuoteTotals>({ subtotal: 0, tax: 0, total: 0 });
+  readonly totals = signal<QuoteTotals>({ grossSubtotal: 0, itemsDiscount: 0, subtotal: 0, tax: 0, total: 0 });
+  readonly productSearch = signal('');
 
   quoteId: string | null = null;
 
@@ -70,12 +73,16 @@ export class QuoteFormComponent {
     }))
   );
 
-  readonly productOptions = computed(() =>
-    this.products().map(product => ({
+  readonly filteredProductOptions = computed(() => {
+    const query = this.productSearch().trim().toLowerCase();
+    const all = this.products().map(product => ({
       value: product.id,
       label: `${product.sku} · ${product.name}`,
-    }))
-  );
+      meta: `${product.sku} ${product.name} ${(product as any).brand ?? ''} ${(product as any).model ?? ''} ${product.category ?? ''}`.toLowerCase(),
+    }));
+    if (!query) return all;
+    return all.filter(opt => opt.meta.includes(query));
+  });
 
   readonly form = this.fb.group({
     clientId: ['', Validators.required],
@@ -84,6 +91,8 @@ export class QuoteFormComponent {
     clientAddressSnapshot: [''],
     status: [QuoteStatus.Draft, Validators.required],
     tax_pct: [DEFAULT_QUOTE_TAX_PCT, [Validators.required, Validators.min(0)]],
+    taxExempt: [false],
+    discount: [null as number | null, [Validators.min(0)]],
     validUntil: [this.getDefaultValidUntil(), Validators.required],
     notes: ['', Validators.maxLength(800)],
     conditions: ['', Validators.maxLength(1200)],
@@ -158,6 +167,8 @@ export class QuoteFormComponent {
       clientAddressSnapshot: quote.clientAddressSnapshot,
       status: quote.status,
       tax_pct: quote.tax_pct,
+      taxExempt: quote.taxExempt,
+      discount: quote.discount,
       validUntil: this.toDateInputValue(quote.validUntil),
       notes: quote.notes,
       conditions: quote.conditions,
@@ -175,9 +186,11 @@ export class QuoteFormComponent {
       productId: [item?.productId ?? '', Validators.required],
       sku: [item?.sku ?? ''],
       productName: [item?.productName ?? ''],
-      quantity: [item?.quantity ?? 1, [Validators.required, Validators.min(1)]],
-      unitPrice: [item?.unitPrice ?? 0, [Validators.required, Validators.min(0)]],
-      discount: [item?.discount ?? 0, [Validators.min(0)]],
+      productCategory: [item?.productCategory ?? ''],
+      quantity: [item?.quantity ?? (null as number | null), [Validators.required, Validators.min(1)]],
+      unitPrice: [item?.unitPrice ?? (null as number | null), [Validators.required, Validators.min(0)]],
+      discount: [item?.discount ?? (null as number | null), [Validators.min(0)]],
+      grossLinePrice: [item?.grossLinePrice ?? 0],
       totalLinePrice: [item?.totalLinePrice ?? 0],
     }));
 
@@ -207,22 +220,56 @@ export class QuoteFormComponent {
       lineGroup.patchValue({
         sku: '',
         productName: '',
-        unitPrice: 0,
-        discount: 0,
+        productCategory: '',
+        unitPrice: null,
+        discount: null,
+        grossLinePrice: 0,
         totalLinePrice: 0,
       }, { emitEvent: false });
       this.recalculateTotals();
       return;
     }
 
+    // Anti-duplicate: check if product already in another line
+    const existingIndex = this.itemsArray.controls.findIndex((ctrl, i) => {
+      if (i === index) return false;
+      return (ctrl as FormGroup).get('productId')?.value === productId;
+    });
+
+    if (existingIndex >= 0) {
+      // Revert selection and show warning
+      lineGroup.patchValue({ productId: '' }, { emitEvent: false });
+      const existingQty = Number((this.itemsArray.at(existingIndex) as FormGroup).get('quantity')?.value ?? 1);
+      this.duplicateWarning.set(`"${product.name}" ya está en la línea ${existingIndex + 1}. Puedes modificar la cantidad allí (actual: ${existingQty}).`);
+      setTimeout(() => this.duplicateWarning.set(''), 5000);
+      return;
+    }
+
+    this.duplicateWarning.set('');
     lineGroup.patchValue({
       productId,
-      sku: product.sku,
-      productName: product.name,
-      unitPrice: product.price_mxn ?? product.unit_price_mxn ?? 0,
+      sku: product.sku ?? '',
+      productName: product.name ?? '',
+      productCategory: (product as any).category ?? '',
+      unitPrice: product.unit_price_mxn ?? (product as any).price_mxn ?? 0,
     }, { emitEvent: false });
 
     this.recalculateTotals();
+  }
+
+  getProductCategoryLabel(index: number): string {
+    const group = this.itemsArray.at(index) as FormGroup;
+    const cat = group.get('productCategory')?.value as string;
+    const labels: Record<string, string> = {
+      equipo_medico: 'Equipo médico',
+      ultrasonido_humano: 'Ultrasonido humano',
+      ultrasonido_veterinario: 'Ultrasonido veterinario',
+      consumible: 'Consumible',
+      refaccion: 'Refacción',
+      accesorio: 'Accesorio',
+      servicio: 'Servicio',
+    };
+    return labels[cat] ?? cat ?? '—';
   }
 
   async onSubmit(): Promise<void> {
@@ -264,24 +311,33 @@ export class QuoteFormComponent {
     if (!control || !(control.touched || control.dirty)) {
       return false;
     }
-
     return errorName ? control.hasError(errorName) : control.invalid;
   }
 
   hasLineError(index: number, controlName: string, errorName?: string): boolean {
     const group = this.itemsArray.at(index) as FormGroup;
     const control = group.get(controlName);
-
     if (!control || !(control.touched || control.dirty)) {
       return false;
     }
-
     return errorName ? control.hasError(errorName) : control.invalid;
+  }
+
+  getLineGross(index: number): number {
+    const group = this.itemsArray.at(index) as FormGroup;
+    return Number(group.get('grossLinePrice')?.value ?? 0);
   }
 
   getLineSubtotal(index: number): number {
     const group = this.itemsArray.at(index) as FormGroup;
     return Number(group.get('totalLinePrice')?.value ?? 0);
+  }
+
+  getLineDiscountExceedsWarning(index: number): boolean {
+    const group = this.itemsArray.at(index) as FormGroup;
+    const gross = this.getLineGross(index);
+    const discount = Number(group.get('discount')?.value ?? 0);
+    return discount > 0 && discount >= gross;
   }
 
   private syncSelectedClient(clientId: string, quote?: Quote): void {
@@ -291,22 +347,28 @@ export class QuoteFormComponent {
     this.form.patchValue({
       clientNameSnapshot: quote?.clientNameSnapshot ?? client?.businessName ?? '',
       clientRfcSnapshot: quote?.clientRfcSnapshot ?? client?.rfc ?? '',
-      clientAddressSnapshot: quote?.clientAddressSnapshot ?? (client ? `${client.shippingAddress || client.address}, ${client.city}, ${client.state}` : ''),
+      clientAddressSnapshot: quote?.clientAddressSnapshot ?? (client
+        ? `${client.shippingAddress || client.address || ''}, ${client.city ?? ''}, ${client.state ?? ''}`
+        : ''),
     }, { emitEvent: false });
   }
 
   private recalculateTotals(): void {
     const draftItems = this.itemsArray.controls.map(control => {
       const group = control as FormGroup;
-      const quantity = Math.max(1, Number(group.get('quantity')?.value) || 1);
-      const unitPrice = Number(group.get('unitPrice')?.value) || 0;
-      const gross = this.roundCurrency(quantity * unitPrice);
-      const discount = this.roundCurrency(Math.min(Math.max(Number(group.get('discount')?.value) || 0, 0), gross));
-      const totalLinePrice = this.roundCurrency(gross - discount);
+      const quantityValue = group.get('quantity')?.value;
+      const unitPriceValue = group.get('unitPrice')?.value;
+      const quantity = quantityValue === null || quantityValue === '' ? 1 : Math.max(1, Number(quantityValue));
+      const unitPrice = Number(unitPriceValue) || 0;
+      const grossLinePrice = this.roundCurrency(quantity * unitPrice);
+      const rawDiscount = Number(group.get('discount')?.value) || 0;
+      const discount = this.roundCurrency(Math.min(Math.max(rawDiscount, 0), grossLinePrice));
+      const totalLinePrice = this.roundCurrency(grossLinePrice - discount);
 
       group.patchValue({
         quantity,
         discount,
+        grossLinePrice,
         totalLinePrice,
       }, { emitEvent: false });
 
@@ -321,7 +383,9 @@ export class QuoteFormComponent {
     });
 
     const taxPct = Number(this.form.get('tax_pct')?.value ?? DEFAULT_QUOTE_TAX_PCT);
-    this.totals.set(this.quotesService.calculateTotals(draftItems, taxPct));
+    const taxExempt = !!this.form.get('taxExempt')?.value;
+    const globalDiscount = Math.max(0, Number(this.form.get('discount')?.value) || 0);
+    this.totals.set(this.quotesService.calculateTotals(draftItems, taxPct, taxExempt, globalDiscount));
   }
 
   private buildPayload(): QuoteUpsertPayload {
@@ -332,6 +396,7 @@ export class QuoteFormComponent {
         productId: String(item.productId),
         sku: String(item.sku ?? ''),
         productName: String(item.productName ?? ''),
+        productCategory: item.productCategory ?? undefined,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
         discount: Number(item.discount ?? 0),
@@ -344,6 +409,8 @@ export class QuoteFormComponent {
       clientAddressSnapshot: rawValue.clientAddressSnapshot ?? '',
       status: rawValue.status ?? QuoteStatus.Draft,
       tax_pct: Number(rawValue.tax_pct ?? DEFAULT_QUOTE_TAX_PCT),
+      taxExempt: !!rawValue.taxExempt,
+      discount: Math.max(0, Number(rawValue.discount ?? 0)),
       validUntil: this.toIsoFromDateInput(String(rawValue.validUntil ?? '')),
       notes: rawValue.notes ?? '',
       conditions: rawValue.conditions ?? '',
@@ -358,18 +425,12 @@ export class QuoteFormComponent {
   }
 
   private toDateInputValue(isoDate: string): string {
-    if (!isoDate) {
-      return '';
-    }
-
+    if (!isoDate) return '';
     return new Date(isoDate).toISOString().slice(0, 10);
   }
 
   private toIsoFromDateInput(value: string): string {
-    if (!value) {
-      return new Date().toISOString();
-    }
-
+    if (!value) return new Date().toISOString();
     return new Date(`${value}T23:59:59`).toISOString();
   }
 

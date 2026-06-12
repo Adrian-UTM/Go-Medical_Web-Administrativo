@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/components/status-badge/status-badge.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
@@ -14,6 +15,7 @@ import { ProductCategory } from '../../../../models/product.model';
   imports: [
     CommonModule,
     RouterLink,
+    FormsModule,
     CurrencyPipe,
     DatePipe,
     PageHeaderComponent,
@@ -31,6 +33,27 @@ export class OpportunityDetailComponent {
   readonly opportunity = signal<Opportunity | null>(null);
   readonly actionMessage = signal('');
   readonly errorMessage = signal('');
+
+  // Form signals
+  readonly followUpNote = signal('');
+  readonly followUpChannel = signal<'whatsapp' | 'phone' | 'email' | 'in_person' | 'other'>('whatsapp');
+  readonly followUpStatus = signal<OpportunityStatus>(OpportunityStatus.Contacted);
+  readonly isSubmittingFollowUp = signal(false);
+
+  readonly statusOptions = [
+    { value: OpportunityStatus.Contacted, label: 'Contactado' },
+    { value: OpportunityStatus.Interested, label: 'Interesado' },
+    { value: OpportunityStatus.NoResponse, label: 'Sin respuesta' },
+    { value: OpportunityStatus.Closed, label: 'Cerrado' }
+  ];
+
+  readonly channelOptions = [
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'phone', label: 'Llamada telefónica' },
+    { value: 'email', label: 'Correo electrónico' },
+    { value: 'in_person', label: 'En persona' },
+    { value: 'other', label: 'Otro' }
+  ];
 
   constructor() {
     void this.loadOpportunity();
@@ -86,6 +109,88 @@ export class OpportunityDetailComponent {
 
   async closeOpportunity(): Promise<void> {
     await this.runAction(() => this.opportunitiesService.closeOpportunity(this.opportunity()!.id), 'Oportunidad cerrada correctamente.');
+  }
+
+  // Interactive link contacts
+  contactByPhone(): void {
+    if (!this.opportunity()?.contact.phone) return;
+    window.open(`tel:${this.opportunity()!.contact.phone}`, '_self');
+    void this.opportunitiesService.addCustomFollowUp(
+      this.opportunity()!.id,
+      OpportunityStatus.Contacted,
+      'phone',
+      'Intento de llamada telefónica comercial.'
+    ).then(updated => {
+      if (updated) {
+        this.opportunity.set(updated);
+        this.actionMessage.set('Llamada iniciada y registrada en el historial.');
+      }
+    });
+  }
+
+  contactByWhatsApp(): void {
+    if (!this.opportunity()?.contact.phone) return;
+    const formattedPhone = this.opportunity()!.contact.phone.replace(/\D/g, '');
+    window.open(`https://wa.me/${formattedPhone}`, '_blank');
+    void this.opportunitiesService.addCustomFollowUp(
+      this.opportunity()!.id,
+      OpportunityStatus.Contacted,
+      'whatsapp',
+      'Conversación de WhatsApp comercial abierta.'
+    ).then(updated => {
+      if (updated) {
+        this.opportunity.set(updated);
+        this.actionMessage.set('WhatsApp abierto y registrado en el historial.');
+      }
+    });
+  }
+
+  contactByEmail(): void {
+    if (!this.opportunity()?.contact.email) return;
+    window.open(`mailto:${this.opportunity()!.contact.email}`, '_blank');
+    void this.opportunitiesService.addCustomFollowUp(
+      this.opportunity()!.id,
+      OpportunityStatus.Contacted,
+      'email',
+      'Intento de envío de correo electrónico comercial.'
+    ).then(updated => {
+      if (updated) {
+        this.opportunity.set(updated);
+        this.actionMessage.set('Cliente de correo abierto y registrado en el historial.');
+      }
+    });
+  }
+
+  async submitFollowUp(): Promise<void> {
+    const note = this.followUpNote().trim();
+    if (!note || !this.opportunity()) {
+      return;
+    }
+
+    this.isSubmittingFollowUp.set(true);
+    this.actionMessage.set('');
+    this.errorMessage.set('');
+
+    try {
+      const updated = await this.opportunitiesService.addCustomFollowUp(
+        this.opportunity()!.id,
+        this.followUpStatus(),
+        this.followUpChannel(),
+        note
+      );
+
+      if (updated) {
+        this.opportunity.set(updated);
+        this.followUpNote.set('');
+        this.actionMessage.set('Nota de seguimiento registrada con éxito.');
+      } else {
+        this.errorMessage.set('No fue posible guardar el seguimiento.');
+      }
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Error al registrar el seguimiento.');
+    } finally {
+      this.isSubmittingFollowUp.set(false);
+    }
   }
 
   getCartStatusBadge(status: OpportunityCartStatus): { label: string; variant: BadgeVariant } {

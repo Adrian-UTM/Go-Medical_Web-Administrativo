@@ -6,7 +6,10 @@ import { Quote } from '../models/quote.model';
   providedIn: 'root'
 })
 export class QuotePdfService {
-  async downloadQuotePdf(quote: Quote, client?: Client | null): Promise<void> {
+  async downloadQuotePdf(
+    quote: Quote,
+    client?: Client | null,
+  ): Promise<void> {
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
     const pdfDoc = await PDFDocument.create();
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -18,6 +21,7 @@ export class QuotePdfService {
     const muted = rgb(92 / 255, 108 / 255, 125 / 255);
     const line = rgb(223 / 255, 230 / 255, 237 / 255);
     const surface = rgb(244 / 255, 247 / 255, 250 / 255);
+    const dangerColor = rgb(192 / 255, 57 / 255, 43 / 255);
     const terms = this.getCommercialTerms(quote);
     let page = pdfDoc.addPage(pageSize);
     const pageWidth = page.getWidth();
@@ -36,7 +40,7 @@ export class QuotePdfService {
       color: ReturnType<typeof rgb>,
       font = regularFont,
     ): void => {
-      page.drawText(text, {
+      page.drawText(String(text ?? ''), {
         x,
         y: pageHeight - top - fontSize,
         size: fontSize,
@@ -46,55 +50,39 @@ export class QuotePdfService {
     };
 
     const wrapText = (text: string, maxWidth: number, font = regularFont, fontSize = 10): string[] => {
-      const words = text.trim().split(/\s+/).filter(Boolean);
-      if (!words.length) {
-        return [''];
-      }
+      const words = String(text ?? '').trim().split(/\s+/).filter(Boolean);
+      if (!words.length) return [''];
 
       const lines: string[] = [];
       let currentLine = '';
 
       const pushWord = (word: string): void => {
         if (font.widthOfTextAtSize(word, fontSize) > maxWidth) {
-          if (currentLine) {
-            lines.push(currentLine);
-            currentLine = '';
-          }
-
+          if (currentLine) { lines.push(currentLine); currentLine = ''; }
           let fragment = '';
           word.split('').forEach(char => {
             const nextFragment = `${fragment}${char}`;
             if (font.widthOfTextAtSize(nextFragment, fontSize) <= maxWidth) {
               fragment = nextFragment;
             } else {
-              if (fragment) {
-                lines.push(fragment);
-              }
+              if (fragment) lines.push(fragment);
               fragment = char;
             }
           });
-
-          if (fragment) {
-            currentLine = fragment;
-          }
+          if (fragment) currentLine = fragment;
           return;
         }
-
         const candidate = currentLine ? `${currentLine} ${word}` : word;
         if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
           currentLine = candidate;
         } else {
-          if (currentLine) {
-            lines.push(currentLine);
-          }
+          if (currentLine) lines.push(currentLine);
           currentLine = word;
         }
       };
 
       words.forEach(pushWord);
-      if (currentLine) {
-        lines.push(currentLine);
-      }
+      if (currentLine) lines.push(currentLine);
       return lines;
     };
 
@@ -112,19 +100,16 @@ export class QuotePdfService {
       lines.forEach((lineText, index) => {
         drawText(lineText, x, top + (index * lineHeight), fontSize, color, font);
       });
-
       return lines.length * lineHeight;
     };
 
     const ensureSpace = (requiredHeight: number): void => {
-      if ((cursorY + requiredHeight) <= (pageHeight - bottomMargin)) {
-        return;
-      }
-
+      if ((cursorY + requiredHeight) <= (pageHeight - bottomMargin)) return;
       page = pdfDoc.addPage(pageSize);
       cursorY = topMargin;
     };
 
+    // ─── HEADER BLOCK ───────────────────────────────────────────────
     const headerBlockHeight = 126;
     const logoX = marginX + 20;
     const logoTop = cursorY + 24;
@@ -134,22 +119,10 @@ export class QuotePdfService {
     const titleX = logoX + logoSize + 22;
     const titleWidth = Math.max(128, headerCardX - titleX - 24);
     const titleFontSize = titleWidth < 180 ? 18 : 21;
-    const titleLines = wrapText('Cotizacion comercial', titleWidth, boldFont, titleFontSize).slice(0, 2);
+    const titleLines = wrapText('Cotizacion Comercial', titleWidth, boldFont, titleFontSize).slice(0, 2);
 
-    page.drawRectangle({
-      x: marginX,
-      y: pageHeight - cursorY - headerBlockHeight,
-      width: contentWidth,
-      height: headerBlockHeight,
-      color: surface,
-    });
-    page.drawRectangle({
-      x: logoX,
-      y: pageHeight - logoTop - logoSize,
-      width: logoSize,
-      height: logoSize,
-      color: accent,
-    });
+    page.drawRectangle({ x: marginX, y: pageHeight - cursorY - headerBlockHeight, width: contentWidth, height: headerBlockHeight, color: surface });
+    page.drawRectangle({ x: logoX, y: pageHeight - logoTop - logoSize, width: logoSize, height: logoSize, color: accent });
     drawText('GM', logoX + 17, logoTop + 27, 24, rgb(1, 1, 1), boldFont);
     drawText('GO MEDICAL', titleX, cursorY + 24, 10, muted, boldFont);
     titleLines.forEach((lineText, index) => {
@@ -157,15 +130,7 @@ export class QuotePdfService {
     });
     drawWrappedText('Soluciones y productos medicos', titleX, cursorY + 94, titleWidth, 10.5, muted);
 
-    page.drawRectangle({
-      x: headerCardX,
-      y: pageHeight - cursorY - 102,
-      width: headerCardWidth,
-      height: 80,
-      borderColor: line,
-      borderWidth: 1,
-      color: rgb(1, 1, 1),
-    });
+    page.drawRectangle({ x: headerCardX, y: pageHeight - cursorY - 102, width: headerCardWidth, height: 80, borderColor: line, borderWidth: 1, color: rgb(1, 1, 1) });
     drawText('FOLIO', headerCardX + 18, cursorY + 28, 9.5, muted, boldFont);
     drawText(quote.quoteNumber, headerCardX + 95, cursorY + 28, 9.5, ink);
     drawText('EMISION', headerCardX + 18, cursorY + 49, 9.5, muted, boldFont);
@@ -175,6 +140,7 @@ export class QuotePdfService {
 
     cursorY += headerBlockHeight + 22;
 
+    // ─── CLIENT BLOCK ───────────────────────────────────────────────
     const fieldHeight = (value: string, width: number): number =>
       18 + (wrapText(value, width, regularFont, 10.4).length * 14);
     const clientName = quote.clientNameSnapshot || 'Cliente no disponible';
@@ -186,13 +152,7 @@ export class QuotePdfService {
     const clientCardHeight = Math.max(132, 50 + Math.max(leftColumnHeight, rightColumnHeight));
 
     ensureSpace(clientCardHeight + 24);
-    page.drawRectangle({
-      x: marginX,
-      y: pageHeight - cursorY - clientCardHeight,
-      width: contentWidth,
-      height: clientCardHeight,
-      color: accentSoft,
-    });
+    page.drawRectangle({ x: marginX, y: pageHeight - cursorY - clientCardHeight, width: contentWidth, height: clientCardHeight, color: accentSoft });
     drawText('DATOS DEL CLIENTE', marginX + 20, cursorY + 16, 10, muted, boldFont);
 
     const drawField = (label: string, value: string, x: number, top: number, width: number): number => {
@@ -210,7 +170,8 @@ export class QuotePdfService {
 
     cursorY += clientCardHeight + 24;
 
-    const columnWidths = [72, 169, 46, 78, 64, 82];
+    // ─── ITEMS TABLE ────────────────────────────────────────────────
+    const columnWidths = [68, 152, 40, 72, 62, 62, 55];
     const columnX = columnWidths.reduce<number[]>((acc, width, index) => {
       acc.push(index === 0 ? marginX : acc[index - 1] + columnWidths[index - 1]);
       return acc;
@@ -220,27 +181,21 @@ export class QuotePdfService {
     const drawItemsHeader = (): void => {
       ensureSpace(headerHeight + 40);
       page.drawRectangle({
-        x: marginX,
-        y: pageHeight - cursorY - headerHeight,
-        width: contentWidth,
-        height: headerHeight,
-        color: surface,
-        borderColor: line,
-        borderWidth: 1,
+        x: marginX, y: pageHeight - cursorY - headerHeight,
+        width: contentWidth, height: headerHeight,
+        color: surface, borderColor: line, borderWidth: 1,
       });
-
-      ['SKU', 'Producto', 'Cant.', 'Precio unitario', 'Desc.', 'Importe'].forEach((label, index) => {
+      ['SKU', 'Producto / Servicio', 'Cant.', 'Precio unit.', 'Desc.', 'Bruto', 'Importe'].forEach((label, index) => {
         const alignRight = index >= 3;
         const centered = index === 2;
-        const labelWidth = boldFont.widthOfTextAtSize(label, 9);
+        const labelWidth = boldFont.widthOfTextAtSize(label, 8.5);
         const x = centered
           ? columnX[index] + ((columnWidths[index] - labelWidth) / 2)
           : alignRight
-            ? columnX[index] + columnWidths[index] - labelWidth - 10
-            : columnX[index] + 10;
-        drawText(label, x, cursorY + 10, 9, muted, boldFont);
+            ? columnX[index] + columnWidths[index] - labelWidth - 8
+            : columnX[index] + 8;
+        drawText(label, x, cursorY + 11, 8.5, muted, boldFont);
       });
-
       cursorY += headerHeight;
     };
 
@@ -249,58 +204,41 @@ export class QuotePdfService {
     if (!quote.items.length) {
       const emptyRowHeight = 34;
       ensureSpace(emptyRowHeight);
-      if (cursorY === topMargin) {
-        drawItemsHeader();
-      }
-      page.drawRectangle({
-        x: marginX,
-        y: pageHeight - cursorY - emptyRowHeight,
-        width: contentWidth,
-        height: emptyRowHeight,
-        borderColor: line,
-        borderWidth: 1,
-        color: rgb(1, 1, 1),
-      });
+      page.drawRectangle({ x: marginX, y: pageHeight - cursorY - emptyRowHeight, width: contentWidth, height: emptyRowHeight, borderColor: line, borderWidth: 1, color: rgb(1, 1, 1) });
       drawText('Sin conceptos registrados', marginX + 10, cursorY + 12, 9.5, muted);
       cursorY += emptyRowHeight;
     }
 
     quote.items.forEach(item => {
       const cells = [
-        wrapText(item.sku || '-', columnWidths[0] - 16, regularFont, 9.5),
-        wrapText(item.productName, columnWidths[1] - 16, regularFont, 9.5),
+        wrapText(item.sku || '-', columnWidths[0] - 14, regularFont, 9),
+        wrapText(item.productName || '—', columnWidths[1] - 14, regularFont, 9),
         [String(item.quantity)],
         [this.formatCurrency(item.unitPrice)],
-        [item.discount ? this.formatCurrency(item.discount) : '-'],
+        [item.discount > 0 ? this.formatCurrency(item.discount) : '—'],
+        [this.formatCurrency(item.grossLinePrice)],
         [this.formatCurrency(item.totalLinePrice)],
       ];
-      const rowHeight = Math.max(28, ...cells.map(lines => (lines.length * 12) + 16));
+      const rowHeight = Math.max(28, ...cells.map(lines => (lines.length * 12) + 14));
 
       ensureSpace(rowHeight + headerHeight);
-      if (cursorY === topMargin) {
-        drawItemsHeader();
-      }
-      page.drawRectangle({
-        x: marginX,
-        y: pageHeight - cursorY - rowHeight,
-        width: contentWidth,
-        height: rowHeight,
-        borderColor: line,
-        borderWidth: 1,
-        color: rgb(1, 1, 1),
-      });
+      if (cursorY === topMargin) drawItemsHeader();
+
+      page.drawRectangle({ x: marginX, y: pageHeight - cursorY - rowHeight, width: contentWidth, height: rowHeight, borderColor: line, borderWidth: 1, color: rgb(1, 1, 1) });
 
       cells.forEach((lines, index) => {
         const alignRight = index >= 3;
         const centered = index === 2;
+        const isDiscount = index === 4 && item.discount > 0;
+        const textColor = isDiscount ? dangerColor : ink;
         lines.forEach((lineText, lineIndex) => {
-          const textWidth = regularFont.widthOfTextAtSize(lineText, 9.5);
+          const textWidth = regularFont.widthOfTextAtSize(lineText, 9);
           const x = centered
             ? columnX[index] + ((columnWidths[index] - textWidth) / 2)
             : alignRight
-              ? columnX[index] + columnWidths[index] - textWidth - 10
-              : columnX[index] + 10;
-          drawText(lineText, x, cursorY + 10 + (lineIndex * 12), 9.5, ink);
+              ? columnX[index] + columnWidths[index] - textWidth - 8
+              : columnX[index] + 8;
+          drawText(lineText, x, cursorY + 10 + (lineIndex * 12), 9, textColor);
         });
       });
 
@@ -309,89 +247,94 @@ export class QuotePdfService {
 
     cursorY += 20;
 
-    const termsHeight = Math.max(144, (terms.length * 26) + 38);
-    const totalsHeight = 122;
+    // ─── TOTALS + TERMS ─────────────────────────────────────────────
+    const hasDiscounts = quote.itemsDiscount > 0 || quote.discount > 0;
+    const totalsRowCount = hasDiscounts ? (quote.itemsDiscount > 0 && quote.discount > 0 ? 6 : 5) : 4;
+    const totalsHeight = 24 + (totalsRowCount * 22) + 28;
+    const termsHeight = Math.max(120, (terms.length * 22) + 38);
 
     ensureSpace(Math.max(termsHeight, totalsHeight) + 20);
-    page.drawRectangle({
-      x: marginX,
-      y: pageHeight - cursorY - termsHeight,
-      width: contentWidth - 220,
-      height: termsHeight,
-      color: accentSoft,
-    });
-    drawText('CONDICIONES COMERCIALES', marginX + 18, cursorY + 16, 10, muted, boldFont);
-    let termsTop = cursorY + 36;
+
+    // Terms
+    page.drawRectangle({ x: marginX, y: pageHeight - cursorY - termsHeight, width: contentWidth - 220, height: termsHeight, color: accentSoft });
+    drawText('CONDICIONES COMERCIALES', marginX + 18, cursorY + 16, 9.5, muted, boldFont);
+    let termsTop = cursorY + 34;
     terms.forEach(term => {
-      termsTop += drawWrappedText(`• ${term}`, marginX + 18, termsTop, contentWidth - 256, 10, ink) + 6;
+      termsTop += drawWrappedText(`• ${term}`, marginX + 18, termsTop, contentWidth - 258, 9.5, ink) + 5;
     });
 
+    // Totals box
     const totalsX = pageWidth - marginX - 198;
-    page.drawRectangle({
-      x: totalsX,
-      y: pageHeight - cursorY - totalsHeight,
-      width: 198,
-      height: totalsHeight,
-      borderColor: line,
-      borderWidth: 1,
-      color: rgb(1, 1, 1),
-    });
-    drawText('Subtotal', totalsX + 18, cursorY + 20, 10.8, muted);
-    drawText(this.formatCurrency(quote.subtotal), totalsX + 104, cursorY + 20, 10.8, ink);
-    drawText(`IVA (${Math.round(quote.tax_pct * 100)}%)`, totalsX + 18, cursorY + 44, 10.8, muted);
-    drawText(this.formatCurrency(quote.tax), totalsX + 112, cursorY + 44, 10.8, ink);
-    page.drawLine({
-      start: { x: totalsX + 18, y: pageHeight - cursorY - 72 },
-      end: { x: totalsX + 180, y: pageHeight - cursorY - 72 },
-      thickness: 1,
-      color: line,
-    });
-    drawText('Total', totalsX + 18, cursorY + 88, 14, accent, boldFont);
-    drawText(this.formatCurrency(quote.total), totalsX + 98, cursorY + 88, 14, accent, boldFont);
+    page.drawRectangle({ x: totalsX, y: pageHeight - cursorY - totalsHeight, width: 198, height: totalsHeight, borderColor: line, borderWidth: 1, color: rgb(1, 1, 1) });
+
+    let tRow = cursorY + 20;
+    const rowSpacing = 22;
+
+    const drawTotalRow = (label: string, value: string, isBold = false, color = ink, labelColor = muted): void => {
+      drawText(label, totalsX + 14, tRow, 10, labelColor, isBold ? boldFont : regularFont);
+      const valWidth = (isBold ? boldFont : regularFont).widthOfTextAtSize(value, isBold ? 11 : 10);
+      drawText(value, totalsX + 198 - 14 - valWidth, tRow, isBold ? 11 : 10, color, isBold ? boldFont : regularFont);
+      tRow += rowSpacing;
+    };
+
+    if (hasDiscounts) {
+      drawTotalRow('Subtotal bruto', this.formatCurrency(quote.grossSubtotal));
+      if (quote.itemsDiscount > 0) {
+        drawTotalRow('Desc. por conceptos', `- ${this.formatCurrency(quote.itemsDiscount)}`, false, dangerColor, muted);
+      }
+      if (quote.discount > 0) {
+        drawTotalRow('Desc. general', `- ${this.formatCurrency(quote.discount)}`, false, dangerColor, muted);
+      }
+      // separator line
+      page.drawLine({ start: { x: totalsX + 14, y: pageHeight - tRow - 4 }, end: { x: totalsX + 184, y: pageHeight - tRow - 4 }, thickness: 0.5, color: line });
+      tRow += 8;
+    }
+
+    drawTotalRow('Subtotal', this.formatCurrency(quote.subtotal));
+    const ivaLabel = quote.taxExempt ? 'IVA (Exento)' : `IVA (${Math.round(quote.tax_pct * 100)}%)`;
+    drawTotalRow(ivaLabel, this.formatCurrency(quote.tax));
+
+    // Total separator
+    page.drawLine({ start: { x: totalsX + 14, y: pageHeight - tRow - 4 }, end: { x: totalsX + 184, y: pageHeight - tRow - 4 }, thickness: 1, color: line });
+    tRow += 10;
+    drawTotalRow('Total', this.formatCurrency(quote.total), true, accent, accent);
 
     cursorY += Math.max(termsHeight, totalsHeight) + 18;
 
-    const noteText = quote.notes?.trim() ? `Nota comercial: ${quote.notes.trim()}` : '';
+    // ─── NOTES ───────────────────────────────────────────────────────
+    const noteText = quote.notes?.trim() ? `Nota: ${quote.notes.trim()}` : '';
     if (noteText) {
-      const noteLines = wrapText(noteText, contentWidth - 36, regularFont, 10.2);
-      const noteHeight = Math.max(64, (noteLines.length * 13) + 28);
-      ensureSpace(noteHeight + 16);
+      const noteLines = wrapText(noteText, contentWidth - 36, regularFont, 10);
+      const noteHeight = Math.max(54, (noteLines.length * 13) + 26);
+      ensureSpace(noteHeight + 12);
 
-      page.drawRectangle({
-        x: marginX,
-        y: pageHeight - cursorY - noteHeight,
-        width: contentWidth,
-        height: noteHeight,
-        color: surface,
-      });
-      drawText('NOTA COMERCIAL', marginX + 18, cursorY + 16, 10, muted, boldFont);
-      drawWrappedText(noteText, marginX + 18, cursorY + 34, contentWidth - 36, 10.2, ink);
-      cursorY += noteHeight + 16;
+      page.drawRectangle({ x: marginX, y: pageHeight - cursorY - noteHeight, width: contentWidth, height: noteHeight, color: surface });
+      drawText('NOTA COMERCIAL', marginX + 18, cursorY + 14, 9.5, muted, boldFont);
+      drawWrappedText(noteText, marginX + 18, cursorY + 30, contentWidth - 36, 10, ink);
+      cursorY += noteHeight + 14;
     }
 
+    // ─── CONDITIONS ──────────────────────────────────────────────────
+    const conditionsText = quote.conditions?.trim();
+    if (conditionsText) {
+      const condLines = wrapText(conditionsText, contentWidth - 36, regularFont, 10);
+      const condHeight = Math.max(54, (condLines.length * 13) + 26);
+      ensureSpace(condHeight + 12);
+
+      page.drawRectangle({ x: marginX, y: pageHeight - cursorY - condHeight, width: contentWidth, height: condHeight, color: accentSoft });
+      drawText('CONDICIONES ADICIONALES', marginX + 18, cursorY + 14, 9.5, muted, boldFont);
+      drawWrappedText(conditionsText, marginX + 18, cursorY + 30, contentWidth - 36, 10, ink);
+      cursorY += condHeight + 14;
+    }
+
+    // ─── PAGE FOOTER ─────────────────────────────────────────────────
     pdfDoc.getPages().forEach((pdfPage, index) => {
-      pdfPage.drawLine({
-        start: { x: marginX, y: bottomMargin },
-        end: { x: pageWidth - marginX, y: bottomMargin },
-        thickness: 1,
-        color: line,
+      pdfPage.drawLine({ start: { x: marginX, y: bottomMargin }, end: { x: pageWidth - marginX, y: bottomMargin }, thickness: 1, color: line });
+      pdfPage.drawText('Documento comercial emitido por Go Medical. Cotizacion sujeta a validacion administrativa y disponibilidad.', {
+        x: marginX, y: bottomMargin - 16, size: 8, font: regularFont, color: muted,
       });
-      pdfPage.drawText(
-        'Documento comercial emitido por Go Medical. Cotizacion sujeta a validacion administrativa y disponibilidad.',
-        {
-          x: marginX,
-          y: bottomMargin - 18,
-          size: 8.5,
-          font: regularFont,
-          color: muted,
-        },
-      );
       pdfPage.drawText(`Pagina ${index + 1} de ${pdfDoc.getPageCount()}`, {
-        x: pageWidth - marginX - 70,
-        y: bottomMargin - 18,
-        size: 8.5,
-        font: regularFont,
-        color: muted,
+        x: pageWidth - marginX - 72, y: bottomMargin - 16, size: 8, font: regularFont, color: muted,
       });
     });
 
@@ -407,9 +350,8 @@ export class QuotePdfService {
 
   getClientAddress(quote: Quote, client?: Client | null): string {
     if (client) {
-      return `${client.shippingAddress || client.address}, ${client.city}, ${client.state}`;
+      return `${client.shippingAddress || client.address || ''}, ${client.city || ''}, ${client.state || ''}`.replace(/^,\s*|,\s*$/g, '');
     }
-
     return quote.clientAddressSnapshot || 'Direccion no disponible';
   }
 
@@ -418,18 +360,14 @@ export class QuotePdfService {
   }
 
   getClientContact(client?: Client | null): string {
-    if (!client) {
-      return 'Contacto no disponible';
-    }
-
+    if (!client) return 'Contacto no disponible';
     const parts = [
       client.contactName,
       client.contactPosition,
       client.email,
       client.phone,
     ].filter(Boolean);
-
-    return parts.join(' · ');
+    return parts.join(' · ') || 'Contacto no disponible';
   }
 
   getCommercialTerms(quote: Quote): string[] {
@@ -439,11 +377,9 @@ export class QuotePdfService {
       'Precios sujetos a cambios posteriores al vencimiento de la vigencia indicada.',
       'Instalacion y capacitacion se coordinan de acuerdo con el alcance comercial confirmado.',
     ];
-
     if (quote.notes?.trim()) {
-      terms.push(`Nota comercial relevante: ${quote.notes.trim()}`);
+      terms.push(`Nota: ${quote.notes.trim()}`);
     }
-
     return terms;
   }
 
@@ -465,6 +401,6 @@ export class QuotePdfService {
       style: 'currency',
       currency: 'MXN',
       minimumFractionDigits: 2,
-    }).format(value);
+    }).format(value || 0);
   }
 }

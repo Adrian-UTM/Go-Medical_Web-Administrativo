@@ -58,11 +58,14 @@ export class InventorySupabaseService {
   }
 
   async getMovements(filters?: InventoryMovementFilters): Promise<InventoryMovement[]> {
-    const [movementResponse, products] = await Promise.all([
+    const [movementResponse, warehouseResponse, products] = await Promise.all([
       this.supabase.client
         .from(this.movementTable)
         .select('*')
         .order('created_at', { ascending: false }),
+      this.supabase.client
+        .from(this.warehouseTable)
+        .select('*'),
       this.getInventoryProducts(),
     ]);
 
@@ -70,10 +73,15 @@ export class InventorySupabaseService {
       throw this.toAppError(movementResponse.error.message, 'No fue posible cargar los movimientos de inventario.');
     }
 
+    if (warehouseResponse.error) {
+      throw this.toAppError(warehouseResponse.error.message, 'No fue posible cargar los almacenes.');
+    }
+
     const productMap = new Map(products.map(product => [product.id, product]));
+    const warehouseMap = new Map((warehouseResponse.data ?? []).map((warehouse: any) => [warehouse.id, warehouse]));
     const movements = (movementResponse.data ?? [])
       .filter(row => productMap.has(row.product_id))
-      .map(row => this.mapMovement(row, productMap));
+      .map(row => this.mapMovement(row, productMap, warehouseMap));
     return this.applyMovementFilters(movements, filters);
   }
 
@@ -158,8 +166,7 @@ export class InventorySupabaseService {
       .insert(insertPayload)
       .select('*')
       .single();
-
-    if (error) {
+    if (error) {
       console.error('[Inventory] Error creating movement', {
         payload: insertPayload,
         error,
@@ -171,8 +178,63 @@ export class InventorySupabaseService {
       throw this.toAppError(error.message, 'No fue posible registrar el movimiento.');
     }
 
+    const warehouseMap = new Map((warehouseResponse.data ?? []).map((warehouse: any) => [warehouse.id, warehouse]));
     const productMap = new Map(products.map(item => [item.id, item]));
-    return this.mapMovement(data, productMap);
+    return this.mapMovement(data, productMap, warehouseMap);
+  }
+
+  async updateStockLevels(productId: string, newCurrentStock: number, newMinStock: number, movementType: MovementType = MovementType.Adjustment, createdBy?: string): Promise<void> {
+    const currentStockData = await this.getStockByProductId(productId);
+    const currentStock = currentStockData?.currentStock ?? 0;
+    const currentMinStock = currentStockData?.minStock ?? 0;
+    
+    if (currentStock !== newCurrentStock) {
+      const difference = newCurrentStock - currentStock;
+      await this.registerManualMovement({
+        productId,
+        movementType: movementType,
+        quantity: Math.abs(difference), // Make it absolute because entry/exit implies sign
+        notes: this.getManualMovementNote(movementType),
+        createdBy
+      });
+    }
+    
+    if (currentMinStock !== newMinStock || !currentStockData) {
+       const { data: existing } = await this.supabase.client
+         .from(this.stockTable)
+         .select('id')
+         .eq('product_id', productId)
+         .maybeSingle();
+         
+       if (existing) {
+         const { error } = await this.supabase.client
+           .from(this.stockTable)
+           .update({ min_stock: newMinStock })
+           .eq('product_id', productId);
+         if (error) throw this.toAppError(error.message, 'No se pudo actualizar el stock mínimo.');
+       } else {
+         const { data: warehouse } = await this.supabase.client.from(this.warehouseTable).select('id').limit(1).maybeSingle();
+         const { error } = await this.supabase.client.from(this.stockTable).insert({
+           product_id: productId,
+           warehouse_id: warehouse?.id,
+           quantity: newCurrentStock,
+           min_stock: newMinStock
+         });
+         if (error) throw this.toAppError(error.message, 'No se pudo registrar el stock inicial.');
+       }
+    }
+  }
+
+  private getManualMovementNote(movementType: MovementType): string {
+    if (movementType === MovementType.Exit) {
+      return 'Salida manual de inventario';
+    }
+
+    if (movementType === MovementType.Return) {
+      return 'Devolución recibida';
+    }
+
+    return 'Entrada manual de inventario';
   }
 
   getStockStatus(stock: InventoryStock): InventoryStockStatus {
@@ -180,7 +242,8 @@ export class InventorySupabaseService {
       return InventoryStockStatus.OutOfStock;
     }
 
-    if (stock.currentStock <= stock.minStock) {
+    const threshold = stock.minStock > 0 ? stock.minStock : 2;
+    if (stock.currentStock <= threshold) {
       return InventoryStockStatus.LowStock;
     }
 
@@ -207,18 +270,38 @@ export class InventorySupabaseService {
       sku: row.sku ?? product?.sku ?? 'Sin SKU',
       productName: row.product_name ?? product?.name ?? 'Producto sin nombre',
       productCategory: (row.product_category ?? product?.category ?? '') as ProductCategory,
+      brand: row.brand ?? product?.brand ?? '',
+      model: row.model ?? product?.model ?? '',
       currentStock: Number(row.quantity ?? row.current_stock ?? row.stock ?? 0),
       minStock: Number(row.min_stock ?? 0),
       maxStock: Number(row.max_stock ?? 0),
       unit: (row.unit ?? product?.unit ?? 'unidad') as InventoryUnit,
       warehouseName: row.warehouse_name ?? warehouse?.name ?? warehouse?.warehouse_name ?? 'Almacen general',
       updatedAt: row.updated_at ?? row.created_at ?? new Date().toISOString(),
+      productImageUrl: this.resolveProductImageUrl(product?.image_url),
       ...(row.warehouse_id ? { warehouseId: row.warehouse_id } : {}),
     } as InventoryStock;
   }
 
-  private mapMovement(row: any, productMap: Map<string, Product>): InventoryMovement {
+  private resolveProductImageUrl(value: unknown): string | undefined {
+    const rawValue = String(value ?? '').trim();
+    if (!rawValue) {
+      return undefined;
+    }
+
+    if (/^https?:\/\//i.test(rawValue) || rawValue.startsWith('data:')) {
+      return rawValue;
+    }
+
+    const normalizedPath = rawValue.replace(/^\/+/, '');
+    return this.supabase.client.storage
+      .from('product-media')
+      .getPublicUrl(normalizedPath).data.publicUrl;
+  }
+
+  private mapMovement(row: any, productMap: Map<string, Product>, warehouseMap = new Map<string, any>()): InventoryMovement {
     const product = productMap.get(row.product_id);
+    const warehouse = warehouseMap.get(row.warehouse_id);
 
     return {
       id: String(row.id),
@@ -235,6 +318,7 @@ export class InventorySupabaseService {
       notes: row.notes ?? '',
       createdAt: row.created_at ?? new Date().toISOString(),
       createdBy: row.created_by ?? 'Sistema',
+      warehouseName: row.warehouse_name ?? warehouse?.name ?? warehouse?.warehouse_name ?? 'Almacen general',
     };
   }
 

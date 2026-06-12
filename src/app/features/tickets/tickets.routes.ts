@@ -13,6 +13,7 @@ export const TICKETS_ROUTES: Routes = [
       import('./pages/ticket-form/ticket-form.component').then(m => m.TicketFormComponent),
     title: 'Go Medical | Nuevo ticket',
   },
+
   {
     path: ':id/editar',
     loadComponent: () =>

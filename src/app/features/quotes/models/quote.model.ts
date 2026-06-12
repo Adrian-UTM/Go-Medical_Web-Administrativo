@@ -13,8 +13,10 @@ export interface QuoteItem {
   productId: string;
   sku: string;
   productName: string;
+  productCategory?: string;
   quantity: number;
   unitPrice: number;
+  grossLinePrice: number;
   discount: number;
   totalLinePrice: number;
 }
@@ -22,13 +24,18 @@ export interface QuoteItem {
 export interface Quote {
   id: string;
   quoteNumber: string;
+  pdfPath?: string;
   clientId: string;
   clientNameSnapshot: string;
   clientRfcSnapshot: string;
   clientAddressSnapshot: string;
   status: QuoteStatus;
   items: QuoteItem[];
+  grossSubtotal: number;
+  itemsDiscount: number;
+  discount: number;
   subtotal: number;
+  taxExempt: boolean;
   tax_pct: number;
   tax: number;
   total: number;
@@ -43,6 +50,7 @@ export interface QuoteItemDraft {
   productId: string;
   sku?: string;
   productName?: string;
+  productCategory?: string;
   quantity: number;
   unitPrice?: number;
   discount?: number;
@@ -56,6 +64,8 @@ export interface QuoteUpsertPayload {
   status?: QuoteStatus;
   items: QuoteItemDraft[];
   tax_pct?: number;
+  taxExempt?: boolean;
+  discount?: number;
   validUntil: string;
   notes?: string;
   conditions?: string;
@@ -67,9 +77,29 @@ export interface QuoteFilters {
 }
 
 export interface QuoteTotals {
+  grossSubtotal: number;
+  itemsDiscount: number;
   subtotal: number;
   tax: number;
   total: number;
 }
 
+export type ProductDocumentType =
+  | 'manual'
+  | 'ficha_tecnica'
+  | 'certificado'
+  | 'cotizacion_pdf'
+  | 'reporte_servicio'
+  | 'imagen'
+  | 'otro';
 
+export interface ProductDocument {
+  id: string;
+  productId: string;
+  productName: string;
+  title: string;
+  filePath: string;
+  documentType: ProductDocumentType;
+  fileName?: string;
+  fileExtension?: string;
+}

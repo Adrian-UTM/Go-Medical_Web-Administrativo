@@ -9,7 +9,7 @@ import { LoaderComponent } from '../../../../shared/components/loader/loader.com
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Client } from '../../../../core/models/client.model';
 import { Product, ProductCategory, ProductItemType } from '../../../../models/product.model';
-import { ServiceTicket, TicketPriority, TicketStatus, TicketTechnician, TicketType, TicketUpsertPayload } from '../../models/ticket.model';
+import { ServiceTicket, TicketPriority, TicketStatus, TicketType, TicketUpsertPayload } from '../../models/ticket.model';
 import { TicketSupabaseService } from '../../services/ticket.supabase.service';
 
 @Component({
@@ -32,7 +32,6 @@ export class TicketFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly ticketsService = inject(TicketSupabaseService);
-  private readonly externalTechnicianValue = '__other__';
 
   readonly isEditMode = signal(false);
   readonly isLoadingData = signal(true);
@@ -40,9 +39,9 @@ export class TicketFormComponent {
   readonly errorMessage = signal('');
   readonly clients = signal<Client[]>([]);
   readonly products = signal<Product[]>([]);
-  readonly technicians = signal<TicketTechnician[]>([]);
   readonly selectedClient = signal<Client | null>(null);
   readonly selectedProduct = signal<Product | null>(null);
+  readonly currentTicket = signal<ServiceTicket | null>(null);
 
   ticketId: string | null = null;
 
@@ -56,12 +55,6 @@ export class TicketFormComponent {
   readonly productOptions = computed(() => [
     { value: '', label: 'Sin producto asociado' },
     ...this.products().map(product => ({ value: product.id, label: `${product.sku} · ${product.name}` })),
-  ]);
-
-  readonly technicianOptions = computed(() => [
-    { value: '', label: 'Sin asignar' },
-    ...this.technicians().map(technician => ({ value: technician.id, label: technician.fullName })),
-    { value: this.externalTechnicianValue, label: 'Otro' },
   ]);
 
   readonly typeOptions = [
@@ -101,9 +94,15 @@ export class TicketFormComponent {
     productId: [''],
     productNameSnapshot: [''],
     equipmentSerialNumber: ['', Validators.maxLength(100)],
-    assignedTechnicianSelection: [''],
+    serviceAddress: ['', Validators.maxLength(500)],
+    serviceCity: ['', Validators.maxLength(120)],
+    serviceState: ['', Validators.maxLength(120)],
+    serviceRegion: ['', Validators.maxLength(120)],
+    requestedServiceDate: [''],
     assignedTechnicianCustomName: ['', Validators.maxLength(120)],
     scheduledAt: [''],
+    scheduledEndAt: [''],
+    routeNotes: ['', Validators.maxLength(1000)],
     notes: ['', Validators.maxLength(1000)],
   });
 
@@ -115,23 +114,11 @@ export class TicketFormComponent {
       )
       .subscribe(value => this.syncSelectedProduct(String(value ?? '')));
 
-    this.form.get('assignedTechnicianSelection')?.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(value => {
-        if (value !== this.externalTechnicianValue) {
-          this.form.patchValue({ assignedTechnicianCustomName: '' }, { emitEvent: false });
-        }
-      });
-
     void this.initialize();
   }
 
   get pageTitle(): string {
     return this.isEditMode() ? 'Editar ticket' : 'Nuevo ticket';
-  }
-
-  get isExternalTechnicianSelected(): boolean {
-    return this.form.get('assignedTechnicianSelection')?.value === this.externalTechnicianValue;
   }
 
   get isSelectedProductService(): boolean {
@@ -161,15 +148,13 @@ export class TicketFormComponent {
     this.isLoadingData.set(true);
 
     try {
-      const [clients, products, technicians] = await Promise.all([
+      const [clients, products] = await Promise.all([
         this.ticketsService.getActiveClients(),
         this.ticketsService.getAvailableProducts(),
-        this.ticketsService.getTechnicianProfiles(),
       ]);
 
       this.clients.set(clients);
       this.products.set(products);
-      this.technicians.set(technicians);
 
       if (isEditing && this.ticketId) {
         await this.loadTicket(this.ticketId);
@@ -189,6 +174,7 @@ export class TicketFormComponent {
       return;
     }
 
+    this.currentTicket.set(ticket);
     this.form.patchValue({
       clientId: ticket.clientId,
       clientNameSnapshot: ticket.clientNameSnapshot,
@@ -200,26 +186,44 @@ export class TicketFormComponent {
       productId: ticket.productId ?? '',
       productNameSnapshot: ticket.productNameSnapshot ?? '',
       equipmentSerialNumber: ticket.equipmentSerialNumber ?? '',
-      assignedTechnicianSelection: ticket.assignedTechnicianCustomName ? this.externalTechnicianValue : ticket.assignedTechnicianId ?? '',
-      assignedTechnicianCustomName: ticket.assignedTechnicianCustomName ?? '',
-      scheduledAt: this.toDateTimeInputValue(ticket.scheduledAt),
+      serviceAddress: ticket.serviceAddress ?? ticket.clientAddress ?? '',
+      serviceCity: ticket.serviceCity ?? ticket.clientCity ?? '',
+      serviceState: ticket.serviceState ?? ticket.clientState ?? '',
+      serviceRegion: ticket.serviceRegion ?? '',
+      requestedServiceDate: this.toDateInputValue(ticket.requestedServiceDate),
+      assignedTechnicianCustomName: ticket.assignedTechnicianCustomName ?? ticket.assignedTechnicianName ?? '',
+      scheduledAt: this.toDateTimeInputValue(ticket.scheduledStartAt ?? ticket.scheduledAt),
+      scheduledEndAt: this.toDateTimeInputValue(ticket.scheduledEndAt),
+      routeNotes: ticket.routeNotes ?? '',
       notes: ticket.notes,
     }, { emitEvent: false });
 
-    // Bloquear técnico si el estado es Resuelto, Cerrado o Cancelado
+    // Bloquear asignación si el estado es Resuelto, Cerrado o Cancelado
     const statusLower = String(ticket.status).toLowerCase();
     const isTerminal = statusLower === 'resolved' || statusLower === 'resuelto' ||
                        statusLower === 'closed' || statusLower === 'cerrado' ||
                        statusLower === 'cancelled' || statusLower === 'canceled' || statusLower === 'cancelado';
 
     if (isTerminal) {
-      this.form.get('assignedTechnicianSelection')?.disable({ emitEvent: false });
       this.form.get('assignedTechnicianCustomName')?.disable({ emitEvent: false });
       this.form.get('scheduledAt')?.disable({ emitEvent: false });
+      this.form.get('scheduledEndAt')?.disable({ emitEvent: false });
+      this.form.get('serviceAddress')?.disable({ emitEvent: false });
+      this.form.get('serviceCity')?.disable({ emitEvent: false });
+      this.form.get('serviceState')?.disable({ emitEvent: false });
+      this.form.get('serviceRegion')?.disable({ emitEvent: false });
+      this.form.get('requestedServiceDate')?.disable({ emitEvent: false });
+      this.form.get('routeNotes')?.disable({ emitEvent: false });
     } else {
-      this.form.get('assignedTechnicianSelection')?.enable({ emitEvent: false });
       this.form.get('assignedTechnicianCustomName')?.enable({ emitEvent: false });
       this.form.get('scheduledAt')?.enable({ emitEvent: false });
+      this.form.get('scheduledEndAt')?.enable({ emitEvent: false });
+      this.form.get('serviceAddress')?.enable({ emitEvent: false });
+      this.form.get('serviceCity')?.enable({ emitEvent: false });
+      this.form.get('serviceState')?.enable({ emitEvent: false });
+      this.form.get('serviceRegion')?.enable({ emitEvent: false });
+      this.form.get('requestedServiceDate')?.enable({ emitEvent: false });
+      this.form.get('routeNotes')?.enable({ emitEvent: false });
     }
 
     this.syncSelectedClient(ticket.clientId, ticket);
@@ -239,14 +243,6 @@ export class TicketFormComponent {
       this.form.markAllAsTouched();
       this.errorMessage.set('Completa los campos obligatorios antes de guardar el ticket.');
       return;
-    }
-
-    if (this.isExternalTechnicianSelected) {
-      const customName = this.form.get('assignedTechnicianCustomName')?.value?.trim();
-      if (!customName) {
-        this.errorMessage.set('Ingresa el nombre del tecnico externo.');
-        return;
-      }
     }
 
     this.isSaving.set(true);
@@ -304,9 +300,22 @@ export class TicketFormComponent {
     const client = this.clients().find(item => item.id === clientId) ?? null;
     this.selectedClient.set(client);
 
-    this.form.patchValue({
+    const patch: Record<string, string> = {
       clientNameSnapshot: ticket?.clientNameSnapshot ?? client?.businessName ?? '',
-    }, { emitEvent: false });
+    };
+
+    if (ticket) {
+      patch['serviceAddress'] = ticket.serviceAddress ?? ticket.clientAddress ?? '';
+      patch['serviceCity'] = ticket.serviceCity ?? ticket.clientCity ?? '';
+      patch['serviceState'] = ticket.serviceState ?? ticket.clientState ?? '';
+      patch['serviceRegion'] = ticket.serviceRegion ?? '';
+    } else if (client && (!this.form.get('serviceAddress')?.value || !this.form.get('serviceCity')?.value || !this.form.get('serviceState')?.value)) {
+      patch['serviceAddress'] = this.buildClientServiceAddress(client);
+      patch['serviceCity'] = client.city ?? '';
+      patch['serviceState'] = client.state ?? '';
+    }
+
+    this.form.patchValue(patch, { emitEvent: false });
   }
 
   private syncSelectedProduct(productId: string, ticket?: ServiceTicket): void {
@@ -359,8 +368,13 @@ export class TicketFormComponent {
 
     let calculatedStatus = raw.status;
     if (!this.isEditMode()) {
-      calculatedStatus = raw.assignedTechnicianSelection ? TicketStatus.Assigned : TicketStatus.Open;
+      calculatedStatus = raw.assignedTechnicianCustomName?.trim() ? TicketStatus.Assigned : TicketStatus.Open;
     }
+    const engineerName = raw.assignedTechnicianCustomName?.trim() || '';
+    const currentAssignedName = this.currentTicket()?.assignedTechnicianName?.trim() || '';
+    const shouldPreserveProfileEngineer = !!this.currentTicket()?.assignedTechnicianId
+      && !this.currentTicket()?.assignedTechnicianCustomName
+      && engineerName === currentAssignedName;
 
     return {
       clientId: raw.clientId ?? '',
@@ -373,15 +387,24 @@ export class TicketFormComponent {
       productId: raw.productId || undefined,
       productNameSnapshot: raw.productNameSnapshot || undefined,
       equipmentSerialNumber: this.isSelectedProductService ? undefined : raw.equipmentSerialNumber || undefined,
-      assignedTechnicianId: raw.assignedTechnicianSelection && raw.assignedTechnicianSelection !== this.externalTechnicianValue
-        ? raw.assignedTechnicianSelection
-        : null,
-      assignedTechnicianCustomName: raw.assignedTechnicianSelection === this.externalTechnicianValue
-        ? raw.assignedTechnicianCustomName?.trim() || null
-        : null,
+      serviceAddress: raw.serviceAddress ?? '',
+      serviceCity: raw.serviceCity ?? '',
+      serviceState: raw.serviceState ?? '',
+      serviceRegion: raw.serviceRegion ?? '',
+      requestedServiceDate: raw.requestedServiceDate ?? '',
+      assignedTechnicianId: shouldPreserveProfileEngineer ? this.currentTicket()?.assignedTechnicianId ?? null : null,
+      assignedTechnicianCustomName: shouldPreserveProfileEngineer ? null : engineerName || null,
       scheduledAt: this.toIsoFromDateTimeInput(raw.scheduledAt || ''),
+      scheduledStartAt: this.toIsoFromDateTimeInput(raw.scheduledAt || ''),
+      scheduledEndAt: this.toIsoFromDateTimeInput(raw.scheduledEndAt || ''),
+      routeAuthorized: this.currentTicket()?.routeAuthorized ?? false,
+      routeNotes: raw.routeNotes ?? '',
       notes: raw.notes ?? '',
     };
+  }
+
+  private buildClientServiceAddress(client: Client): string {
+    return client.formattedShippingAddress || client.formattedBillingAddress || client.shippingAddress || client.address || '';
   }
 
   private toDateTimeInputValue(isoDate?: string): string {
@@ -390,6 +413,14 @@ export class TicketFormComponent {
     }
 
     return new Date(isoDate).toISOString().slice(0, 16);
+  }
+
+  private toDateInputValue(date?: string): string {
+    if (!date) {
+      return '';
+    }
+
+    return String(date).slice(0, 10);
   }
 
   private toIsoFromDateTimeInput(value: string): string | undefined {

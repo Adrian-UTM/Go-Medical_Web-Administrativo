@@ -36,6 +36,7 @@ export enum ProductItemType {
 export enum ProductCondition {
   New = 'new',
   Preowned = 'preowned',
+  Remanufactured = 'remanufactured',
 }
 
 export enum PhysicalCondition {

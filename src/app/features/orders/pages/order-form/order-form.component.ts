@@ -63,6 +63,16 @@ export class OrderFormComponent {
     { value: OrderStatus.Canceled, label: 'Cancelado' },
   ];
 
+  readonly paymentMethodOptions = [
+    { value: 'transfer', label: 'Transferencia' },
+    { value: 'card', label: 'Tarjeta' },
+    { value: 'cash', label: 'Efectivo' },
+    { value: 'credit', label: 'Crédito' },
+    { value: 'spei', label: 'SPEI' },
+    { value: 'financial', label: 'Financiamiento' },
+    { value: 'other', label: 'Otro' },
+  ];
+
   readonly clientOptions = computed(() =>
     this.clients().map(client => ({
       value: client.id,
@@ -86,6 +96,8 @@ export class OrderFormComponent {
     taxExempt: [false],
     taxPct: [DEFAULT_ORDER_TAX_PCT, [Validators.required, Validators.min(0)]],
     notes: ['', Validators.maxLength(800)],
+    shippingAddress: ['', Validators.maxLength(800)],
+    paymentMethod: ['other', Validators.required],
     items: this.fb.array([]),
   });
 
@@ -157,9 +169,11 @@ export class OrderFormComponent {
       taxExempt: order.taxExempt,
       taxPct: order.taxPct,
       notes: order.notes,
+      shippingAddress: order.shippingAddress,
+      paymentMethod: order.paymentMethod,
     }, { emitEvent: false });
 
-    this.syncSelectedClient(order.clientId, order.clientNameSnapshot);
+    this.syncSelectedClient(order.clientId, order.clientNameSnapshot, true);
 
     this.itemsArray.clear();
     if (order.items.length > 0) {
@@ -176,8 +190,8 @@ export class OrderFormComponent {
       sku: [item?.sku ?? ''],
       productName: [item?.productName ?? ''],
       productCategory: [item?.productCategory ?? ''],
-      quantity: [item?.quantity ?? 1, [Validators.required, Validators.min(1)]],
-      unitPrice: [item?.unitPrice ?? 0, [Validators.required, Validators.min(0)]],
+      quantity: [item?.quantity ?? (null as number | null), [Validators.required, Validators.min(1)]],
+      unitPrice: [item?.unitPrice ?? (null as number | null), [Validators.required, Validators.min(0)]],
       totalLinePrice: [item?.totalLinePrice ?? 0],
     });
 
@@ -220,7 +234,7 @@ export class OrderFormComponent {
         sku: '',
         productName: '',
         productCategory: '',
-        unitPrice: 0,
+        unitPrice: null,
         totalLinePrice: 0,
       }, { emitEvent: false });
       this.recalculateTotals();
@@ -326,19 +340,58 @@ export class OrderFormComponent {
     return labels[category] ?? 'Sin categoria';
   }
 
-  private syncSelectedClient(clientId: string, clientNameSnapshot?: string): void {
+  getSelectedClientShippingAddress(): string {
+    return this.resolveClientShippingAddress(this.selectedClient());
+  }
+
+  private syncSelectedClient(clientId: string, clientNameSnapshot?: string, preserveExistingShippingAddress = false): void {
     const client = this.clients().find(item => item.id === clientId) ?? null;
     this.selectedClient.set(client);
-    this.form.patchValue({
+    const currentShippingAddress = String(this.form.get('shippingAddress')?.value ?? '').trim();
+    const resolvedShippingAddress = this.resolveClientShippingAddress(client);
+    const patch: { clientNameSnapshot: string; shippingAddress?: string } = {
       clientNameSnapshot: clientNameSnapshot ?? client?.businessName ?? '',
-    }, { emitEvent: false });
+    };
+
+    if (!preserveExistingShippingAddress || !currentShippingAddress) {
+      patch.shippingAddress = resolvedShippingAddress;
+    }
+
+    this.form.patchValue(patch, { emitEvent: false });
+  }
+
+  private resolveClientShippingAddress(client: Client | null): string {
+    if (!client) {
+      return '';
+    }
+
+    const candidates = [
+      client.formattedShippingAddress,
+      client.shippingAddress,
+      client.formattedBillingAddress,
+      client.address,
+      this.formatClientAddressParts(client),
+    ];
+
+    return candidates
+      .map(value => String(value ?? '').trim())
+      .find(value => !!value && value !== ',' && !/^,+$/.test(value)) ?? '';
+  }
+
+  private formatClientAddressParts(client: Client): string {
+    return [client.city, client.state, client.country]
+      .map(value => String(value ?? '').trim())
+      .filter(Boolean)
+      .join(', ');
   }
 
   private recalculateTotals(): void {
     const draftItems = this.itemsArray.controls.map(control => {
       const group = control as FormGroup;
-      const quantity = Math.max(1, Number(group.get('quantity')?.value) || 1);
-      const unitPrice = Number(group.get('unitPrice')?.value) || 0;
+      const quantityValue = group.get('quantity')?.value;
+      const unitPriceValue = group.get('unitPrice')?.value;
+      const quantity = quantityValue === null || quantityValue === '' ? 1 : Math.max(1, Number(quantityValue));
+      const unitPrice = Number(unitPriceValue) || 0;
       const totalLinePrice = this.roundCurrency(quantity * unitPrice);
 
       group.patchValue({
@@ -379,6 +432,8 @@ export class OrderFormComponent {
       taxPct: Number(rawValue.taxPct ?? DEFAULT_ORDER_TAX_PCT),
       taxExempt: !!rawValue.taxExempt,
       notes: rawValue.notes ?? '',
+      shippingAddress: rawValue.shippingAddress ?? '',
+      paymentMethod: rawValue.paymentMethod ?? 'other',
       items,
     };
   }

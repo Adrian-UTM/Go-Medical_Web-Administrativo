@@ -14,9 +14,18 @@
     {{ errorMessage() }}
   </div>
 
+  <div *ngIf="duplicateWarning()" class="form-warning-banner" role="alert">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    {{ duplicateWarning() }}
+  </div>
+
   <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
     <div class="form-layout">
       <div class="form-col form-col--main">
+
+        <!-- CLIENTE -->
         <div class="form-section">
           <h2 class="form-section__title">Cliente</h2>
 
@@ -34,29 +43,47 @@
           <div *ngIf="selectedClient()" class="client-preview">
             <div class="client-preview__row">
               <span class="client-preview__label">Contacto</span>
-              <span class="client-preview__value">{{ selectedClient()!.contactName }}</span>
+              <span class="client-preview__value">{{ selectedClient()!.contactName || '—' }}</span>
             </div>
             <div class="client-preview__row">
               <span class="client-preview__label">Correo</span>
-              <span class="client-preview__value">{{ selectedClient()!.email }}</span>
+              <span class="client-preview__value">{{ selectedClient()!.email || '—' }}</span>
             </div>
             <div class="client-preview__row">
               <span class="client-preview__label">RFC</span>
-              <span class="client-preview__value">{{ selectedClient()!.rfc }}</span>
+              <span class="client-preview__value">{{ selectedClient()!.rfc || '—' }}</span>
             </div>
             <div class="client-preview__row">
               <span class="client-preview__label">Direccion</span>
               <span class="client-preview__value">
-                {{ selectedClient()!.formattedShippingAddress || selectedClient()!.formattedBillingAddress || ((selectedClient()!.shippingAddress || selectedClient()!.address) + ', ' + selectedClient()!.city + ', ' + selectedClient()!.state + (selectedClient()!.country ? ', ' + selectedClient()!.country : '')) }}
+                {{ selectedClient()!.formattedShippingAddress || selectedClient()!.formattedBillingAddress || ((selectedClient()!.shippingAddress || selectedClient()!.address) + ', ' + selectedClient()!.city + ', ' + selectedClient()!.state) }}
               </span>
             </div>
           </div>
         </div>
 
+        <!-- CONCEPTOS -->
         <div class="form-section">
           <div class="section-heading">
             <h2 class="form-section__title form-section__title--no-border">Conceptos de la cotizacion</h2>
-            <button type="button" class="btn-ghost btn-sm" (click)="addQuoteLine()">Agregar linea</button>
+            <button type="button" class="btn-primary btn-sm" (click)="addQuoteLine()">
+              + Agregar linea
+            </button>
+          </div>
+
+          <!-- Buscador de productos -->
+          <div class="product-search-bar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="search"
+              class="product-search-bar__input"
+              placeholder="Buscar producto por nombre, SKU, marca, categoría..."
+              [value]="productSearch()"
+              (input)="productSearch.set($any($event.target).value)"
+              autocomplete="off">
+            <span *ngIf="productSearch()" class="product-search-bar__count">{{ filteredProductOptions().length }} resultado{{ filteredProductOptions().length !== 1 ? 's' : '' }}</span>
           </div>
 
           <div formArrayName="items" class="line-items">
@@ -77,10 +104,10 @@
 
               <div class="line-item__grid">
                 <div class="form-field line-item__product" [class.form-field--error]="hasLineError(i, 'productId')">
-                  <label class="form-field__label">Producto <span class="required">*</span></label>
+                  <label class="form-field__label">Producto / Servicio <span class="required">*</span></label>
                   <bc-custom-select
                     formControlName="productId"
-                    [options]="productOptions()"
+                    [options]="filteredProductOptions()"
                     placeholder="Seleccionar producto"
                     (selectionChange)="onProductSelected(i, $event)">
                   </bc-custom-select>
@@ -92,6 +119,11 @@
                   <span class="line-item__info-value line-item__info-value--mono">{{ lineGroup.get('sku')?.value || '—' }}</span>
                 </div>
 
+                <div class="line-item__info">
+                  <span class="line-item__info-label">Categoria</span>
+                  <span class="line-item__info-value">{{ getProductCategoryLabel(i) }}</span>
+                </div>
+
                 <div class="form-field line-item__qty" [class.form-field--error]="hasLineError(i, 'quantity')">
                   <label class="form-field__label">Cantidad <span class="required">*</span></label>
                   <input
@@ -99,7 +131,8 @@
                     class="form-field__input"
                     formControlName="quantity"
                     min="1"
-                    step="1">
+                    step="1"
+                    placeholder="Ej: 1">
                   <span *ngIf="hasLineError(i, 'quantity', 'min')" class="form-field__error">La cantidad minima es 1.</span>
                 </div>
 
@@ -109,18 +142,25 @@
                 </div>
 
                 <div class="form-field line-item__discount" [class.form-field--error]="hasLineError(i, 'discount')">
-                  <label class="form-field__label">Descuento</label>
+                  <label class="form-field__label">Descuento (MXN)</label>
                   <input
                     type="number"
                     class="form-field__input"
                     formControlName="discount"
                     min="0"
-                    step="0.01">
-                  <span class="form-field__hint">Monto aplicado en MXN.</span>
+                    step="0.01"
+                    placeholder="Ej: 0.00">
+                  <span *ngIf="getLineDiscountExceedsWarning(i)" class="form-field__error">El descuento no puede ser mayor al bruto de la linea.</span>
+                  <span *ngIf="!getLineDiscountExceedsWarning(i)" class="form-field__hint">Monto fijo descontado en esta linea.</span>
                 </div>
 
                 <div class="line-item__info">
-                  <span class="line-item__info-label">Importe</span>
+                  <span class="line-item__info-label">Subtotal bruto</span>
+                  <span class="line-item__info-value">{{ getLineGross(i) | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+                </div>
+
+                <div class="line-item__info">
+                  <span class="line-item__info-label">Importe neto</span>
                   <span class="line-item__info-value line-item__info-value--strong">{{ getLineSubtotal(i) | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
                 </div>
               </div>
@@ -128,6 +168,7 @@
           </div>
         </div>
 
+        <!-- INFORMACIÓN COMERCIAL -->
         <div class="form-section">
           <h2 class="form-section__title">Informacion comercial</h2>
 
@@ -143,23 +184,24 @@
               id="notes"
               class="form-field__textarea"
               formControlName="notes"
-              rows="4"
-              placeholder="Seguimiento comercial, alcances, condiciones de entrega o acuerdos internos..."></textarea>
+              rows="3"
+              placeholder="Seguimiento comercial, alcances, acuerdos internos..."></textarea>
           </div>
 
           <div class="form-field">
-            <label class="form-field__label" for="conditions">Condiciones</label>
+            <label class="form-field__label" for="conditions">Condiciones para el cliente</label>
             <textarea
               id="conditions"
               class="form-field__textarea"
               formControlName="conditions"
               rows="4"
-              placeholder="Condiciones de pago, vigencia, tiempos de entrega y observaciones formales para el cliente..."></textarea>
-            <span class="form-field__hint">Visible en la cotización para el cliente.</span>
+              placeholder="Condiciones de pago, vigencia, tiempos de entrega y observaciones formales..."></textarea>
+            <span class="form-field__hint">Visible en la cotización y en el PDF para el cliente.</span>
           </div>
         </div>
       </div>
 
+      <!-- SIDEBAR -->
       <div class="form-col form-col--side">
         <div class="form-section">
           <h2 class="form-section__title">Control</h2>
@@ -172,19 +214,45 @@
               placeholder="Seleccionar estado">
             </bc-custom-select>
           </div>
+
+          <label class="toggle-field">
+            <input type="checkbox" formControlName="taxExempt">
+            <span>Cotizacion exenta de IVA</span>
+          </label>
+        </div>
+
+        <div class="form-section">
+          <h2 class="form-section__title">Descuento general</h2>
+          <div class="form-field" [class.form-field--error]="hasError('discount')">
+            <label class="form-field__label" for="discount">Monto (MXN)</label>
+            <input id="discount" type="number" class="form-field__input" formControlName="discount" min="0" step="0.01" placeholder="Ej: 500">
+            <span class="form-field__hint">Descuento adicional aplicado al subtotal global.</span>
+          </div>
         </div>
 
         <div class="form-section">
           <h2 class="form-section__title">Totales</h2>
 
           <div class="totals-card">
-            <div class="totals-row">
+            <div class="totals-row totals-row--muted">
+              <span>Subtotal bruto</span>
+              <span>{{ totals().grossSubtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+            </div>
+            <div class="totals-row totals-row--discount" *ngIf="totals().itemsDiscount > 0">
+              <span>— Desc. por lineas</span>
+              <span>{{ totals().itemsDiscount | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+            </div>
+            <div class="totals-row totals-row--discount" *ngIf="(form.get('discount')?.value ?? 0) > 0">
+              <span>— Desc. general</span>
+              <span>{{ form.get('discount')?.value | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+            </div>
+            <div class="totals-row totals-row--sub">
               <span>Subtotal</span>
               <strong>{{ totals().subtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
             </div>
             <div class="totals-row">
-              <span>IVA</span>
-              <strong>{{ totals().tax | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+              <span>IVA {{ form.get('taxExempt')?.value ? '(Exento)' : '(16%)' }}</span>
+              <span>{{ totals().tax | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
             </div>
             <div class="totals-row totals-row--grand">
               <span>Total</span>
@@ -210,5 +278,3 @@
     </div>
   </form>
 </ng-container>
-
-

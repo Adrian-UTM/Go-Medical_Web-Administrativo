@@ -17,7 +17,7 @@ export const INVENTORY_ROUTES: Routes = [
     path: 'ajuste',
     loadComponent: () =>
       import('./pages/inventory-adjustment-form/inventory-adjustment-form.component').then(m => m.InventoryAdjustmentFormComponent),
-    title: 'Ajuste de Inventario | Go Medical',
+    title: 'Movimiento de Inventario | Go Medical',
   },
 ];
 

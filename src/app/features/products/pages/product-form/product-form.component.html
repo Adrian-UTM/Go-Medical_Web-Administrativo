@@ -82,7 +82,7 @@
           <div class="form-grid-2">
             <div class="form-field" [class.form-field--error]="hasError('category')">
               <label class="form-field__label" for="category">Categoría <span class="required">*</span></label>
-              <bc-custom-select selectId="category" formControlName="category" [options]="categories" placeholder="Seleccionar categoría"></bc-custom-select>
+              <bc-custom-select selectId="category" formControlName="category" [options]="filteredCategories" placeholder="Seleccionar categoría"></bc-custom-select>
               <span *ngIf="hasError('category', 'required')" class="form-field__error">La categoría es requerida</span>
             </div>
 
@@ -111,7 +111,7 @@
         </div>
 
         <div class="form-section" *ngIf="isPreowned">
-          <h2 class="form-section__title">Datos del producto seminuevo</h2>
+          <h2 class="form-section__title">Datos del producto seminuevo / remanufacturado</h2>
           <div class="form-grid-2">
             <div class="form-field">
               <label class="form-field__label" for="physical_condition">Estado físico</label>

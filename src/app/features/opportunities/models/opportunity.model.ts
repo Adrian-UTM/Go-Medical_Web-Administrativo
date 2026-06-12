@@ -36,6 +36,7 @@ export interface OpportunityItem {
   quantity: number;
   unitPrice: number;
   estimatedLineTotal: number;
+  imageUrl?: string;
 }
 
 export interface OpportunityFollowUp {
@@ -45,6 +46,7 @@ export interface OpportunityFollowUp {
   note: string;
   createdAt: string;
   createdBy: string;
+  contactChannel?: string;
 }
 
 export interface OpportunityContact {

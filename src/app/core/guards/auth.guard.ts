@@ -9,7 +9,12 @@ export const authGuard: CanActivateFn = async () => {
   await auth.ensureSessionReady();
 
   if (auth.isAuthenticated) {
-    return true;
+    const isValid = await auth.validateAdminAccessAsync();
+    if (isValid) {
+      return true;
+    }
+    
+    await auth.signOut();
   }
 
   return router.createUrlTree(['/login']);

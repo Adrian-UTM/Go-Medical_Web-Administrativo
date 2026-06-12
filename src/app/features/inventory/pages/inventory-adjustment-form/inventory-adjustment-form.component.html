@@ -2,7 +2,8 @@
 
 <ng-container *ngIf="!isLoading()">
   <bc-page-header
-    title="Registrar movimiento de inventario"
+    [title]="pageTitle"
+    [subtitle]="pageSubtitle"
     [breadcrumbs]="breadcrumbs">
     <a routerLink="/inventario" class="btn-ghost">Cancelar</a>
   </bc-page-header>
@@ -19,7 +20,12 @@
     <div class="form-layout">
       <div class="form-col form-col--main">
         <div class="form-section">
-          <h2 class="form-section__title">Datos del movimiento</h2>
+          <h2 class="form-section__title">Niveles de Inventario</h2>
+          <p class="form-section__desc" style="margin-bottom: 24px; color: var(--color-neutral-600); font-size: 14px;">
+            {{ minimumOnlyMode()
+              ? 'Define el nivel mínimo para calcular Normal, Bajo stock o Sin stock.'
+              : 'Registra la cantidad física que entra, sale o regresa al inventario.' }}
+          </p>
 
           <div class="form-field" [class.form-field--error]="hasError('productId')">
             <label class="form-field__label">Producto <span class="required">*</span></label>
@@ -31,34 +37,41 @@
             <span *ngIf="hasError('productId', 'required')" class="form-field__error">Selecciona un producto.</span>
           </div>
 
-          <div class="form-grid-2">
+          <div class="form-grid-2" *ngIf="!minimumOnlyMode()">
             <div class="form-field">
               <label class="form-field__label">Tipo de movimiento <span class="required">*</span></label>
               <bc-custom-select
                 formControlName="movementType"
                 [options]="movementTypeOptions"
-                placeholder="Seleccionar movimiento">
+                placeholder="Seleccionar tipo">
               </bc-custom-select>
             </div>
-
-            <div class="form-field">
-              <label class="form-field__label">Cantidad <span class="required">*</span></label>
+            
+            <div class="form-field" [class.form-field--error]="hasError('quantity')">
+              <label class="form-field__label">Cantidad</label>
               <input
                 type="number"
                 class="form-field__input"
                 formControlName="quantity"
-                step="1">
-              <span class="form-field__hint">{{ quantityHint }}</span>
+                step="1"
+                min="1"
+                placeholder="Ej: 10">
+              <span class="form-field__hint">Cantidad de {{ projectedUnit }} a mover.</span>
+              <span *ngIf="hasError('quantity', 'required')" class="form-field__error">Ingresa una cantidad.</span>
+              <span *ngIf="hasError('quantity', 'min')" class="form-field__error">La cantidad debe ser mayor a 0.</span>
             </div>
           </div>
 
           <div class="form-field">
-            <label class="form-field__label">Nota</label>
-            <textarea
-              class="form-field__textarea"
-              formControlName="notes"
-              rows="4"
-              placeholder="Motivo del movimiento o referencia operativa..."></textarea>
+            <label class="form-field__label">Stock mínimo <span class="required">*</span></label>
+            <input
+              type="number"
+              class="form-field__input"
+              formControlName="minStock"
+              step="1"
+              min="0"
+              placeholder="Ej: 5">
+            <span class="form-field__hint">Nivel para generar alerta de escasez en el Dashboard.</span>
           </div>
         </div>
       </div>
@@ -70,18 +83,17 @@
           <div class="stock-summary" *ngIf="currentStock(); else noProductSelected">
             <div class="stock-summary__item">
               <span class="stock-summary__label">Stock actual</span>
-              <strong>{{ currentStock()!.currentStock }} {{ currentStock()!.unit }}</strong>
+              <strong>{{ currentStock()!.currentStock }} {{ projectedUnit }}</strong>
             </div>
             <div class="stock-summary__item">
-              <span class="stock-summary__label">Almacen</span>
-              <strong>{{ currentStock()!.warehouseName }}</strong>
-            </div>
-            <div class="stock-summary__item">
-              <span class="stock-summary__label">Stock proyectado</span>
-              <strong [class.stock-summary__value--danger]="projectedStockInvalid">
-                {{ projectedStock() !== null ? projectedStock() : '—' }}
-                <span>{{ projectedUnit }}</span>
+              <span class="stock-summary__label">Stock resultante esperado</span>
+              <strong [class.text-danger]="projectedStockInvalid">
+                {{ projectedStock }} {{ projectedUnit }}
               </strong>
+            </div>
+            <div class="stock-summary__item" *ngIf="projectedStockInvalid">
+              <span class="stock-summary__label text-danger">Atención</span>
+              <strong class="text-danger">El stock resultante no puede ser menor a 0.</strong>
             </div>
           </div>
 
@@ -89,34 +101,15 @@
             <div class="empty-preview">
               {{ emptyPreviewMessage }}
             </div>
-
-            <div *ngIf="hasSelectedProductWithoutStock" class="stock-summary stock-summary--empty">
-              <div class="stock-summary__item">
-                <span class="stock-summary__label">Stock actual</span>
-                <strong>0 {{ projectedUnit }}</strong>
-              </div>
-              <div class="stock-summary__item">
-                <span class="stock-summary__label">Almacen sugerido</span>
-                <strong>{{ projectedWarehouse }}</strong>
-              </div>
-              <div class="stock-summary__item">
-                <span class="stock-summary__label">Stock proyectado</span>
-                <strong>{{ projectedStock() !== null ? projectedStock() : 0 }} {{ projectedUnit }}</strong>
-              </div>
-            </div>
           </ng-template>
-
-          <div *ngIf="projectedStockInvalid" class="inline-warning">
-            El resultado proyectado no es válido porque dejaría el stock en negativo.
-          </div>
         </div>
       </div>
     </div>
 
     <div class="form-footer">
       <a routerLink="/inventario" class="btn-ghost">Cancelar</a>
-      <button type="submit" class="btn-primary" [disabled]="isSaving() || projectedStockInvalid">
-        <span *ngIf="!isSaving()">Registrar movimiento</span>
+      <button type="submit" class="btn-primary" [disabled]="isSaving() || form.invalid">
+        <span *ngIf="!isSaving()">Guardar configuración</span>
         <span *ngIf="isSaving()" class="btn-loading-content">
           <span class="btn-spinner"></span>
           Guardando...

@@ -8,9 +8,10 @@ import { StatusBadgeComponent, BadgeVariant } from '../../../../shared/component
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
+import { ActionMenuComponent } from '../../../../shared/components/action-menu/action-menu.component';
 import { ProductCategory } from '../../../../models/product.model';
 import { InventorySupabaseService } from '../../services/inventory.supabase.service';
-import { InventoryStock, InventoryStockStatus } from '../../../../models/inventory.model';
+import { InventoryMovement, InventoryStock, InventoryStockStatus, MovementType } from '../../../../models/inventory.model';
 import { PageVisibilityService } from '../../../../core/services/page-visibility.service';
 
 @Component({
@@ -25,6 +26,7 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
     LoaderComponent,
     EmptyStateComponent,
     CustomSelectComponent,
+    ActionMenuComponent,
   ],
   templateUrl: './stock-list.component.html',
   styleUrl: './stock-list.component.css',
@@ -39,6 +41,7 @@ export class StockListComponent implements OnInit {
   readonly isLoading = signal(false);
   readonly errorMessage = signal('');
   readonly stocks = signal<InventoryStock[]>([]);
+  readonly movements = signal<InventoryMovement[]>([]);
   readonly searchQuery = signal('');
   readonly selectedCategory = signal<ProductCategory | ''>('');
   readonly selectedStockStatus = signal<InventoryStockStatus | ''>('');
@@ -51,7 +54,6 @@ export class StockListComponent implements OnInit {
     { value: ProductCategory.Consumible, label: 'Consumibles' },
     { value: ProductCategory.Refaccion, label: 'Refacciones' },
     { value: ProductCategory.Accesorio, label: 'Accesorios' },
-    { value: ProductCategory.Servicio, label: 'Servicios' },
   ];
 
   readonly stockStatusOptions = [
@@ -61,16 +63,78 @@ export class StockListComponent implements OnInit {
     { value: InventoryStockStatus.OutOfStock, label: 'Sin stock' },
   ];
 
+  readonly visibleMovements = computed(() => this.movements().filter(movement => this.isVisibleMovement(movement)));
+
+  readonly summaryCards = computed(() => {
+    const stocks = this.stocks();
+    const lowStock = stocks.filter(stock => this.inventoryService.getStockStatus(stock) === InventoryStockStatus.LowStock).length;
+    const outOfStock = stocks.filter(stock => this.inventoryService.getStockStatus(stock) === InventoryStockStatus.OutOfStock).length;
+    const monthMovements = this.visibleMovements().filter(movement => this.isCurrentMonth(movement.createdAt)).length;
+
+    return [
+      {
+        label: 'Productos en inventario',
+        value: stocks.length,
+        hint: 'SKUs físicos activos',
+        tone: 'teal',
+        icon: 'box',
+      },
+      {
+        label: 'Bajo stock',
+        value: lowStock,
+        hint: 'Requieren reposición',
+        tone: 'warning',
+        icon: 'warning',
+      },
+      {
+        label: 'Sin stock',
+        value: outOfStock,
+        hint: 'Fuera de inventario',
+        tone: 'danger',
+        icon: 'out',
+      },
+      {
+        label: 'Movimientos del mes',
+        value: monthMovements,
+        hint: this.visibleMovements().length ? 'Entradas, salidas y devoluciones' : 'No disponible',
+        tone: 'info',
+        icon: 'chart',
+      },
+    ];
+  });
+
+  readonly recentMovements = computed(() => this.visibleMovements().slice(0, 5));
+
+  readonly lowStockCount = computed(() =>
+    this.stocks().filter(stock => this.inventoryService.getStockStatus(stock) === InventoryStockStatus.LowStock).length
+  );
+
+  readonly outOfStockCount = computed(() =>
+    this.stocks().filter(stock => this.inventoryService.getStockStatus(stock) === InventoryStockStatus.OutOfStock).length
+  );
+
+  readonly noMinStockCount = computed(() =>
+    this.stocks().filter(stock => Number(stock.minStock) <= 0).length
+  );
+
+  readonly InventoryStockStatus = InventoryStockStatus;
+
   readonly filteredStocks = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
     const stockStatus = this.selectedStockStatus();
 
     return this.stocks().filter(stock => {
+      // Excluir servicios (por seguridad, aunque el servicio de DB ya los filtra)
+      if (stock.productCategory === ProductCategory.Servicio) return false;
+      if (String(stock.unit).toLowerCase() === 'servicio') return false;
+
       const matchesQuery = !query || [
         stock.sku,
         stock.productName,
         stock.warehouseName,
+        stock.brand ?? '',
+        stock.model ?? ''
       ].some(value => value.toLowerCase().includes(query));
 
       const matchesCategory = !category || stock.productCategory === category;
@@ -104,9 +168,15 @@ export class StockListComponent implements OnInit {
     this.errorMessage.set('');
 
     try {
-      this.stocks.set(await this.inventoryService.getStocks());
+      const [stocks, movements] = await Promise.all([
+        this.inventoryService.getStocks(),
+        this.inventoryService.getMovements(),
+      ]);
+      this.stocks.set(stocks);
+      this.movements.set(movements);
     } catch (error) {
       this.stocks.set([]);
+      this.movements.set([]);
       this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible cargar el inventario.');
     } finally {
       this.loadInFlight = false;
@@ -118,6 +188,10 @@ export class StockListComponent implements OnInit {
     this.searchQuery.set('');
     this.selectedCategory.set('');
     this.selectedStockStatus.set('');
+  }
+
+  applyStockStatusFilter(status: InventoryStockStatus): void {
+    this.selectedStockStatus.set(status);
   }
 
   get emptyStateTitle(): string {
@@ -162,5 +236,46 @@ export class StockListComponent implements OnInit {
     };
 
     return map[status];
+  }
+
+  getMovementLabel(type: MovementType): string {
+    if (type === MovementType.Exit) {
+      return 'Salida';
+    }
+
+    if (type === MovementType.Return) {
+      return 'Devolución recibida';
+    }
+
+    return 'Entrada';
+  }
+
+  getMovementTone(movement: InventoryMovement): 'positive' | 'negative' | 'neutral' {
+    if (movement.quantity > 0) return 'positive';
+    if (movement.quantity < 0) return 'negative';
+    return 'neutral';
+  }
+
+  getMovementQuantityLabel(movement: InventoryMovement): string {
+    const quantity = Number(movement.quantity ?? 0);
+    return `${quantity > 0 ? '+' : ''}${quantity}`;
+  }
+
+  private isCurrentMonth(value: string): boolean {
+    const date = new Date(value);
+    const now = new Date();
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }
+
+  private isVisibleMovement(movement: InventoryMovement): boolean {
+    const isPhysicalProduct = movement.productCategory !== ProductCategory.Servicio
+      && movement.productCategory !== ProductCategory.Services;
+
+    return isPhysicalProduct && [
+      MovementType.InitialLoad,
+      MovementType.Entry,
+      MovementType.Exit,
+      MovementType.Return,
+    ].includes(movement.movementType);
   }
 }

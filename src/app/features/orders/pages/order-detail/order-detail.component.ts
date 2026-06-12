@@ -91,6 +91,14 @@ export class OrderDetailComponent {
     await this.updateStatus(OrderStatus.Shipped, 'Pedido marcado como enviado.');
   }
 
+  async markAsDelivered(): Promise<void> {
+    if (!this.canMarkAsDelivered()) {
+      return;
+    }
+
+    await this.updateStatus(OrderStatus.Delivered, 'Pedido marcado como entregado.');
+  }
+
   async cancelOrder(): Promise<void> {
     const currentOrder = this.order();
     if (!currentOrder) {
@@ -187,12 +195,17 @@ export class OrderDetailComponent {
 
   canMarkAsPaid(): boolean {
     const status = this.currentStatusKey();
-    return !this.isCanceledStatus(status) && status !== OrderStatus.Paid;
+    return ['draft', 'pending_review', 'pending_payment'].includes(status);
   }
 
   canMarkAsShipped(): boolean {
     const status = this.currentStatusKey();
-    return !this.isCanceledStatus(status) && !['shipped', 'delivered', 'completed'].includes(status);
+    return ['paid', 'processing'].includes(status);
+  }
+
+  canMarkAsDelivered(): boolean {
+    const status = this.currentStatusKey();
+    return ['shipped'].includes(status);
   }
 
   canCancelOrder(): boolean {

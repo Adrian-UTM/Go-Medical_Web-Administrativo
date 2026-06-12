@@ -41,6 +41,8 @@ export interface Order {
   tax: number;
   total: number;
   notes: string;
+  shippingAddress?: string;
+  paymentMethod?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,6 +64,8 @@ export interface OrderUpsertPayload {
   taxPct?: number;
   taxExempt?: boolean;
   notes?: string;
+  shippingAddress?: string;
+  paymentMethod?: string;
 }
 
 export interface OrderFilters {

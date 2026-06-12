@@ -1,17 +1,14 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { startWith } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PageHeaderComponent, BreadcrumbItem } from '../../../../shared/components/page-header/page-header.component';
 import { LoaderComponent } from '../../../../shared/components/loader/loader.component';
 import { CustomSelectComponent } from '../../../../shared/components/custom-select/custom-select.component';
 import { Product } from '../../../../models/product.model';
-import {
-  InventoryStock,
-  MovementType,
-} from '../../../../models/inventory.model';
+import { InventoryStock, MovementType } from '../../../../models/inventory.model';
 import { InventorySupabaseService } from '../../services/inventory.supabase.service';
 import { AuthService } from '../../../../core/services/auth.service';
 
@@ -32,6 +29,7 @@ import { AuthService } from '../../../../core/services/auth.service';
 export class InventoryAdjustmentFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly inventoryService = inject(InventorySupabaseService);
   private readonly authService = inject(AuthService);
@@ -40,17 +38,10 @@ export class InventoryAdjustmentFormComponent {
   readonly isSaving = signal(false);
   readonly products = signal<Product[]>([]);
   readonly currentStock = signal<InventoryStock | null>(null);
-  readonly projectedStock = signal<number | null>(null);
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
   readonly selectedProduct = signal<Product | null>(null);
-
-  readonly movementTypeOptions = [
-    { value: MovementType.InitialLoad, label: 'Carga inicial' },
-    { value: MovementType.Entry, label: 'Entrada' },
-    { value: MovementType.Exit, label: 'Salida' },
-    { value: MovementType.Adjustment, label: 'Ajuste' },
-  ];
+  readonly minimumOnlyMode = signal(false);
 
   readonly productOptions = computed(() =>
     this.products().map(product => ({
@@ -61,17 +52,20 @@ export class InventoryAdjustmentFormComponent {
 
   readonly form = this.fb.group({
     productId: ['', Validators.required],
-    movementType: [MovementType.Entry, Validators.required],
-    quantity: [1, [Validators.required]],
-    notes: ['', Validators.maxLength(500)],
+    movementType: ['entry', Validators.required],
+    quantity: [null as number | null, [Validators.required, Validators.min(1)]],
+    minStock: [null as number | null, [Validators.required, Validators.min(0)]],
   });
 
+  readonly movementTypeOptions = [
+    { value: 'entry', label: 'Entrada' },
+    { value: 'exit', label: 'Salida' },
+    { value: 'return', label: 'Devolución recibida' },
+  ];
+
   constructor() {
-    this.form.valueChanges
-      .pipe(
-        startWith(this.form.getRawValue()),
-        takeUntilDestroyed(this.destroyRef)
-      )
+    this.form.get('productId')?.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => void this.syncPreview());
 
     void this.initialize();
@@ -81,26 +75,18 @@ export class InventoryAdjustmentFormComponent {
     return [
       { label: 'Inicio', routerLink: '/dashboard' },
       { label: 'Inventario', routerLink: '/inventario' },
-      { label: 'Registrar movimiento' },
+      { label: this.minimumOnlyMode() ? 'Configurar stock mínimo' : 'Movimiento de inventario' },
     ];
   }
 
-  get quantityHint(): string {
-    const movementType = this.form.get('movementType')?.value;
-
-    if (movementType === MovementType.Adjustment) {
-      return 'Para ajuste puedes capturar un valor positivo o negativo.';
-    }
-
-    if (movementType === MovementType.InitialLoad) {
-      return 'Usa carga inicial para registrar existencias iniciales.';
-    }
-
-    return 'Captura un valor positivo. El sistema aplicara la direccion del movimiento.';
+  get pageTitle(): string {
+    return this.minimumOnlyMode() ? 'Configurar stock mínimo' : 'Registrar movimiento de inventario';
   }
 
-  get isInitialLoadSelected(): boolean {
-    return this.form.get('movementType')?.value === MovementType.InitialLoad;
+  get pageSubtitle(): string {
+    return this.minimumOnlyMode()
+      ? 'Stock mínimo es una configuración del producto, no un movimiento de inventario.'
+      : 'Registra entradas, salidas o devoluciones recibidas con impacto real en stock.';
   }
 
   get hasSelectedProductWithoutStock(): boolean {
@@ -112,19 +98,29 @@ export class InventoryAdjustmentFormComponent {
   }
 
   get projectedWarehouse(): string {
-    return this.currentStock()?.warehouseName ?? 'Almacen general';
+    return this.currentStock()?.warehouseName ?? 'Almacén principal';
   }
 
   get emptyPreviewMessage(): string {
     if (this.hasSelectedProductWithoutStock) {
-      return 'Este producto aun no tiene existencias registradas. Puedes usar una carga inicial para comenzar su control de stock.';
+      return 'Este producto aún no tiene existencias registradas. Puedes realizar una Entrada inicial.';
+    }
+    return 'Selecciona un producto para visualizar el stock actual.';
+  }
+
+  get projectedStock(): number {
+    const current = this.currentStock()?.currentStock ?? 0;
+    if (this.minimumOnlyMode()) {
+      return current;
     }
 
-    return 'Selecciona un producto para visualizar el stock actual y el resultado esperado.';
+    const type = this.form.get('movementType')?.value;
+    const qty = Number(this.form.get('quantity')?.value ?? 0);
+    return type === 'exit' ? current - qty : current + qty;
   }
 
   get projectedStockInvalid(): boolean {
-    return this.projectedStock() !== null && this.projectedStock()! < 0;
+    return this.projectedStock < 0;
   }
 
   async initialize(): Promise<void> {
@@ -134,12 +130,20 @@ export class InventoryAdjustmentFormComponent {
     try {
       this.products.set(await this.inventoryService.getInventoryProducts());
 
+      const mode = this.route.snapshot.queryParamMap.get('mode');
+      this.minimumOnlyMode.set(mode === 'min');
+      this.syncQuantityValidators();
+
+      const movementType = this.route.snapshot.queryParamMap.get('movementType');
+      if (this.isMovementTypeOption(movementType)) {
+        this.form.patchValue({ movementType }, { emitEvent: false });
+      }
+
       const productId = this.route.snapshot.queryParamMap.get('productId');
       if (productId) {
         this.form.patchValue({ productId }, { emitEvent: true });
+        await this.syncPreview();
       }
-
-      await this.syncPreview();
     } catch (error) {
       this.products.set([]);
       this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible preparar el formulario de inventario.');
@@ -148,16 +152,35 @@ export class InventoryAdjustmentFormComponent {
     }
   }
 
-  async onSubmit(): Promise<void> {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      this.errorMessage.set('Completa los campos requeridos para registrar el movimiento.');
-      this.successMessage.set('');
+  async syncPreview(): Promise<void> {
+    const productId = this.form.get('productId')?.value;
+    if (!productId) {
+      this.selectedProduct.set(null);
+      this.currentStock.set(null);
       return;
     }
 
-    if (this.projectedStockInvalid) {
-      this.errorMessage.set('El movimiento no puede dejar stock negativo.');
+    const product = this.products().find(p => p.id === productId) ?? null;
+    this.selectedProduct.set(product);
+
+    if (product) {
+      try {
+        const stock = await this.inventoryService.getStockByProductId(product.id);
+        this.currentStock.set(stock ?? null);
+        if (stock) {
+          this.form.patchValue({ minStock: stock.minStock === 0 ? null : stock.minStock }, { emitEvent: false });
+        }
+      } catch (error) {
+        console.error('Error syncing preview', error);
+        this.currentStock.set(null);
+      }
+    }
+  }
+
+  async onSubmit(): Promise<void> {
+    if (this.form.invalid || this.projectedStockInvalid) {
+      this.form.markAllAsTouched();
+      this.errorMessage.set('Verifica los campos antes de continuar.');
       this.successMessage.set('');
       return;
     }
@@ -167,24 +190,34 @@ export class InventoryAdjustmentFormComponent {
     this.successMessage.set('');
 
     try {
-      const movement = await this.inventoryService.registerManualMovement({
-        productId: this.form.get('productId')?.value ?? '',
-        movementType: this.form.get('movementType')?.value ?? MovementType.Entry,
-        quantity: Number(this.form.get('quantity')?.value ?? 0),
-        notes: this.form.get('notes')?.value ?? '',
-        createdBy: this.authService.currentUserId() ?? undefined,
-      });
+      const productId = this.form.get('productId')?.value ?? '';
+      const minStock = Number(this.form.get('minStock')?.value ?? 0);
+      const newStock = this.projectedStock;
+      const typeValue = this.form.get('movementType')?.value as 'entry' | 'exit' | 'return';
+      const movementType = typeValue === 'exit'
+        ? MovementType.Exit
+        : typeValue === 'return'
+          ? MovementType.Return
+          : MovementType.Entry;
+      
+      await this.inventoryService.updateStockLevels(
+        productId,
+        newStock,
+        minStock,
+        movementType,
+        this.authService.currentUserId() ?? undefined
+      );
 
-      await this.refreshCurrentStock(movement.productId);
-      this.projectedStock.set(movement.resultingStock);
-      this.successMessage.set(`Movimiento registrado correctamente. Stock resultante: ${movement.resultingStock}.`);
-      this.form.patchValue({
-        movementType: MovementType.Entry,
-        quantity: 1,
-        notes: '',
-      }, { emitEvent: true });
+      this.successMessage.set(this.minimumOnlyMode()
+        ? 'Stock mínimo actualizado correctamente.'
+        : 'Movimiento de inventario registrado correctamente.');
+      
+      setTimeout(() => {
+        this.router.navigate(['/inventario']);
+      }, 1500);
+
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible registrar el movimiento.');
+      this.errorMessage.set(error instanceof Error ? error.message : 'No fue posible actualizar el stock.');
       this.successMessage.set('');
     } finally {
       this.isSaving.set(false);
@@ -196,45 +229,27 @@ export class InventoryAdjustmentFormComponent {
     if (!control || !(control.touched || control.dirty)) {
       return false;
     }
-
     return errorName ? control.hasError(errorName) : control.invalid;
   }
 
-  private async syncPreview(): Promise<void> {
-    const productId = this.form.get('productId')?.value ?? '';
-    const movementType = this.form.get('movementType')?.value ?? MovementType.Entry;
-    const quantity = Number(this.form.get('quantity')?.value ?? 0);
+  private isMovementTypeOption(value: string | null): value is 'entry' | 'exit' | 'return' {
+    return value === 'entry' || value === 'exit' || value === 'return';
+  }
 
-    this.errorMessage.set('');
-    this.selectedProduct.set(this.products().find(product => product.id === productId) ?? null);
-
-    if (!productId) {
-      this.currentStock.set(null);
-      this.projectedStock.set(null);
+  private syncQuantityValidators(): void {
+    const quantityControl = this.form.get('quantity');
+    if (!quantityControl) {
       return;
     }
 
-    await this.refreshCurrentStock(productId);
-    const baseStock = this.currentStock()?.currentStock ?? 0;
-    this.projectedStock.set(this.calculateProjectedStock(baseStock, movementType, quantity));
-  }
-
-  private async refreshCurrentStock(productId: string): Promise<void> {
-    this.currentStock.set(await this.inventoryService.getStockByProductId(productId) ?? null);
-  }
-
-  private calculateProjectedStock(currentStock: number, movementType: MovementType, quantity: number): number {
-    const normalized = Math.abs(Number(quantity) || 0);
-
-    if (movementType === MovementType.Adjustment) {
-      return currentStock + (Number(quantity) || 0);
+    if (this.minimumOnlyMode()) {
+      quantityControl.clearValidators();
+      quantityControl.setValue(null, { emitEvent: false });
+    } else {
+      quantityControl.setValidators([Validators.required, Validators.min(1)]);
     }
 
-    if (movementType === MovementType.Exit) {
-      return currentStock - normalized;
-    }
-
-    return currentStock + normalized;
+    quantityControl.updateValueAndValidity({ emitEvent: false });
   }
+
 }
-

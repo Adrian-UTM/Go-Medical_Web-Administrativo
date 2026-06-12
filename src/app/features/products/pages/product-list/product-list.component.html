@@ -1,29 +1,54 @@
 <bc-page-header
-  title="Productos"
-  subtitle="Catálogo de productos físicos y servicios comerciales"
+  [title]="productsPanel() === 'promotions' ? 'Panel de promociones' : 'Catálogo de Productos'"
+  [subtitle]="productsPanel() === 'promotions' ? 'Administra descuentos, campañas especiales y promociones programadas.' : 'Administra los productos y servicios de tu catálogo.'"
   [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Productos' }]">
-  <a id="btn-nuevo-producto" routerLink="/productos/nuevo" class="btn-primary">
+  <a *ngIf="productsPanel() === 'catalog'" id="btn-nuevo-producto" routerLink="/productos/nuevo" class="btn-primary">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
          fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
-    Nuevo producto
+    Nuevo Producto
   </a>
+  <div *ngIf="productsPanel() === 'promotions' && !promotionModalOpen()" class="promotions-page-actions">
+    <button type="button" class="btn-ghost" (click)="loadPromotionsPanel(true)" [disabled]="promotionsLoading()">
+      Actualizar
+    </button>
+    <button *ngIf="canManagePromotions" type="button" class="btn-primary" (click)="openEmptyPromotionForm()">
+      Crear promoción
+    </button>
+  </div>
 </bc-page-header>
-
-<div class="product-tabs" role="tablist" aria-label="Tipo de registro de productos">
-  <button type="button" class="product-tab" [class.product-tab--active]="activeTab === ProductItemType.Product" (click)="setTab(ProductItemType.Product)">
-    Productos físicos
-  </button>
-  <button type="button" class="product-tab" [class.product-tab--active]="activeTab === ProductItemType.Service" (click)="setTab(ProductItemType.Service)">
-    Servicios
-  </button>
-</div>
 
 <div *ngIf="actionMessage()" class="info-banner">
   {{ actionMessage() }}
 </div>
 
+<div *ngIf="promotionMessage()" class="info-banner">
+  {{ promotionMessage() }}
+</div>
+
+<div *ngIf="promotionErrorMessage() && !promotionModalOpen()" class="info-banner info-banner--warning">
+  {{ promotionErrorMessage() }}
+</div>
+
+<div class="products-panel-switch" role="tablist" aria-label="Paneles de productos">
+  <button
+    type="button"
+    class="products-panel-switch__button"
+    [class.products-panel-switch__button--active]="productsPanel() === 'catalog'"
+    (click)="setProductsPanel('catalog')">
+    Catálogo
+  </button>
+  <button
+    type="button"
+    class="products-panel-switch__button"
+    [class.products-panel-switch__button--active]="productsPanel() === 'promotions'"
+    (click)="setProductsPanel('promotions')">
+    Promociones
+  </button>
+</div>
+
+<ng-container *ngIf="productsPanel() === 'catalog'; else promotionsPanel">
 <div class="filters-bar">
   <div class="filters-bar__search">
     <span class="filters-bar__search-icon">
@@ -36,15 +61,24 @@
       id="search-productos"
       type="search"
       class="filters-bar__input"
-      placeholder="Buscar por nombre, SKU o marca..."
+      placeholder="Buscar por nombre, SKU, marca o categoría..."
       [(ngModel)]="searchTerm"
       (ngModelChange)="onSearch()"
       aria-label="Buscar productos">
   </div>
 
+  <div class="product-tabs" role="tablist" aria-label="Tipo de registro de productos">
+    <button type="button" class="product-tab" [class.product-tab--active]="activeTab === ProductItemType.Product" (click)="setTab(ProductItemType.Product)">
+      Productos
+    </button>
+    <button type="button" class="product-tab" [class.product-tab--active]="activeTab === ProductItemType.Service" (click)="setTab(ProductItemType.Service)">
+      Servicios
+    </button>
+  </div>
+
   <div style="min-width: 220px;">
     <bc-custom-select 
-      [options]="categories" 
+      [options]="filteredCategories" 
       [(ngModel)]="selectedCategory" 
       (selectionChange)="onFilterChange()"
       placeholder="Todas las categorías">
@@ -83,97 +117,518 @@
   <button *ngIf="hasActiveFilters" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
 </bc-empty-state>
 
-<div class="table-wrapper" *ngIf="!isLoading() && products().length > 0">
-  <table class="data-table" aria-label="Lista de productos">
-    <thead>
-      <tr>
-        <th scope="col">SKU</th>
-        <th scope="col">Nombre</th>
-        <th scope="col" *ngIf="!isServicesTab">Condición</th>
-        <th scope="col">Categoría</th>
-        <th scope="col" *ngIf="!isServicesTab">Marca / Modelo</th>
-        <th scope="col" *ngIf="isServicesTab">Duración estimada</th>
-        <th scope="col" *ngIf="isServicesTab">Visita</th>
-        <th scope="col" class="text-right">Precio MXN</th>
-        <th scope="col">Estado</th>
-        <th scope="col" class="text-center">Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let product of products()" class="data-table__row">
-        <td class="data-table__sku">{{ product.sku }}</td>
-        <td class="data-table__name">
-          <div class="product-cell">
-            <div class="product-thumb" *ngIf="product.image_url; else emptyThumb">
+<section class="catalog-grid" *ngIf="!isLoading() && products().length > 0" aria-label="Catálogo de productos">
+  <article *ngFor="let product of products()" class="product-card">
+    <div class="product-card__media">
+      <span
+        class="condition-badge product-card__condition"
+        [class.condition-badge--preowned]="product.product_condition === 'preowned'"
+        [class.condition-badge--remanufactured]="product.product_condition === 'remanufactured'"
+        [class.condition-badge--service]="isServicesTab">
+        {{ isServicesTab ? 'Servicio' : getConditionLabel(product.product_condition) }}
+      </span>
+
+      <span class="status-pill" [class.status-pill--inactive]="!(product.is_active ?? false)">
+        {{ (product.is_active ?? false) ? 'Activo' : 'Inactivo' }}
+      </span>
+
+      <img *ngIf="product.image_url; else visualPlaceholder" [src]="product.image_url" [alt]="product.name">
+      <ng-template #visualPlaceholder>
+        <div class="product-card__placeholder" [class.product-card__placeholder--service]="isServicesTab">
+          <svg *ngIf="isServicesTab; else productPlaceholderIcon" xmlns="http://www.w3.org/2000/svg" width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.2-3.2a5.5 5.5 0 0 1-7.3 7.3l-5.9 5.9a2.1 2.1 0 0 1-3-3l5.9-5.9a5.5 5.5 0 0 1 7.3-7.3z"></path>
+          </svg>
+          <ng-template #productPlaceholderIcon>
+            <svg xmlns="http://www.w3.org/2000/svg" width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <path d="M3.3 7 12 12l8.7-5"></path>
+              <path d="M12 22V12"></path>
+            </svg>
+          </ng-template>
+        </div>
+      </ng-template>
+    </div>
+
+    <div class="product-card__body">
+      <div class="product-card__header">
+        <h3 class="product-card__title">{{ product.name }}</h3>
+        <span class="category-pill">{{ getCategoryLabel(product.category) }}</span>
+      </div>
+
+      <p class="product-card__sku">SKU: {{ product.sku }}</p>
+
+      <div class="product-card__price">
+        <ng-container *ngIf="isProductPromotionActive(product); else baseProductPrice">
+          <span class="product-card__old-price">
+            {{ getProductPrice(product) | currency:'MXN':'symbol-narrow':'1.0-0' }} MXN
+          </span>
+          <strong>{{ getPromotionalPrice(product) | currency:'MXN':'symbol-narrow':'1.0-0' }} MXN</strong>
+        </ng-container>
+        <ng-template #baseProductPrice>
+          <strong>{{ getProductPrice(product) | currency:'MXN':'symbol-narrow':'1.0-0' }} MXN</strong>
+        </ng-template>
+      </div>
+
+      <span *ngIf="getProductPromotion(product)" class="promo-pill">
+        {{ getPromotionStatusLabel(product) }}
+      </span>
+      <span *ngIf="isProductPromotionActive(product)" class="promo-percent-pill">
+        {{ getPromotionDiscountBadge(product) }}
+      </span>
+    </div>
+
+    <div class="product-card__footer">
+      <span class="product-card__stock" *ngIf="!isServicesTab">
+        {{ product.track_inventory ? 'Inventario activo' : 'Inventario no rastreado' }}
+      </span>
+      <span class="product-card__stock" *ngIf="isServicesTab">
+        {{ getDurationLabel(product.service_duration_minutes) }}
+      </span>
+
+      <bc-action-menu label="Acciones" [iconOnly]="false">
+        <a [routerLink]="['/productos', product.id]" class="action-menu__item">Ver detalle</a>
+        <a [routerLink]="['/productos', product.id, 'editar']" class="action-menu__item">Editar</a>
+        <button type="button" class="action-menu__item" (click)="toggleProductActive(product)">
+          {{ (product.is_active ?? false) ? 'Desactivar' : 'Activar' }}
+        </button>
+        <button *ngIf="canManagePromotions && !getProductPromotion(product)" type="button" class="action-menu__item" (click)="openPromotionModal(product, 'create')">
+          Crear promoción
+        </button>
+        <button *ngIf="canManagePromotions && getProductPromotion(product)" type="button" class="action-menu__item" (click)="openPromotionModal(product, 'view')">
+          Ver promoción actual
+        </button>
+        <button *ngIf="canManagePromotions && getProductPromotion(product)" type="button" class="action-menu__item" (click)="openPromotionModal(product, 'edit')">
+          Editar promoción
+        </button>
+        <button *ngIf="canManagePromotions && getProductPromotion(product)" type="button" class="action-menu__item action-menu__item--danger" (click)="cancelPromotion(product)">
+          Cancelar promoción
+        </button>
+        <span class="action-menu__divider"></span>
+        <button type="button" class="action-menu__item action-menu__item--danger" (click)="deleteProduct(product)" [disabled]="deletingId() === product.id">
+          Eliminar
+        </button>
+      </bc-action-menu>
+    </div>
+  </article>
+</section>
+
+<div class="catalog-footer" *ngIf="!isLoading() && products().length > 0">
+  <span class="table-count">Mostrando 1 a {{ products().length }} de {{ products().length }} {{ isServicesTab ? 'servicio' : 'producto' }}{{ products().length !== 1 ? 's' : '' }}</span>
+</div>
+</ng-container>
+
+<ng-template #promotionsPanel>
+  <section id="promotions-dashboard" class="promotions-dashboard" aria-label="Panel de promociones">
+    <div *ngIf="!canManagePromotions" class="promotion-alert">
+      Solo usuarios admin pueden administrar promociones. Puedes consultar el listado, pero no crear ni modificar campañas.
+    </div>
+
+    <div class="promotion-summary-cards" *ngIf="!promotionModalOpen()">
+      <article class="promotion-summary-card promotion-summary-card--active">
+        <span class="promotion-summary-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.59 13.41 11 3.83A2.82 2.82 0 0 0 9 3H4a1 1 0 0 0-1 1v5a2.82 2.82 0 0 0 .83 2l9.58 9.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83z"/>
+            <path d="M7 7h.01"/>
+          </svg>
+        </span>
+        <div>
+          <span>Promociones activas</span>
+          <strong>{{ promotionStats().active }}</strong>
+        </div>
+      </article>
+
+      <article class="promotion-summary-card promotion-summary-card--scheduled">
+        <span class="promotion-summary-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <path d="M16 2v4"/>
+            <path d="M8 2v4"/>
+            <path d="M3 10h18"/>
+          </svg>
+        </span>
+        <div>
+          <span>Programadas</span>
+          <strong>{{ promotionStats().scheduled }}</strong>
+        </div>
+      </article>
+
+      <article class="promotion-summary-card promotion-summary-card--special">
+        <span class="promotion-summary-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 12 20 22 4 22 4 12"/>
+            <rect x="2" y="7" width="20" height="5"/>
+            <line x1="12" y1="22" x2="12" y2="7"/>
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+          </svg>
+        </span>
+        <div>
+          <span>Fechas especiales</span>
+          <strong>{{ promotionStats().special }}</strong>
+        </div>
+      </article>
+    </div>
+
+    <form *ngIf="promotionModalOpen()" id="promotion-editor" class="promotion-editor" (ngSubmit)="savePromotion()">
+      <div class="promotion-editor__header">
+        <div>
+          <h3>{{ getPromotionModalTitle() }}</h3>
+          <p>Configura una promoción comercial sin modificar inventario ni precio base.</p>
+        </div>
+        <button type="button" class="promotion-editor__cancel" (click)="closePromotionEditor()">
+          Cancelar
+        </button>
+      </div>
+
+      <div *ngIf="promotionErrorMessage()" class="promotion-alert">
+        {{ promotionErrorMessage() }}
+      </div>
+
+      <div *ngIf="promotionValidationErrors().length > 0" class="promotion-alert promotion-alert--danger">
+        <span *ngFor="let error of promotionValidationErrors()">{{ error }}</span>
+      </div>
+
+      <div class="promotion-editor__layout">
+        <section class="promotion-editor-card">
+          <h4>Producto seleccionado</h4>
+
+          <label class="promotion-field" *ngIf="!selectedEditorProduct">
+            <span>Producto o servicio</span>
+            <bc-custom-select
+              [options]="promotionProductOptions()"
+              [ngModel]="promotionForm.product_id"
+              (ngModelChange)="onPromotionProductChange($event)"
+              name="promotionProduct"
+              [disabled]="promotionModalMode() === 'view'">
+            </bc-custom-select>
+          </label>
+
+          <div class="promotion-selected-product" *ngIf="selectedEditorProduct as product">
+            <div class="promotion-selected-product__image" *ngIf="product.image_url; else noPromotionProductImage">
               <img [src]="product.image_url" [alt]="product.name">
             </div>
-            <ng-template #emptyThumb>
-              <div class="product-thumb product-thumb--empty">IMG</div>
+            <ng-template #noPromotionProductImage>
+              <div class="promotion-selected-product__image promotion-selected-product__image--empty">IMG</div>
             </ng-template>
             <div>
-              <span class="product-name">{{ product.name }}</span>
-              <span class="product-tags">
-                <span class="product-tag product-tag--type">{{ getItemTypeLabel(product) }}</span>
-                <span class="product-tag" *ngIf="!isServicesTab">{{ product.application }}</span>
-              </span>
+              <strong>{{ product.name }}</strong>
+              <span>SKU: {{ product.sku }}</span>
+              <span>{{ getCategoryLabel(product.category) }} · {{ getItemTypeLabel(product) }}</span>
+              <span>{{ (product.is_active ?? false) ? 'Activo' : 'Inactivo' }}</span>
+              <b>{{ getProductPrice(product) | currency:'MXN':'symbol-narrow':'1.2-2' }} MXN</b>
             </div>
           </div>
-        </td>
-        <td *ngIf="!isServicesTab">
-          <span class="condition-badge" [class.condition-badge--preowned]="product.product_condition === 'preowned'">
-            {{ getConditionLabel(product.product_condition) }}
-          </span>
-        </td>
-        <td>
-          <span class="category-label">{{ getCategoryLabel(product.category) }}</span>
-        </td>
-        <td class="data-table__secondary" *ngIf="!isServicesTab">
-          {{ product.brand ?? '—' }}
-          <span *ngIf="product.model"> / {{ product.model }}</span>
-        </td>
-        <td class="data-table__secondary" *ngIf="isServicesTab">{{ getDurationLabel(product.service_duration_minutes) }}</td>
-        <td *ngIf="isServicesTab">
-          <span class="visit-badge" [class.visit-badge--remote]="!product.service_requires_visit">{{ getVisitLabel(product) }}</span>
-        </td>
-        <td class="text-right data-table__price">
-          {{ product.unit_price_mxn | currency:'MXN':'symbol-narrow':'1.0-0' }}
-        </td>
-        <td>
-          <bc-status-badge
-            [label]="getStatusBadge(product.is_active ?? false).label"
-            [variant]="getStatusBadge(product.is_active ?? false).variant"
-            [showDot]="true">
-          </bc-status-badge>
-        </td>
-        <td class="text-center">
-          <div class="table-actions">
-            <a [routerLink]="['/productos', product.id]" class="btn-icon" aria-label="Ver detalle" title="Ver detalle">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-            </a>
-            <a [routerLink]="['/productos', product.id, 'editar']" class="btn-icon" aria-label="Editar" title="Editar">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-            </a>
-            <button type="button" class="btn-icon btn-icon--danger" (click)="deleteProduct(product)" [disabled]="deletingId() === product.id" aria-label="Eliminar" title="Eliminar">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-                <path d="M10 11v6"></path>
-                <path d="M14 11v6"></path>
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-              </svg>
+        </section>
+
+        <section class="promotion-editor-card">
+          <h4>Nombre de promoción</h4>
+          <label class="promotion-field">
+            <span>Nombre de promoción</span>
+            <input
+              type="text"
+              name="promotionName"
+              placeholder="Ej. Promoción Rayos X Digital GM-RX500"
+              [(ngModel)]="promotionForm.name"
+              [disabled]="promotionModalMode() === 'view'"
+              required>
+          </label>
+        </section>
+
+        <section class="promotion-editor-card">
+          <h4>Tipo de promoción</h4>
+          <div class="promotion-choice-grid">
+            <button type="button" class="promotion-choice-card" [class.promotion-choice--active]="promotionForm.promotion_kind === 'normal'" (click)="promotionForm.promotion_kind = 'normal'" [disabled]="promotionModalMode() === 'view'">
+              <strong>Promoción normal</strong>
+              <span>Descuento temporal creado manualmente.</span>
+            </button>
+            <button type="button" class="promotion-choice-card" [class.promotion-choice--active]="promotionForm.promotion_kind === 'special_campaign'" (click)="promotionForm.promotion_kind = 'special_campaign'" [disabled]="promotionModalMode() === 'view'">
+              <strong>Promoción por fecha especial</strong>
+              <span>Campaña programada como Hot Sale, Buen Fin, Navidad o fechas especiales.</span>
             </button>
           </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
 
-  <div class="table-footer">
-    <span class="table-count">{{ products().length }} {{ isServicesTab ? 'servicio' : 'producto' }}{{ products().length !== 1 ? 's' : '' }}</span>
-  </div>
-</div>
+          <div class="promotion-grid promotion-grid--compact" *ngIf="promotionForm.promotion_kind === 'special_campaign'">
+            <div class="promotion-field promotion-field--full">
+              <span>Campaña especial</span>
+              <div class="campaign-chip-grid" role="listbox" aria-label="Campaña especial">
+                <button
+                  *ngFor="let campaign of specialCampaignOptions"
+                  type="button"
+                  class="campaign-chip"
+                  [class.campaign-chip--active]="promotionForm.campaign_name === campaign"
+                  [attr.aria-pressed]="promotionForm.campaign_name === campaign"
+                  (click)="promotionForm.campaign_name = campaign"
+                  [disabled]="promotionModalMode() === 'view'">
+                  {{ campaign }}
+                </button>
+              </div>
+            </div>
+            <label class="promotion-field" *ngIf="promotionForm.campaign_name === 'Otra campaña'">
+              <span>Nombre de campaña</span>
+              <input type="text" name="promotionCustomCampaign" [(ngModel)]="promotionForm.custom_campaign_name" [disabled]="promotionModalMode() === 'view'">
+            </label>
+          </div>
+        </section>
+
+        <section class="promotion-editor-card">
+          <h4>Descuento</h4>
+          <label class="promotion-field">
+            <span>Porcentaje de descuento</span>
+            <div class="percentage-input">
+              <input
+                type="number"
+                name="promotionDiscountValue"
+                min="1"
+                max="100"
+                step="1"
+                placeholder="Ej. 15"
+                [(ngModel)]="promotionForm.discount_value"
+                [disabled]="promotionModalMode() === 'view'"
+                required>
+              <span>%</span>
+            </div>
+          </label>
+        </section>
+
+        <section class="promotion-editor-card">
+          <h4>Vigencia</h4>
+          <div class="quick-validity">
+            <button *ngFor="let option of quickValidityOptions" type="button" class="quick-validity__button" [class.quick-validity__button--active]="promotionForm.quick_validity === option.value" (click)="applyQuickValidity(option.value)" [disabled]="promotionModalMode() === 'view'">
+              {{ option.label }}
+            </button>
+          </div>
+          <div class="promotion-grid promotion-grid--dates">
+            <label class="promotion-field">
+              <span>Fecha de inicio</span>
+              <input type="date" name="promotionStartDate" [(ngModel)]="promotionForm.start_date" [disabled]="promotionModalMode() === 'view'" required>
+            </label>
+            <label class="promotion-field">
+              <span>Hora de inicio</span>
+              <input type="time" name="promotionStartTime" [(ngModel)]="promotionForm.start_time" [disabled]="promotionModalMode() === 'view'" required>
+            </label>
+            <label class="promotion-field">
+              <span>Fecha de fin</span>
+              <input type="date" name="promotionEndDate" [(ngModel)]="promotionForm.end_date" [disabled]="promotionModalMode() === 'view'" required>
+            </label>
+            <label class="promotion-field">
+              <span>Hora de fin</span>
+              <input type="time" name="promotionEndTime" [(ngModel)]="promotionForm.end_time" [disabled]="promotionModalMode() === 'view'" required>
+            </label>
+          </div>
+        </section>
+
+        <section class="promotion-editor-card">
+          <h4>Estado</h4>
+          <label class="promotion-switch">
+            <input type="checkbox" name="promotionEnabled" [(ngModel)]="promotionForm.is_enabled" [disabled]="promotionModalMode() === 'view'">
+            <span>Promoción {{ promotionForm.is_enabled ? 'activa' : 'inactiva' }}</span>
+          </label>
+        </section>
+
+        <section class="promotion-editor-card promotion-editor-card--preview">
+          <h4>Vista previa</h4>
+          <bc-status-badge [label]="getPromotionPreviewStatus().label" [variant]="getPromotionPreviewStatus().variant" [showDot]="true"></bc-status-badge>
+          <div class="promotion-preview-grid" *ngIf="selectedEditorProduct as product">
+            <span>Precio original <strong>{{ getProductPrice(product) | currency:'MXN':'symbol-narrow':'1.2-2' }} MXN</strong></span>
+            <span>Descuento aplicado <strong>{{ promotionForm.discount_value || 0 }}%</strong></span>
+            <span>Precio promocional <strong>{{ getCalculatedPromotionPrice() | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong></span>
+            <span>Ahorro del cliente <strong>{{ getPromotionPreviewSavings() | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong></span>
+          </div>
+        </section>
+
+        <section class="promotion-editor-card promotion-editor-card--wide promotion-additional">
+          <button
+            type="button"
+            class="promotion-additional__toggle"
+            [class.promotion-additional__toggle--open]="promotionAdditionalOpen()"
+            [attr.aria-expanded]="promotionAdditionalOpen()"
+            aria-controls="promotion-additional-fields"
+            (click)="promotionAdditionalOpen.set(!promotionAdditionalOpen())">
+            <span>
+              <strong>Información adicional</strong>
+              <small>Descripción comercial y notas internas opcionales.</small>
+            </span>
+            <b>{{ promotionAdditionalOpen() ? 'Cerrar' : 'Agregar' }}</b>
+          </button>
+
+          <div
+            *ngIf="promotionAdditionalOpen()"
+            id="promotion-additional-fields"
+            class="promotion-grid promotion-grid--additional">
+            <label class="promotion-field">
+              <span>Descripción comercial</span>
+              <small>Texto opcional visible para el cliente en la app o detalle del producto.</small>
+              <textarea name="promotionDescription" rows="3" [(ngModel)]="promotionForm.description" [disabled]="promotionModalMode() === 'view'"></textarea>
+            </label>
+            <label class="promotion-field">
+              <span>Notas internas</span>
+              <small>Notas privadas para administración. No visibles para el cliente.</small>
+              <textarea name="promotionInternalNotes" rows="3" [(ngModel)]="promotionForm.internal_notes" [disabled]="promotionModalMode() === 'view'"></textarea>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <div class="promotion-modal__actions">
+        <button type="button" class="btn-ghost" (click)="closePromotionEditor()">
+          {{ promotionModalMode() === 'view' ? 'Cerrar' : 'Cancelar' }}
+        </button>
+        <button *ngIf="promotionModalMode() === 'view' && canManagePromotions" type="button" class="btn-secondary" (click)="setPromotionEditMode()">Editar promoción</button>
+        <button *ngIf="promotionModalMode() !== 'view' && canManagePromotions" type="submit" class="btn-primary" [disabled]="promotionSaving()">
+          {{ promotionSaving() ? 'Guardando...' : 'Guardar promoción' }}
+        </button>
+      </div>
+    </form>
+
+    <div class="promotion-monitor" *ngIf="!promotionModalOpen()">
+      <div class="promotion-monitor__tabs" role="tablist" aria-label="Estado de promociones">
+        <button type="button" [class.promotion-monitor__tab--active]="promotionsPanelTab() === 'active'" (click)="setPromotionsPanelTab('active')">
+          Activas
+        </button>
+        <button type="button" [class.promotion-monitor__tab--active]="promotionsPanelTab() === 'scheduled'" (click)="setPromotionsPanelTab('scheduled')">
+          Programadas
+        </button>
+        <button type="button" [class.promotion-monitor__tab--active]="promotionsPanelTab() === 'special'" (click)="setPromotionsPanelTab('special')">
+          Fechas especiales
+        </button>
+        <button type="button" [class.promotion-monitor__tab--active]="promotionsPanelTab() === 'history'" (click)="setPromotionsPanelTab('history')">
+          Historial
+        </button>
+      </div>
+
+      <div class="promotion-filters">
+        <div class="filters-bar__search">
+          <span class="filters-bar__search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </span>
+          <input
+            type="search"
+            class="filters-bar__input"
+            placeholder="Buscar por producto o promoción"
+            [ngModel]="promotionsSearchTerm()"
+            (ngModelChange)="promotionsSearchTerm.set($event)"
+            aria-label="Buscar promociones">
+        </div>
+
+        <div class="promotion-filter-select">
+          <bc-custom-select
+            [options]="promotionStatusOptions"
+            [ngModel]="promotionsStatusFilter()"
+            (ngModelChange)="promotionsStatusFilter.set($event)">
+          </bc-custom-select>
+        </div>
+
+        <button *ngIf="hasPromotionFilters" type="button" class="btn-ghost btn-sm" (click)="clearPromotionFilters()">
+          Limpiar filtros
+        </button>
+      </div>
+
+      <bc-loader *ngIf="promotionsLoading()" message="Cargando promociones..."></bc-loader>
+
+      <bc-empty-state
+        *ngIf="!promotionsLoading() && filteredPromotions().length === 0"
+        title="Sin promociones"
+        description="No hay promociones reales para este segmento."
+        [hasAction]="hasPromotionFilters || canManagePromotions">
+        <button *ngIf="hasPromotionFilters" class="btn-ghost" (click)="clearPromotionFilters()">Limpiar filtros</button>
+        <button *ngIf="!hasPromotionFilters && canManagePromotions" class="btn-primary" (click)="openEmptyPromotionForm()">Crear promoción</button>
+      </bc-empty-state>
+
+      <div class="promotion-table-wrap" *ngIf="!promotionsLoading() && filteredPromotions().length > 0">
+        <table class="promotion-table" aria-label="Listado de promociones">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Promoción</th>
+              <th>Tipo</th>
+              <th>Descuento / Valor</th>
+              <th>Vigencia</th>
+              <th>Estado</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let promotion of filteredPromotions()">
+              <td>
+                <div class="promotion-product">
+                  <div class="promotion-product__thumb" *ngIf="getPromotionProduct(promotion)?.image_url; else promotionProductPlaceholder">
+                    <img [src]="getPromotionProduct(promotion)?.image_url" [alt]="getPromotionProduct(promotion)?.name || 'Producto'">
+                  </div>
+                  <ng-template #promotionProductPlaceholder>
+                    <div class="promotion-product__thumb promotion-product__thumb--empty">IMG</div>
+                  </ng-template>
+                  <div>
+                    <strong>{{ getPromotionProduct(promotion)?.name || 'Producto no disponible' }}</strong>
+                    <span>{{ getPromotionProduct(promotion)?.sku || 'SKU no disponible' }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <strong class="promotion-name">{{ promotion.name }}</strong>
+                <span class="promotion-description">{{ promotion.description || 'Sin descripción' }}</span>
+              </td>
+              <td>
+                <span class="promotion-type-pill" [class.promotion-type-pill--special]="isSpecialPromotion(promotion)">
+                  {{ isSpecialPromotion(promotion) ? 'Fecha especial' : getPromotionTypeLabel(promotion.discount_type) }}
+                </span>
+              </td>
+              <td>
+                <strong class="promotion-value">{{ getPromotionValueLabel(promotion) }}</strong>
+                <span class="promotion-description" *ngIf="promotion.discount_type !== 'percentage'">Precio final</span>
+                <span class="promotion-description" *ngIf="promotion.discount_type === 'percentage'">de descuento</span>
+              </td>
+              <td>
+                <span class="promotion-date">{{ getPromotionDateLabel(promotion.starts_at) }}</span>
+                <span class="promotion-date">{{ getPromotionDateLabel(promotion.ends_at) }}</span>
+              </td>
+              <td>
+                <bc-status-badge
+                  [label]="getPromotionStatusBadge(promotion).label"
+                  [variant]="getPromotionStatusBadge(promotion).variant"
+                  [showDot]="true">
+                </bc-status-badge>
+              </td>
+              <td class="text-center">
+                <bc-action-menu>
+                  <a *ngIf="getPromotionProduct(promotion)" [routerLink]="['/productos', getPromotionProduct(promotion)!.id]" class="action-menu__item">
+                    Ver producto
+                  </a>
+                  <button type="button" class="action-menu__item" (click)="openPromotionModalFromPromotion(promotion, 'view')">
+                    Ver promoción
+                  </button>
+                  <button
+                    *ngIf="canManagePromotions && getPromotionComputedStatus(promotion) !== 'cancelled' && getPromotionComputedStatus(promotion) !== 'expired'"
+                    type="button"
+                    class="action-menu__item"
+                    (click)="openPromotionModalFromPromotion(promotion, 'edit')">
+                    Editar promoción
+                  </button>
+                  <button
+                    *ngIf="canManagePromotions && getPromotionComputedStatus(promotion) !== 'cancelled' && getPromotionComputedStatus(promotion) !== 'expired'"
+                    type="button"
+                    class="action-menu__item"
+                    (click)="togglePromotionEnabledFromPanel(promotion)">
+                    {{ getPromotionComputedStatus(promotion) === 'inactive' ? 'Activar' : 'Desactivar' }}
+                  </button>
+                  <button
+                    *ngIf="canManagePromotions && getPromotionComputedStatus(promotion) !== 'cancelled' && getPromotionComputedStatus(promotion) !== 'expired'"
+                    type="button"
+                    class="action-menu__item action-menu__item--danger"
+                    (click)="cancelPromotionFromPanel(promotion)">
+                    Cancelar promoción
+                  </button>
+                </bc-action-menu>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</ng-template>

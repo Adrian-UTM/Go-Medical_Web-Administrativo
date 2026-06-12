@@ -106,7 +106,9 @@ export class QuotePdfListComponent {
     }
   }
 
-  async sendByEmailMock(quote: Quote): Promise<void> {
+  async shareByEmail(quote: Quote): Promise<void> {
+    if (!this.confirmShare(quote, 'correo')) return;
+
     const client = await this.quotesService.getClientById(quote.clientId) ?? null;
     const email = client?.billingEmail || client?.email;
 
@@ -121,7 +123,9 @@ export class QuotePdfListComponent {
     this.actionMessage.set(`Se abrio tu cliente de correo con la cotizacion ${quote.quoteNumber} preparada para ${quote.clientNameSnapshot}.`);
   }
 
-  async sendByWhatsappMock(quote: Quote): Promise<void> {
+  async shareByWhatsapp(quote: Quote): Promise<void> {
+    if (!this.confirmShare(quote, 'WhatsApp')) return;
+
     const client = await this.quotesService.getClientById(quote.clientId) ?? null;
     const phone = this.normalizePhone(client?.phone);
 
@@ -183,6 +187,10 @@ export class QuotePdfListComponent {
       `Vigencia: ${this.formatDate(quote.validUntil)}.`,
       'Quedamos atentos para cualquier comentario o confirmacion.',
     ].join(' ');
+  }
+
+  private confirmShare(quote: Quote, channel: string): boolean {
+    return window.confirm(`Preparar ${channel} para la cotizacion ${quote.quoteNumber}?`);
   }
 
   private normalizePhone(phone?: string): string {

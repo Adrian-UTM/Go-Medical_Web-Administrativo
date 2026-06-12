@@ -36,12 +36,15 @@ export interface InventoryStock {
   sku: string;
   productName: string;
   productCategory: ProductCategory;
+  brand?: string;
+  model?: string;
   currentStock: number;
   minStock: number;
   maxStock: number;
   unit: InventoryUnit;
   warehouseName: string;
   updatedAt: string;
+  productImageUrl?: string;
 }
 
 export interface InventoryMovement {
@@ -59,6 +62,7 @@ export interface InventoryMovement {
   notes: string;
   createdAt: string;
   createdBy: string;
+  warehouseName?: string;
 }
 
 export interface InventoryStockFilters {

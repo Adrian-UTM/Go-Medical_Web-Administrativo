@@ -19,7 +19,7 @@ export class ProductSupabaseService {
         *,
         media:product_media(file_path, is_primary)
       `)
-      .order('created_at', { ascending: false });
+      .order('name', { ascending: true });
 
     if (filters?.search) {
       query = query.or(`name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%`);
@@ -36,6 +36,8 @@ export class ProductSupabaseService {
       query = query.or('product_condition.eq.new,product_condition.is.null');
     } else if (filters?.product_condition === ProductCondition.Preowned) {
       query = query.eq('product_condition', ProductCondition.Preowned);
+    } else if (filters?.product_condition === ProductCondition.Remanufactured) {
+      query = query.eq('product_condition', ProductCondition.Remanufactured);
     }
     if (filters?.is_active !== undefined) {
       query = query.eq('is_active', filters.is_active);
@@ -142,8 +144,9 @@ export class ProductSupabaseService {
     const itemType = this.cleanText(source['item_type']) === ProductItemType.Service
       ? ProductItemType.Service
       : ProductItemType.Product;
+    const rawCondition = this.cleanText(source['product_condition']);
     const productCondition = itemType === ProductItemType.Product
-      ? (this.cleanText(source['product_condition']) === ProductCondition.Preowned ? ProductCondition.Preowned : ProductCondition.New)
+      ? (rawCondition === ProductCondition.Preowned ? ProductCondition.Preowned : (rawCondition === ProductCondition.Remanufactured ? ProductCondition.Remanufactured : ProductCondition.New))
       : null;
 
     const payload: Record<string, any> = {
@@ -175,13 +178,13 @@ export class ProductSupabaseService {
       service_requires_visit: itemType === ProductItemType.Service ? !!source['service_requires_visit'] : false,
       service_includes: itemType === ProductItemType.Service ? this.cleanText(source['service_includes']) : null,
       service_notes: itemType === ProductItemType.Service ? this.cleanText(source['service_notes']) : null,
-      physical_condition: productCondition === ProductCondition.Preowned ? this.cleanText(source['physical_condition']) : null,
-      functional_condition: productCondition === ProductCondition.Preowned ? this.cleanText(source['functional_condition']) : null,
-      inspection_date: productCondition === ProductCondition.Preowned ? this.cleanText(source['inspection_date']) : null,
-      warranty_days: productCondition === ProductCondition.Preowned ? this.toNumber(source['warranty_days'], true) : null,
-      condition_notes: productCondition === ProductCondition.Preowned ? this.cleanText(source['condition_notes']) : null,
-      serial_number: productCondition === ProductCondition.Preowned ? this.cleanText(source['serial_number']) : null,
-      included_accessories: productCondition === ProductCondition.Preowned ? this.cleanText(source['included_accessories']) : null,
+      physical_condition: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.cleanText(source['physical_condition']) : null,
+      functional_condition: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.cleanText(source['functional_condition']) : null,
+      inspection_date: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.cleanText(source['inspection_date']) : null,
+      warranty_days: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.toNumber(source['warranty_days'], true) : null,
+      condition_notes: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.cleanText(source['condition_notes']) : null,
+      serial_number: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.cleanText(source['serial_number']) : null,
+      included_accessories: (productCondition === ProductCondition.Preowned || productCondition === ProductCondition.Remanufactured) ? this.cleanText(source['included_accessories']) : null,
     };
 
     delete payload['id'];

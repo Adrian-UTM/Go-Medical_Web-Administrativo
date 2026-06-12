@@ -1,141 +1,303 @@
-<bc-page-header
-  title="Tickets / Soporte tecnico"
-  subtitle="Registro y seguimiento administrativo de fallas, garantias, revisiones e instalaciones"
-  [breadcrumbs]="[{ label: 'Inicio', routerLink: '/dashboard' }, { label: 'Tickets' }]">
-  <a routerLink="/tickets/nuevo" class="btn-primary">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-    Nuevo ticket
-  </a>
-</bc-page-header>
-
-<div class="filters-bar">
-  <div class="filters-bar__search">
-    <span class="filters-bar__search-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<section class="tickets-screen">
+  <div class="tickets-topbar">
+    <div class="tickets-search">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-    </span>
-    <input
-      type="search"
-      class="filters-bar__input"
-      placeholder="Buscar por ticket, cliente, titulo, producto o tecnico..."
-      [ngModel]="searchQuery()"
-      (ngModelChange)="searchQuery.set($event)"
-      aria-label="Buscar tickets">
+      <input
+        type="search"
+        placeholder="Buscar servicios o técnicos..."
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        aria-label="Buscar servicios técnicos">
+    </div>
+
   </div>
 
-  <div class="filters-bar__select">
-    <bc-custom-select
-      [options]="statusOptions"
-      [ngModel]="selectedStatus()"
-      (ngModelChange)="selectedStatus.set($event)"
-      placeholder="Todos los estados">
-    </bc-custom-select>
+  <div class="tickets-heading">
+    <div>
+      <p class="tickets-breadcrumb">Mantenimiento <span>/</span> Gestión de Servicios</p>
+      <h1>Servicios Técnicos</h1>
+    </div>
+    <div class="tickets-actions">
+
+      <div class="report-dropdown-wrapper" style="position: relative;">
+        <button type="button" class="btn-report" (click)="isReportMenuOpen.set(!isReportMenuOpen())" title="Generar Reporte">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Reporte
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 2px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <div *ngIf="isReportMenuOpen()" class="report-dropdown-menu">
+          <button type="button" class="report-dropdown-item" (click)="generateReport('day')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Del Día
+          </button>
+          <button type="button" class="report-dropdown-item" (click)="generateReport('week')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+            De la Semana
+          </button>
+          <button type="button" class="report-dropdown-item" (click)="generateReport('month')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="8" y="14" width="8" height="4" rx="1"/></svg>
+            Del Mes
+          </button>
+        </div>
+      </div>
+      <a routerLink="/tickets/nuevo" class="btn-new">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nueva Solicitud
+      </a>
+    </div>
   </div>
 
-  <div class="filters-bar__select">
-    <bc-custom-select
-      [options]="priorityOptions"
-      [ngModel]="selectedPriority()"
-      (ngModelChange)="selectedPriority.set($event)"
-      placeholder="Todas las prioridades">
-    </bc-custom-select>
+  <div *ngIf="errorMessage()" class="error-banner" role="alert">
+    {{ errorMessage() }}
   </div>
 
-  <div class="filters-bar__select">
-    <bc-custom-select
-      [options]="typeOptions"
-      [ngModel]="selectedType()"
-      (ngModelChange)="selectedType.set($event)"
-      placeholder="Todos los tipos">
-    </bc-custom-select>
-  </div>
+  <div class="tickets-dashboard">
+    <div class="summary-stack" aria-label="Resumen de servicios técnicos">
+      <article *ngFor="let card of summaryCards()" class="summary-card" [ngClass]="'summary-card--' + card.tone">
+        <div class="summary-icon">
+          <svg *ngIf="card.tone === 'primary'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <svg *ngIf="card.tone === 'success'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <svg *ngIf="card.tone === 'danger'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="2" x2="12" y2="14"/>
+            <line x1="12" y1="20" x2="12.01" y2="20"/>
+          </svg>
+          <svg *ngIf="card.tone === 'warning'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
+        <div class="summary-body">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </div>
+        <span class="summary-hint">{{ card.hint }}</span>
+      </article>
+    </div>
 
-  <button *ngIf="hasActiveFilters()" class="btn-ghost btn-sm" (click)="clearFilters()">
-    Limpiar filtros
-  </button>
-</div>
+    <section class="routes-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3v12"/>
+            <circle cx="6" cy="17" r="2"/>
+            <path d="M18 21V9"/>
+            <circle cx="18" cy="7" r="2"/>
+            <path d="M6 5h7a5 5 0 0 1 5 5"/>
+          </svg>
+          <h2>Rutas Técnicas por Ciudad</h2>
+        </div>
+        <span class="active-routes">{{ cityRouteGroups().length }} Rutas Activas</span>
+      </div>
 
-<bc-loader *ngIf="isLoading()" message="Cargando tickets de soporte..."></bc-loader>
+      <div *ngIf="cityRouteGroups().length === 0" class="inline-empty">
+        No hay solicitudes con ubicación suficiente para agrupar rutas.
+      </div>
 
-<bc-empty-state
-  *ngIf="!isLoading() && filteredTickets().length === 0"
-  title="Sin tickets"
-  description="No se encontraron tickets con los filtros aplicados."
-  [hasAction]="hasActiveFilters()">
-  <button *ngIf="hasActiveFilters()" class="btn-ghost" (click)="clearFilters()">Limpiar filtros</button>
-</bc-empty-state>
-
-<div class="table-wrapper" *ngIf="!isLoading() && filteredTickets().length > 0">
-  <table class="data-table" aria-label="Listado de tickets de soporte">
-    <thead>
-      <tr>
-        <th scope="col">Ticket</th>
-        <th scope="col">Cliente</th>
-        <th scope="col">Tipo</th>
-        <th scope="col">Prioridad</th>
-        <th scope="col">Estado</th>
-        <th scope="col">Producto / equipo</th>
-        <th scope="col">Fecha solicitud</th>
-        <th scope="col">Tecnico</th>
-        <th scope="col" class="text-center">Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let ticket of filteredTickets()" class="data-table__row">
-        <td class="data-table__name">
-          <span class="ticket-number">{{ ticket.ticketNumber }}</span>
-          <span class="ticket-meta">{{ ticket.title }}</span>
-        </td>
-        <td class="data-table__name">
-          <span class="ticket-client">{{ ticket.clientNameSnapshot }}</span>
-        </td>
-        <td class="data-table__secondary">{{ getTypeLabel(ticket.type) }}</td>
-        <td>
-          <bc-status-badge
-            [label]="getPriorityBadge(ticket.priority).label"
-            [variant]="getPriorityBadge(ticket.priority).variant"
-            [showDot]="true">
-          </bc-status-badge>
-        </td>
-        <td>
-          <bc-status-badge
-            [label]="getStatusBadge(ticket.status).label"
-            [variant]="getStatusBadge(ticket.status).variant"
-            [showDot]="true">
-          </bc-status-badge>
-        </td>
-        <td>
-          <span class="ticket-related">{{ getRelatedAsset(ticket) }}</span>
-        </td>
-        <td class="data-table__secondary">{{ ticket.requestedAt | date:'dd/MM/yyyy' }}</td>
-        <td class="data-table__secondary">{{ ticket.assignedTechnicianName || 'Sin asignar' }}</td>
-        <td class="text-center">
-          <div class="table-actions">
-            <a [routerLink]="['/tickets', ticket.id]" class="btn-icon" aria-label="Ver detalle" title="Ver detalle">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-            </a>
-            <a [routerLink]="['/tickets', ticket.id, 'editar']" class="btn-icon" aria-label="Editar ticket" title="Editar ticket">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-            </a>
+      <div *ngIf="cityRouteGroups().length > 0" class="routes-grid">
+        <article
+          *ngFor="let route of cityRouteGroups()"
+          class="route-card"
+          [ngClass]="getRouteCardClass(route)">
+          <div class="route-card__head">
+            <div>
+              <strong>{{ route.city }}, {{ route.state }}</strong>
+              <span class="route-badge">{{ getRouteBadge(route).label }}</span>
+            </div>
+            <svg *ngIf="route.routeStatus === 'pending'" class="route-warning" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
           </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
 
-  <div class="table-footer">
-    <span class="table-count">{{ filteredTickets().length }} ticket{{ filteredTickets().length !== 1 ? 's' : '' }} registrado{{ filteredTickets().length !== 1 ? 's' : '' }}</span>
+          <p>{{ getRouteMessage(route) }}</p>
+
+          <div class="route-metric">
+            <span>{{ route.routeStatus === 'local' ? 'Servicios pendientes:' : 'Equipos actuales:' }}</span>
+            <strong>{{ route.routeStatus === 'local' ? route.count : route.count + '/3' }}</strong>
+          </div>
+          <div class="route-progress">
+            <span [style.width.%]="getRouteProgress(route)"></span>
+          </div>
+
+          <div class="route-card__footer">
+            <span>{{ getPriorityBadge(route.highestPriority).label }}</span>
+            <button type="button" *ngIf="shouldShowAction(route)">{{ getRouteActionLabel(route) }}</button>
+          </div>
+        </article>
+      </div>
+    </section>
   </div>
-</div>
+
+  <section class="services-panel">
+    <div class="table-toolbar">
+      <h2>Listado General de Servicios</h2>
+      <div class="table-filters">
+        <bc-custom-select
+          [options]="quickFilterOptions"
+          [ngModel]="selectedQuickFilter()"
+          (ngModelChange)="selectedQuickFilter.set($event)"
+          placeholder="Vista: Todos">
+        </bc-custom-select>
+        <bc-custom-select
+          [options]="statusOptions"
+          [ngModel]="selectedStatus()"
+          (ngModelChange)="selectedStatus.set($event)"
+          placeholder="Todos los Estados">
+        </bc-custom-select>
+        <bc-custom-select
+          [options]="priorityOptions"
+          [ngModel]="selectedPriority()"
+          (ngModelChange)="selectedPriority.set($event)"
+          placeholder="Prioridad: Todas">
+        </bc-custom-select>
+        <button *ngIf="hasActiveFilters()" type="button" class="btn-clear" (click)="clearFilters()">Limpiar</button>
+      </div>
+    </div>
+
+    <bc-loader *ngIf="isLoading()" message="Cargando servicios técnicos..."></bc-loader>
+
+    <bc-empty-state
+      *ngIf="!isLoading() && filteredTickets().length === 0"
+      title="Sin tickets"
+      description="No se encontraron servicios técnicos con los filtros aplicados."
+      [hasAction]="hasActiveFilters()">
+      <button *ngIf="hasActiveFilters()" class="btn-clear" (click)="clearFilters()">Limpiar filtros</button>
+    </bc-empty-state>
+
+    <!-- Click overlay to close popover -->
+    <div *ngIf="activeActionTicketId()" class="popover-backdrop" (click)="closeActionsMenu()"></div>
+
+    <div class="table-wrapper" *ngIf="!isLoading() && filteredTickets().length > 0">
+      <table class="services-table" aria-label="Listado general de servicios técnicos" style="table-layout: fixed; width: 100%;">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 8%">Folio</th>
+            <th scope="col" style="width: 16%; text-align: center;">Cliente</th>
+            <th scope="col" style="width: 14%">Equipo</th>
+            <th scope="col" style="width: 11%">Ciudad</th>
+            <th scope="col" style="width: 9%">Fecha</th>
+            <th scope="col" style="width: 14%; text-align: center;">Ingeniero</th>
+            <th scope="col" style="width: 9%; text-align: center;">Prioridad</th>
+            <th scope="col" style="width: 10%; text-align: center;">Estado</th>
+            <th scope="col" style="width: 9%; text-align: center;">Notif.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ticket of filteredTickets()" (click)="viewTicketDetails(ticket.id)" class="clickable-row">
+            <!-- FOLIO -->
+            <td class="folio-cell" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" (click)="$event.stopPropagation(); viewTicketDetails(ticket.id)">
+              <span class="folio-number">{{ ticket.ticketNumber }}</span>
+              <span class="folio-date">{{ ticket.requestedAt | date:'dd/MM/yy' }}</span>
+            </td>
+
+            <!-- CLIENTE -->
+            <td>
+              <div class="client-cell">
+                <span class="client-avatar">{{ getClientInitials(ticket) }}</span>
+                <div>
+                  <strong>{{ ticket.clientNameSnapshot }}</strong>
+                </div>
+              </div>
+            </td>
+
+            <!-- EQUIPO -->
+            <td>
+              <strong class="asset-name">{{ ticket.productNameSnapshot || 'Sin asociar' }}</strong>
+              <span class="asset-serial">SN: {{ ticket.equipmentSerialNumber || 'Sin serie' }}</span>
+            </td>
+
+            <!-- CIUDAD -->
+            <td>
+              <strong class="city-name">{{ getLocationLabel(ticket) }}</strong>
+              <span class="location-badge" [ngClass]="getLocationBadgeClass(ticket)">{{ getLocationBadgeLabel(ticket) }}</span>
+            </td>
+
+            <!-- FECHA -->
+            <td class="date-cell">{{ getOperationalDate(ticket) | date:'dd MMM yyyy' }}</td>
+
+            <!-- INGENIERO -->
+            <td>
+              <div class="engineer-cell" [class.engineer-cell--empty]="!ticket.assignedTechnicianName">
+                <span class="engineer-avatar">{{ ticket.assignedTechnicianName ? ticket.assignedTechnicianName.charAt(0).toUpperCase() : '--' }}</span>
+                <strong>{{ ticket.assignedTechnicianName || 'Sin asignar' }}</strong>
+              </div>
+            </td>
+
+            <!-- PRIORIDAD -->
+            <td style="text-align: center;">
+              <bc-status-badge
+                [label]="getPriorityBadge(ticket.priority).label"
+                [variant]="getPriorityBadge(ticket.priority).variant"
+                [showDot]="false"
+                size="sm">
+              </bc-status-badge>
+            </td>
+
+            <!-- ESTADO -->
+            <td style="text-align: center;">
+              <bc-status-badge
+                [label]="getStatusBadge(ticket.status).label"
+                [variant]="getStatusBadge(ticket.status).variant"
+                [showDot]="true"
+                size="sm">
+              </bc-status-badge>
+            </td>
+
+            <!-- NOTIFICACIONES -->
+            <td class="notif-cell" style="text-align: center;">
+              <span [ngClass]="getNotificationLabel(ticket).cls">
+                <!-- Con notificaciones: campana con dot + cantidad -->
+                <ng-container *ngIf="getNotificationLabel(ticket).count > 0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                  {{ getNotificationLabel(ticket).text }}
+                </ng-container>
+
+                <!-- Sin notificaciones: solo campana gris/clara -->
+                <ng-container *ngIf="getNotificationLabel(ticket).count === 0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                </ng-container>
+              </span>
+            </td>
+
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="table-footer">
+        <span>Mostrando {{ filteredTickets().length }} de {{ tickets().length }} servicios</span>
+      </div>
+    </div>
+  </section>
+</section>

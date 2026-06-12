@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -30,12 +30,13 @@ import { PageVisibilityService } from '../../../../core/services/page-visibility
   templateUrl: './opportunity-list.component.html',
   styleUrl: './opportunity-list.component.css',
 })
-export class OpportunityListComponent implements OnInit {
+export class OpportunityListComponent implements OnInit, OnDestroy {
   private readonly opportunitiesService = inject(OpportunitiesSupabaseService);
   private readonly pageVisibility = inject(PageVisibilityService);
   private readonly destroyRef = inject(DestroyRef);
 
   private loadInFlight = false;
+  private pollingIntervalId: any;
 
   readonly isLoading = signal(false);
   readonly errorMessage = signal('');
@@ -113,6 +114,28 @@ export class OpportunityListComponent implements OnInit {
       .subscribe(() => {
         void this.loadOpportunities();
       });
+
+    this.startPolling();
+  }
+
+  ngOnDestroy(): void {
+    this.stopPolling();
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+    this.pollingIntervalId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void this.loadOpportunities();
+      }
+    }, 60000);
+  }
+
+  private stopPolling(): void {
+    if (this.pollingIntervalId) {
+      clearInterval(this.pollingIntervalId);
+      this.pollingIntervalId = undefined;
+    }
   }
 
   async loadOpportunities(): Promise<void> {
@@ -182,17 +205,22 @@ export class OpportunityListComponent implements OnInit {
 
   getTimeWithoutFinishing(opportunity: Opportunity): string {
     const diffMs = Math.max(0, Date.now() - new Date(opportunity.abandonedAt).getTime());
-    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days} día${days === 1 ? '' : 's'}`;
+      return `Hace ${days} día${days === 1 ? '' : 's'}`;
     }
 
     if (hours > 0) {
-      return `${hours} h`;
+      return `Hace ${hours} hora${hours === 1 ? '' : 's'}`;
     }
 
-    return 'Menos de 1 h';
+    if (minutes > 0) {
+      return `Hace ${minutes} minuto${minutes === 1 ? '' : 's'}`;
+    }
+
+    return 'Hace unos instantes';
   }
 }

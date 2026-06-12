@@ -69,8 +69,8 @@
         <button type="button" class="btn-primary" (click)="downloadPdf()" [disabled]="isGeneratingPdf()">
           {{ isGeneratingPdf() ? 'Generando...' : 'Descargar PDF' }}
         </button>
-        <button type="button" class="btn-secondary btn-secondary--block" (click)="sendByEmailMock()">Compartir por correo</button>
-        <button type="button" class="btn-ghost btn-ghost--block" (click)="sendByWhatsappMock()">Compartir por WhatsApp</button>
+        <button type="button" class="btn-secondary btn-secondary--block" (click)="openSendModal('email')">Compartir por correo</button>
+        <button type="button" class="btn-ghost btn-ghost--block" (click)="openSendModal('whatsapp')">Compartir por WhatsApp</button>
       </div>
     </div>
   </div>
@@ -78,8 +78,8 @@
   <div class="detail-layout">
     <div class="detail-card">
       <div class="detail-card__header">
-        <h2 class="detail-card__title">Resumen comercial</h2>
-        <span class="detail-card__subtitle">Detalle de conceptos, vigencia y condiciones de la cotizacion</span>
+        <h2 class="detail-card__title">Conceptos de la cotizacion</h2>
+        <span class="detail-card__subtitle">{{ quote()!.items.length }} concepto{{ quote()!.items.length !== 1 ? 's' : '' }} registrados</span>
       </div>
 
       <div class="table-wrapper">
@@ -88,8 +88,9 @@
             <tr>
               <th scope="col">SKU</th>
               <th scope="col">Concepto</th>
-              <th scope="col" class="text-center">Cantidad</th>
-              <th scope="col" class="text-right">Precio</th>
+              <th scope="col" class="text-center">Cant.</th>
+              <th scope="col" class="text-right">Precio unit.</th>
+              <th scope="col" class="text-right">Bruto</th>
               <th scope="col" class="text-right">Descuento</th>
               <th scope="col" class="text-right">Importe</th>
             </tr>
@@ -100,6 +101,7 @@
               <td><span class="item-name">{{ item.productName }}</span></td>
               <td class="text-center">{{ item.quantity }}</td>
               <td class="text-right">{{ item.unitPrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+              <td class="text-right data-table__secondary">{{ item.grossLinePrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
               <td class="text-right data-table__secondary">{{ item.discount ? (item.discount | currency:'MXN':'symbol-narrow':'1.2-2') : '—' }}</td>
               <td class="text-right item-total">{{ item.totalLinePrice | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
             </tr>
@@ -120,12 +122,24 @@
     </div>
 
     <aside class="totals-card">
-      <div class="totals-card__section">
+      <div class="totals-card__section totals-card__section--muted">
+        <span class="totals-card__label">Subtotal bruto</span>
+        <span>{{ quote()!.grossSubtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+      </div>
+      <div class="totals-card__section totals-card__section--discount" *ngIf="quote()!.itemsDiscount > 0">
+        <span class="totals-card__label">— Desc. por conceptos</span>
+        <span>{{ quote()!.itemsDiscount | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+      </div>
+      <div class="totals-card__section totals-card__section--discount" *ngIf="quote()!.discount > 0">
+        <span class="totals-card__label">— Desc. general</span>
+        <span>{{ quote()!.discount | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+      </div>
+      <div class="totals-card__section totals-card__section--sub">
         <span class="totals-card__label">Subtotal</span>
         <strong>{{ quote()!.subtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
       </div>
       <div class="totals-card__section">
-        <span class="totals-card__label">IVA <span class="totals-card__meta">{{ quote()!.tax_pct * 100 | number:'1.0-0' }}%</span></span>
+        <span class="totals-card__label">IVA <span class="totals-card__meta">{{ quote()!.taxExempt ? 'Exento' : (quote()!.tax_pct * 100 | number:'1.0-0') + '%' }}</span></span>
         <strong>{{ quote()!.tax | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
       </div>
       <div class="totals-card__section totals-card__section--grand">
@@ -135,6 +149,7 @@
     </aside>
   </div>
 
+  <!-- PDF PREVIEW MODAL -->
   <div *ngIf="isPreviewOpen()" class="preview-overlay" (click)="closePdfPreview()">
     <section class="preview-modal" (click)="$event.stopPropagation()">
       <header class="preview-bar">
@@ -203,9 +218,9 @@
           <thead>
             <tr>
               <th>SKU</th>
-              <th>Producto</th>
-              <th>Cantidad</th>
-              <th>Precio unitario</th>
+              <th>Producto / Servicio</th>
+              <th>Cant.</th>
+              <th>Precio unit.</th>
               <th>Descuento</th>
               <th>Importe</th>
             </tr>
@@ -238,12 +253,24 @@
           </div>
 
           <aside class="sheet-totals">
+            <div class="sheet-total-row sheet-total-row--muted" *ngIf="quote()!.itemsDiscount > 0 || quote()!.discount > 0">
+              <span>Subtotal bruto</span>
+              <span>{{ quote()!.grossSubtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+            </div>
+            <div class="sheet-total-row sheet-total-row--discount" *ngIf="quote()!.itemsDiscount > 0">
+              <span>— Desc. por conceptos</span>
+              <span>{{ quote()!.itemsDiscount | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+            </div>
+            <div class="sheet-total-row sheet-total-row--discount" *ngIf="quote()!.discount > 0">
+              <span>— Desc. general</span>
+              <span>{{ quote()!.discount | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+            </div>
             <div class="sheet-total-row">
               <span>Subtotal</span>
               <strong>{{ quote()!.subtotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
             </div>
             <div class="sheet-total-row">
-              <span>IVA ({{ quote()!.tax_pct * 100 | number:'1.0-0' }}%)</span>
+              <span>IVA ({{ quote()!.taxExempt ? 'Exento' : (quote()!.tax_pct * 100 | number:'1.0-0') + '%' }})</span>
               <strong>{{ quote()!.tax | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
             </div>
             <div class="sheet-total-row sheet-total-row--grand">
@@ -263,12 +290,97 @@
       </article>
     </section>
   </div>
+
+  <!-- SEND MODAL -->
+  <div *ngIf="sendModalOpen()" class="preview-overlay send-overlay" (click)="closeSendModal()">
+    <section class="send-modal" (click)="$event.stopPropagation()">
+      <header class="preview-bar">
+        <div>
+          <h2 class="preview-bar__title">{{ sendChannel() === 'email' ? 'Enviar por correo' : 'Enviar por WhatsApp' }}</h2>
+          <p class="preview-bar__copy">{{ selectedAttachmentCount() }} documento{{ selectedAttachmentCount() !== 1 ? 's' : '' }} seleccionado{{ selectedAttachmentCount() !== 1 ? 's' : '' }} para preparar el mensaje.</p>
+        </div>
+        <button type="button" class="btn-ghost" (click)="closeSendModal()">Cerrar</button>
+      </header>
+
+      <div class="send-modal__body">
+        <div class="docs-section__header docs-section__header--compact">
+          <h3 class="docs-section__title">Documentos adjuntos</h3>
+          <button
+            *ngIf="selectedProductDocuments().length > 0"
+            type="button"
+            class="btn-secondary"
+            (click)="downloadSelectedDocuments()">
+            Descargar documentos
+          </button>
+        </div>
+
+        <p *ngIf="hasMissingProductDocuments()" class="docs-warning">Algunos productos no tienen ficha técnica adjunta.</p>
+
+        <div class="send-doc-list">
+          <label class="send-doc-card" [class.send-doc-card--selected]="includeQuotePdf()">
+            <input
+              type="checkbox"
+              class="doc-card__check"
+              [checked]="includeQuotePdf()"
+              (change)="toggleQuotePdf()">
+            <div class="doc-card__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 21h10a2 2 0 0 0 2-2V9.414a1 1 0 0 0-.293-.707l-5.414-5.414A1 1 0 0 0 12.586 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"/>
+                <path d="M12 3v6h6"/>
+              </svg>
+            </div>
+            <div class="send-doc-card__body">
+              <span class="doc-card__title">Cotizacion PDF</span>
+              <span class="doc-card__meta">{{ quote()!.quoteNumber }} · {{ getQuotePdfAttachmentHint() }}</span>
+              <span class="doc-card__type-badge">PDF</span>
+            </div>
+          </label>
+
+          <ng-container *ngIf="productDocuments().length > 0; else noSendDocs">
+            <label
+              *ngFor="let doc of productDocuments()"
+              class="send-doc-card"
+              [class.send-doc-card--selected]="isDocumentSelected(doc.id)">
+              <input
+                type="checkbox"
+                class="doc-card__check"
+                [checked]="isDocumentSelected(doc.id)"
+                (change)="toggleDocument(doc.id)">
+              <div class="doc-card__icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path [attr.d]="getDocumentTypeIcon(doc.documentType)"/>
+                </svg>
+              </div>
+              <div class="send-doc-card__body">
+                <span class="doc-card__title">{{ doc.title }}</span>
+                <span class="doc-card__meta">{{ doc.productName }}</span>
+                <span class="doc-card__type-badge">{{ getDocumentTypeLabel(doc.documentType) }}</span>
+              </div>
+            </label>
+          </ng-container>
+
+          <ng-template #noSendDocs>
+            <p class="docs-empty docs-empty--inline">No hay brochures o fichas tecnicas publicas para los productos seleccionados.</p>
+          </ng-template>
+        </div>
+      </div>
+
+      <footer class="send-modal__actions">
+        <button type="button" class="btn-ghost" (click)="closeSendModal()">Cancelar</button>
+        <button type="button" class="btn-secondary" (click)="confirmSendQuote()">Enviar cotizacion</button>
+        <button
+          type="button"
+          class="btn-primary"
+          (click)="confirmSendQuoteWithDocuments()"
+          [disabled]="selectedProductDocuments().length === 0">
+          Enviar cotizacion con documentos
+        </button>
+      </footer>
+    </section>
+  </div>
 </ng-container>
 
 <div *ngIf="!isLoading() && !quote()" class="not-found">
   <p>La cotizacion no fue encontrada.</p>
   <a routerLink="/cotizaciones" class="btn-ghost">← Volver a cotizaciones</a>
 </div>
-
-
-

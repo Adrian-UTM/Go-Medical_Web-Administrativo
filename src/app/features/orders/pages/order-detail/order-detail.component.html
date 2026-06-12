@@ -56,6 +56,7 @@
         <a *ngIf="canRegisterReturn()" [routerLink]="['/pedidos', order()!.id, 'devolucion', 'nueva']" class="btn-secondary btn-secondary--block">Registrar devolucion</a>
         <button *ngIf="canMarkAsPaid()" type="button" class="btn-primary btn-primary--block" (click)="markAsPaid()">Marcar como pagado</button>
         <button *ngIf="canMarkAsShipped()" type="button" class="btn-secondary btn-secondary--block" (click)="markAsShipped()">Marcar como enviado</button>
+        <button *ngIf="canMarkAsDelivered()" type="button" class="btn-secondary btn-secondary--block" (click)="markAsDelivered()">Marcar como entregado</button>
         <button *ngIf="canCancelOrder()" type="button" class="btn-danger btn-danger--block" (click)="cancelOrderFromAction()" [disabled]="isCanceling()">
           <span *ngIf="!isCanceling()">Cancelar pedido</span>
           <span *ngIf="isCanceling()">Cancelando...</span>

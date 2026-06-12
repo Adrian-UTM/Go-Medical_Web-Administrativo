@@ -1,5 +1,6 @@
-import { Component, Input, Output, EventEmitter, inject, OnInit } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, DestroyRef, Input, Output, EventEmitter, inject, OnInit, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgFor, NgIf, NgClass } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
@@ -37,11 +38,6 @@ const NAV_GROUPS: NavGroup[] = [
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`
       },
       {
-        label: 'Inventario',
-        route: '/inventario',
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`
-      },
-      {
         label: 'Clientes',
         route: '/clientes',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
@@ -64,12 +60,12 @@ const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
-    label: 'SERVICIOS TÉCNICOS',
+    label: 'OPERACIÓN INTERNA',
     items: [
       {
-        label: 'Tickets',
-        route: '/tickets',
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/><path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/><path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/><path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/><path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/><path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/></svg>`
+        label: 'Inventario',
+        route: '/inventario',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`
       },
       {
         label: 'Documentos',
@@ -82,6 +78,16 @@ const NAV_GROUPS: NavGroup[] = [
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`
       },
     ]
+  },
+  {
+    label: 'SERVICIO TÉCNICO',
+    items: [
+      {
+        label: 'Tickets',
+        route: '/tickets',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/><path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/><path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/><path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/><path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/><path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/></svg>`
+      },
+    ],
   },
 ];
 
@@ -121,9 +127,33 @@ const NAV_GROUPS: NavGroup[] = [
 
       <!-- Nav Groups -->
       <nav class="sidebar__nav" aria-label="Menú principal">
-        <div *ngFor="let group of navGroups" class="sidebar__group">
-          <div *ngIf="!collapsed" class="sidebar__group-label">{{ group.label }}</div>
-          <ul class="sidebar__nav-list">
+        <div
+          *ngFor="let group of navGroups"
+          class="sidebar__group"
+          [class.sidebar__group--active]="isGroupActive(group)">
+          <button
+            *ngIf="!collapsed"
+            type="button"
+            class="sidebar__group-toggle"
+            [attr.aria-expanded]="isGroupOpen(group)"
+            (click)="toggleGroup(group.label)">
+            <span>{{ group.label }}</span>
+            <svg
+              class="sidebar__group-chevron"
+              [class.sidebar__group-chevron--open]="isGroupOpen(group)"
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <ul class="sidebar__nav-list" *ngIf="collapsed || isGroupOpen(group)">
             <li *ngFor="let item of group.items" class="sidebar__nav-item">
               <a
                 [routerLink]="item.route"
@@ -153,6 +183,10 @@ export class SidebarComponent implements OnInit {
   @Output() toggleCollapse = new EventEmitter<void>();
 
   private sanitizer = inject(DomSanitizer);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly expandedGroups = signal<Set<string>>(new Set());
   navGroups: NavGroup[] = [];
 
   ngOnInit() {
@@ -163,5 +197,50 @@ export class SidebarComponent implements OnInit {
         safeIcon: this.sanitizer.bypassSecurityTrustHtml(item.icon)
       }))
     }));
+    this.expandedGroups.set(new Set(this.navGroups.map(group => group.label)));
+    this.openActiveGroup();
+
+    this.router.events
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(event => {
+        if (event instanceof NavigationEnd) {
+          this.openActiveGroup();
+        }
+      });
+  }
+
+  toggleGroup(label: string): void {
+    const next = new Set(this.expandedGroups());
+    if (next.has(label)) {
+      next.delete(label);
+    } else {
+      next.add(label);
+    }
+    this.expandedGroups.set(next);
+  }
+
+  isGroupOpen(group: NavGroup): boolean {
+    return this.expandedGroups().has(group.label) || this.isGroupActive(group);
+  }
+
+  isGroupActive(group: NavGroup): boolean {
+    const currentUrl = this.router.url.split('?')[0].split('#')[0];
+    return group.items.some(item => {
+      if (item.exact) {
+        return currentUrl === item.route;
+      }
+      return currentUrl === item.route || currentUrl.startsWith(`${item.route}/`);
+    });
+  }
+
+  private openActiveGroup(): void {
+    const activeGroup = this.navGroups.find(group => this.isGroupActive(group));
+    if (!activeGroup || this.expandedGroups().has(activeGroup.label)) {
+      return;
+    }
+
+    const next = new Set(this.expandedGroups());
+    next.add(activeGroup.label);
+    this.expandedGroups.set(next);
   }
 }

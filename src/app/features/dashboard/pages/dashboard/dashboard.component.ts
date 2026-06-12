@@ -47,6 +47,7 @@ export class DashboardComponent implements OnInit {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly snapshot = signal<DashboardSnapshot | null>(null);
+  readonly unreadNotifications = signal<Array<{ ticketId: string; ticketNumber: string; clientName: string; count: number; lastMessage: string; lastMessageAt: string }>>([]);
   readonly isReportMenuOpen = signal(false);
   readonly isGeneratingReport = signal(false);
   readonly reportError = signal('');
@@ -142,8 +143,16 @@ export class DashboardComponent implements OnInit {
     if (!current) {
       return 0;
     }
+    
+    console.log('--- DASHBOARD SNAPSHOT ---', current);
+    console.log('pendingOrdersList:', current.pendingOrdersList);
+    console.log('pendingQuotesList:', current.pendingQuotesList);
+    console.log('pendingRequestsList:', current.pendingRequestsList);
 
-    return current.openTickets + current.lowStockProducts;
+    return current.lowStockProducts + 
+           (current.pendingOrdersList?.length || 0) + 
+           (current.pendingQuotesList?.length || 0) + 
+           (current.pendingRequestsList?.length || 0);
   });
   readonly operationalAlerts = computed<OperationalAlert[]>(() => {
     const current = this.snapshot();
@@ -153,23 +162,51 @@ export class DashboardComponent implements OnInit {
 
     const alerts: OperationalAlert[] = [];
 
-    if (current.lowStockProducts > 0) {
-      alerts.push({
-        id: 'alert-stock',
-        title: 'Reposición sugerida',
-        description: `${this.formatCount(current.lowStockProducts)} producto(s) requieren seguimiento por bajo stock.`,
-        tone: 'warning',
+    if (current.lowStockItems && current.lowStockItems.length > 0) {
+      current.lowStockItems.forEach(item => {
+        alerts.push({
+          id: `alert-stock-${item.productId}`,
+          title: `Stock bajo: ${item.productName}`,
+          description: `Solo quedan ${item.quantity} unidades (mínimo requerido: ${item.minStock}).`,
+          tone: 'warning',
+        });
       });
     }
 
-    if (current.openTickets > 0) {
-      alerts.push({
-        id: 'alert-tickets',
-        title: 'Soporte técnico activo',
-        description: `${this.formatCount(current.openTickets)} ticket(s) siguen abiertos en este momento.`,
-        tone: 'info',
+    if (current.pendingOrdersList && current.pendingOrdersList.length > 0) {
+      current.pendingOrdersList.forEach(order => {
+        alerts.push({
+          id: `alert-order-${order.id}`,
+          title: `Pedido Pendiente: ${order.folio}`,
+          description: `Esperando pago o revisión (${order.clientName}).`,
+          tone: 'warning',
+        });
       });
     }
+
+    if (current.pendingQuotesList && current.pendingQuotesList.length > 0) {
+      current.pendingQuotesList.forEach(quote => {
+        alerts.push({
+          id: `alert-quote-${quote.id}`,
+          title: `Cotización sin aprobar: ${quote.quoteNumber}`,
+          description: `Enviada a ${quote.clientName}, esperando respuesta.`,
+          tone: 'info',
+        });
+      });
+    }
+
+    if (current.pendingRequestsList && current.pendingRequestsList.length > 0) {
+      current.pendingRequestsList.forEach(req => {
+        alerts.push({
+          id: `alert-req-${req.id}`,
+          title: `Solicitud de Soporte: ${req.requestNumber}`,
+          description: `${req.title} (${req.clientName}).`,
+          tone: 'warning',
+        });
+      });
+    }
+
+
 
     if (!alerts.length) {
       alerts.push({
@@ -244,6 +281,9 @@ export class DashboardComponent implements OnInit {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         void this.loadDashboard();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_ticket_messages' }, () => {
+        void this.loadDashboard();
+      })
       .subscribe();
 
     this.destroyRef.onDestroy(() => {
@@ -260,7 +300,12 @@ export class DashboardComponent implements OnInit {
     this.error.set('');
 
     try {
-      this.snapshot.set(await this.dashboardService.getSnapshot());
+      const [snapshot, unreadNotifications] = await Promise.all([
+        this.dashboardService.getSnapshot(),
+        this.dashboardService.getUnreadTicketNotifications()
+      ]);
+      this.snapshot.set(snapshot);
+      this.unreadNotifications.set(unreadNotifications);
     } catch (error: any) {
       console.error('[Dashboard] Error loading dashboard data', {
         error,
@@ -270,6 +315,7 @@ export class DashboardComponent implements OnInit {
         code: error?.code,
       });
       this.snapshot.set(null);
+      this.unreadNotifications.set([]);
       this.error.set('No fue posible cargar la información del dashboard.');
     } finally {
       this.loadInFlight = false;
@@ -343,6 +389,25 @@ export class DashboardComponent implements OnInit {
 
   private formatCount(value: number): string {
     return new Intl.NumberFormat('es-MX').format(value);
+  }
+
+  getMetricRoute(id: string): string {
+    const routesMap: Record<string, string> = {
+      'metric-productos': '/productos',
+      'metric-clientes': '/clientes',
+      'metric-pedidos': '/pedidos',
+      'metric-cotizaciones': '/cotizaciones',
+      'metric-tickets': '/tickets',
+      'metric-stock-bajo': '/inventario',
+    };
+    return routesMap[id] ?? '/dashboard';
+  }
+
+  scrollToActivity(): void {
+    const el = document.getElementById('actividad-operativa');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 }
 
